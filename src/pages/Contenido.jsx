@@ -107,7 +107,7 @@ export default function Contenido({ session }) {
         }
       />
       <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
-        <div className="bg-[#EDE0C8] border border-[#EFDDCE] rounded-xl p-4 text-sm text-[#3d382c]">
+        <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#2C4A57]">
           Esta es tu <strong>biblioteca de contenido</strong>: todo lo que subís acá (manuales, audios
           transcriptos, apuntes) queda guardado como "pendiente". El siguiente paso, todavía no
           conectado, es que la IA lo convierta solo en cursos con pasos y evaluación.
