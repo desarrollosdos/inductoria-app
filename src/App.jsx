@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Empleados from './pages/Empleados';
+import Contenido from './pages/Contenido';
 import Progreso from './pages/Progreso';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
@@ -70,7 +71,7 @@ export default function App() {
     return (
       <>
         <Header session={session} />
-        <AdminPage />
+        <AdminPage session={session} />
       </>
     );
   }
@@ -84,6 +85,24 @@ export default function App() {
     );
   }
 
+  if (path === '/contenido') {
+    return (
+      <>
+        <Header session={session} />
+        <Contenido session={session} />
+      </>
+    );
+  }
+
+  if (path === '/sucursales') {
+    return (
+      <>
+        <Header session={session} />
+        <Dashboard session={session} />
+      </>
+    );
+  }
+
   if (path === '/progreso') {
     return (
       <>
@@ -93,19 +112,10 @@ export default function App() {
     );
   }
 
-  if (path === '/suscripcion') {
-    return (
-      <>
-        <Header session={session} />
-        <Suscripcion session={session} />
-      </>
-    );
-  }
-
   return (
     <>
       <Header session={session} />
-      <Dashboard session={session} />
+      <Suscripcion session={session} />
     </>
   );
 }
