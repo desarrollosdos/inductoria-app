@@ -11,9 +11,29 @@ function IconCard(props) {
   );
 }
 
+// Mismos 4 estados y mismos colores que ya usás en Repunte. "inactive" es
+// propio de Inductoria (acá no hay trial), para la cuenta que nunca se
+// suscribió todavía.
+const ESTADOS = {
+  inactive: { pill: '#8a8471', card: '#8a8471', corto: 'Inactiva', largo: 'Todavía no te suscribiste' },
+  active: { pill: '#1D9E75', card: '#1D9E75', corto: 'Activa', largo: 'Suscripción activa' },
+  past_due: { pill: '#EF9F27', card: '#EF9F27', corto: 'Pago pendiente', largo: 'Suscripción con pago pendiente' },
+  suspended: { pill: '#7F77DD', card: '#7F77DD', corto: 'Suspendida', largo: 'Suscripción suspendida' },
+  cancelled: { pill: '#E24B4A', card: '#E24B4A', corto: 'Cancelada', largo: 'Suscripción cancelada' },
+};
+
+function precioPorSucursales(n) {
+  if (n <= 1) return 12000;
+  if (n <= 4) return n * 10000;
+  if (n <= 9) return n * 9000;
+  return n * 8000;
+}
+
 export default function Suscripcion({ session }) {
   const [cuenta, setCuenta] = useState(null);
+  const [negocios, setNegocios] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [iniciandoPago, setIniciandoPago] = useState(false);
 
   useEffect(() => {
     cargar();
@@ -22,13 +42,37 @@ export default function Suscripcion({ session }) {
 
   async function cargar() {
     setLoading(true);
-    const { data } = await supabase
+    const { data: cuentaData } = await supabase
       .from('cuentas')
       .select('*')
       .eq('owner_id', session.user.id)
       .maybeSingle();
-    setCuenta(data);
+    setCuenta(cuentaData);
+
+    if (cuentaData) {
+      const { data: negociosData } = await supabase
+        .from('negocios')
+        .select('id')
+        .eq('cuenta_id', cuentaData.id);
+      setNegocios(negociosData || []);
+    }
+
     setLoading(false);
+  }
+
+  async function handleSuscribirme() {
+    setIniciandoPago(true);
+    const { data, error } = await supabase.functions.invoke('crear-suscripcion', {
+      method: 'POST',
+      body: { cuenta_id: cuenta.id },
+    });
+    setIniciandoPago(false);
+
+    if (error || !data?.init_point) {
+      alert('No se pudo iniciar el pago. Probá de nuevo en un momento.');
+      return;
+    }
+    window.location.href = data.init_point;
   }
 
   if (loading) {
@@ -49,7 +93,9 @@ export default function Suscripcion({ session }) {
     );
   }
 
-  const activa = cuenta.plan === 'active';
+  const estado = ESTADOS[cuenta.plan] || ESTADOS.inactive;
+  const cantidadSucursales = Math.max(negocios.length, cuenta.sucursales_contratadas || 1);
+  const precioMensual = precioPorSucursales(cantidadSucursales);
 
   return (
     <div>
@@ -63,29 +109,43 @@ export default function Suscripcion({ session }) {
             <span className="text-[15px] font-semibold text-[#2C2C2A]">Suscripción</span>
           </div>
           <span
-            className="text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap"
-            style={{
-              backgroundColor: activa ? '#eef9f4' : '#fbe9e9',
-              color: activa ? '#1D9E75' : '#C1502E',
-            }}
+            className="text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap text-white"
+            style={{ backgroundColor: estado.pill }}
           >
-            {activa ? 'Activa' : 'Inactiva'}
+            {estado.corto}
           </span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          {activa ? (
-            <div className="bg-[#eef9f4] text-[#1D9E75] font-semibold text-sm rounded-full px-4 py-2 inline-block mb-2">
-              Suscripción activa
-              {cuenta.updated_at && ` desde el ${new Date(cuenta.updated_at).toLocaleDateString('es-AR')}`}
-            </div>
-          ) : (
+          <div
+            className="text-white font-semibold text-sm rounded-full px-4 py-2 inline-block mb-4"
+            style={{ backgroundColor: estado.card }}
+          >
+            {estado.largo}
+            {cuenta.plan === 'active' &&
+              cuenta.updated_at &&
+              ` desde el ${new Date(cuenta.updated_at).toLocaleDateString('es-AR')}`}
+          </div>
+
+          {cuenta.plan !== 'active' && (
             <>
-              <p className="text-sm font-semibold text-[#2C2C2A] mb-2">Tu cuenta todavía no está activa.</p>
-              <p className="text-sm text-[#6b6455]">
-                Escribinos para activar tu suscripción. La activación por pago automático todavía no está
-                disponible, la estamos por sumar.
+              <p className="text-sm text-[#6b6455] mb-4">
+                {cuenta.plan === 'past_due' &&
+                  'Regularizá tu pago para volver a usar todas las funciones.'}
+                {cuenta.plan === 'suspended' &&
+                  'Tu acceso quedó limitado. Ponete al día para reactivar tu cuenta.'}
+                {cuenta.plan === 'cancelled' &&
+                  'Tu suscripción está cancelada. Podés volver a suscribirte cuando quieras.'}
+                {cuenta.plan === 'inactive' &&
+                  `Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
               </p>
+              <button
+                onClick={handleSuscribirme}
+                disabled={iniciandoPago}
+                className="px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              >
+                {iniciandoPago ? 'Redirigiendo...' : `Suscribirme por $${precioMensual.toLocaleString('es-AR')}/mes`}
+              </button>
             </>
           )}
         </div>
