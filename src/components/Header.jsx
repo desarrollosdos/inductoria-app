@@ -1,11 +1,16 @@
 import { supabase } from '../supabaseClient';
 
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
+function IconSalir(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
 
 export default function Header({ session }) {
-  const isAdmin = session?.user?.email === ADMIN_EMAIL;
-  const path = typeof window !== 'undefined' ? window.location.pathname : '';
-
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = '/';
@@ -30,24 +35,14 @@ export default function Header({ session }) {
         </a>
 
         {session && (
-          <div className="flex items-center gap-4">
-            {isAdmin && (
-              <a
-                href="/admin"
-                className={`text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                  path === '/admin'
-                    ? 'bg-[#C1502E] text-white'
-                    : 'text-[#FBF3EC] hover:bg-white/10'
-                }`}
-              >
-                Admin
-              </a>
-            )}
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-sm text-[#c9c5bd]">{session.user.email}</span>
             <button
               onClick={handleLogout}
-              className="text-sm font-semibold text-[#c9c5bd] hover:text-[#FBF3EC]"
+              title="Salir"
+              className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center hover:opacity-90 transition-opacity"
             >
-              Salir
+              <IconSalir />
             </button>
           </div>
         )}

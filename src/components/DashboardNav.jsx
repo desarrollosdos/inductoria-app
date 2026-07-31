@@ -37,6 +37,16 @@ function IconSuscripcion(props) {
   );
 }
 
+function IconContenido(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 4h6l2 2h8v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
 function IconAdmin(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -47,10 +57,11 @@ function IconAdmin(props) {
 }
 
 const TABS = [
-  { id: 'sucursales', label: 'Sucursales', path: '/', Icon: IconSucursales },
+  { id: 'suscripcion', label: 'Suscripción', path: '/', Icon: IconSuscripcion },
+  { id: 'sucursales', label: 'Sucursales', path: '/sucursales', Icon: IconSucursales },
   { id: 'empleados', label: 'Empleados', path: '/empleados', Icon: IconEmpleados },
+  { id: 'contenido', label: 'Contenido', path: '/contenido', Icon: IconContenido },
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
-  { id: 'suscripcion', label: 'Suscripción', path: '/suscripcion', Icon: IconSuscripcion },
 ];
 
 export default function DashboardNav({ userEmail }) {
@@ -63,18 +74,17 @@ export default function DashboardNav({ userEmail }) {
       <div className="flex gap-3 overflow-x-auto sm:overflow-visible sm:flex-wrap sm:justify-center pb-2 -mx-1 px-1">
         {tabs.map((tab) => {
           const active = path === tab.path;
+          const color = tab.id === 'admin' ? '#3F7D5C' : '#C1502E';
           return (
             <a
               key={tab.id}
               href={tab.path}
-              className={`flex flex-col items-center gap-2 px-4 py-3 rounded-2xl border flex-shrink-0 transition-colors ${
-                active ? 'border-[#C1502E] bg-white' : 'border-transparent'
-              }`}
+              className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl border flex-shrink-0 transition-colors"
+              style={{ borderColor: active ? color : 'transparent', background: active ? '#fff' : 'transparent' }}
             >
               <span
-                className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
-                  active ? 'bg-[#C1502E] text-white' : 'bg-[#F5EFE3] text-[#8a8471]'
-                }`}
+                className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: active ? color : '#F5EFE3', color: active ? '#fff' : '#8a8471' }}
               >
                 <tab.Icon />
               </span>

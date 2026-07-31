@@ -39,9 +39,12 @@ export default function Suscripcion({ session }) {
     return (
       <div>
         <DashboardNav userEmail={session.user.email} />
-        <p className="text-center mt-12 text-[#6b6455]">
-          Primero cargá el nombre de tu negocio en la pantalla de Sucursales.
-        </p>
+        <div className="text-center mt-12 px-4">
+          <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
+          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+            Ir a Sucursales
+          </a>
+        </div>
       </div>
     );
   }

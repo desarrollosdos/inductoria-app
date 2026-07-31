@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
+import EstadoBar from '../components/EstadoBar';
+
+function IconProgresoMini(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  );
+}
 
 export default function Progreso({ session }) {
   const [cuenta, setCuenta] = useState(null);
@@ -90,17 +99,39 @@ export default function Progreso({ session }) {
     return (
       <div>
         <DashboardNav userEmail={session.user.email} />
-        <p className="text-center mt-12 text-[#6b6455]">
-          Primero cargá el nombre de tu negocio en la pantalla de Sucursales.
-        </p>
+        <div className="text-center mt-12 px-4">
+          <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
+          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+            Ir a Sucursales
+          </a>
+        </div>
       </div>
     );
   }
 
+  const promedioGeneral =
+    totalCursos > 0 && filas.length > 0
+      ? Math.round(
+          filas.reduce((acc, f) => acc + f.completados / totalCursos, 0) / filas.length * 100
+        )
+      : 0;
+
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
-      <div className="max-w-4xl mx-auto mt-6 px-4 pb-16 space-y-6">
+      <EstadoBar
+        session={session}
+        icon={IconProgresoMini}
+        label="Progreso"
+        right={
+          <div
+            className="w-10 h-10 rounded-full border-2 border-[#C1502E] flex items-center justify-center flex-shrink-0"
+          >
+            <span className="text-xs font-bold text-[#C1502E]">{promedioGeneral}%</span>
+          </div>
+        }
+      />
+      <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Progreso del equipo</h2>
           <p className="text-sm text-[#6b6455]">

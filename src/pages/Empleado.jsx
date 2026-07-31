@@ -66,7 +66,7 @@ export default function Empleado() {
         {datos.microcursos.length === 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 text-center">
             <p className="text-sm text-[#6b6455]">
-              Todavía no hay microcursos cargados para vos. Consultá con tu encargado.
+              Todavía no hay cursos cargados para vos. Consultá con tu encargado.
             </p>
           </div>
         )}

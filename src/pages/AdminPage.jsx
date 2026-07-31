@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import DashboardNav from '../components/DashboardNav';
+
+function etiquetaPlan(plan) {
+  if (plan === 'active') return 'Activa';
+  if (plan === 'inactive') return 'Inactiva';
+  return plan; // por si queda algún valor viejo cargado a mano
+}
 
 function Tarjeta({ label, valor }) {
   return (
@@ -10,7 +17,7 @@ function Tarjeta({ label, valor }) {
   );
 }
 
-export default function AdminPage() {
+export default function AdminPage({ session }) {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -44,15 +51,21 @@ export default function AdminPage() {
     return <p className="text-center mt-24 text-[#C1502E]">{error}</p>;
   }
 
+  if (!datos) {
+    return <p className="text-center mt-24 text-[#6b6455]">No se pudieron cargar las métricas.</p>;
+  }
+
   return (
-    <div className="max-w-5xl mx-auto mt-8 px-4 pb-16">
-      <h1 className="text-2xl font-bold text-[#2C2C2A] mb-6">Panel de administración</h1>
+    <div className="max-w-5xl mx-auto pb-16">
+      <DashboardNav userEmail={session.user.email} />
+      <div className="mt-8 px-4">
+        <h1 className="text-2xl font-bold text-[#2C2C2A] mb-6">Panel de administración</h1>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <Tarjeta label="Cuentas" valor={datos.totalCuentas} />
         <Tarjeta label="Sucursales" valor={datos.totalNegocios} />
         <Tarjeta label="Empleados activos" valor={datos.totalEmpleadosActivos} />
-        <Tarjeta label="Microcursos" valor={datos.totalMicrocursos} />
+        <Tarjeta label="Cursos" valor={datos.totalMicrocursos} />
       </div>
 
       <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 mb-8">
@@ -64,7 +77,7 @@ export default function AdminPage() {
           {Object.entries(datos.planCounts).map(([plan, cantidad]) => (
             <div key={plan}>
               <p className="text-2xl font-bold text-[#2C2C2A]">{cantidad}</p>
-              <p className="text-xs text-[#8a8471] uppercase tracking-wide">{plan}</p>
+              <p className="text-xs text-[#8a8471] uppercase tracking-wide">{etiquetaPlan(plan)}</p>
             </div>
           ))}
         </div>
@@ -87,11 +100,12 @@ export default function AdminPage() {
                     {new Date(c.created_at).toLocaleDateString('es-AR')}
                   </p>
                 </div>
-                <span className="text-xs font-semibold uppercase text-[#C1502E]">{c.plan}</span>
+                <span className="text-xs font-semibold uppercase text-[#C1502E]">{etiquetaPlan(c.plan)}</span>
               </div>
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
