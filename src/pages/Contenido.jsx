@@ -100,10 +100,14 @@ export default function Contenido({ session }) {
         session={session}
         icon={IconContenidoMini}
         label="Contenido"
-        right={<span className="text-sm font-bold text-[#C1502E]">{contenidos.length}</span>}
+        right={
+          <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
+            {contenidos.length}
+          </span>
+        }
       />
       <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
-        <div className="bg-[#F5EFE3] border border-[#EFDDCE] rounded-xl p-4 text-sm text-[#3d382c]">
+        <div className="bg-[#EDE0C8] border border-[#EFDDCE] rounded-xl p-4 text-sm text-[#3d382c]">
           Esta es tu <strong>biblioteca de contenido</strong>: todo lo que subís acá (manuales, audios
           transcriptos, apuntes) queda guardado como "pendiente". El siguiente paso, todavía no
           conectado, es que la IA lo convierta solo en cursos con pasos y evaluación.
@@ -144,7 +148,7 @@ export default function Contenido({ session }) {
           ) : (
             <div className="space-y-3">
               {contenidos.map((c) => (
-                <div key={c.id} className="border border-[#F5EFE3] rounded-xl p-4">
+                <div key={c.id} className="border border-[#EDE0C8] rounded-xl p-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-[#2C2C2A]">
                       {c.archivo_original || 'Sin título'}
@@ -152,7 +156,7 @@ export default function Contenido({ session }) {
                     <span
                       className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
                       style={{
-                        background: c.estado === 'aprobado' ? '#eef9f4' : '#F5EFE3',
+                        background: c.estado === 'aprobado' ? '#eef9f4' : '#EDE0C8',
                         color: c.estado === 'aprobado' ? '#1D9E75' : '#8a8471',
                       }}
                     >

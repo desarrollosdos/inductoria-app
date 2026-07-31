@@ -149,14 +149,14 @@ export default function Progreso({ session }) {
               {filas.map((f) => {
                 const porcentaje = totalCursos > 0 ? Math.round((f.completados / totalCursos) * 100) : 0;
                 return (
-                  <div key={f.id} className="border-b border-[#F5EFE3] pb-3 last:border-0">
+                  <div key={f.id} className="border-b border-[#EDE0C8] pb-3 last:border-0">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
                       <p className="text-xs text-[#8a8471]">
                         {f.completados}/{totalCursos} cursos · {f.negocioNombre}
                       </p>
                     </div>
-                    <div className="w-full h-2 bg-[#F5EFE3] rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-[#EDE0C8] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#3F7D5C] rounded-full"
                         style={{ width: `${porcentaje}%` }}

@@ -146,8 +146,8 @@ export default function Dashboard({ session }) {
         icon={IconSucursalesMini}
         label="Sucursales"
         right={
-          <span className="text-sm font-bold text-[#C1502E]">
-            {negocios.length}/{cuenta.sucursales_contratadas}
+          <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
+            {negocios.length}
           </span>
         }
       />
@@ -159,11 +159,11 @@ export default function Dashboard({ session }) {
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="font-semibold text-[#2C2C2A]">Sucursales</h2>
-            <span className="w-7 h-7 rounded-full bg-[#F5EFE3] text-[#C1502E] font-bold text-sm flex items-center justify-center">
+            <span className="w-7 h-7 rounded-full bg-[#EDE0C8] text-[#C1502E] font-bold text-sm flex items-center justify-center">
               {negocios.length}
             </span>
             <span className="text-[#8a8471] font-semibold">/</span>
-            <span className="w-7 h-7 rounded-full bg-[#F5EFE3] text-[#C1502E] font-bold text-sm flex items-center justify-center">
+            <span className="w-7 h-7 rounded-full bg-[#EDE0C8] text-[#C1502E] font-bold text-sm flex items-center justify-center">
               {cuenta.sucursales_contratadas}
             </span>
           </div>
@@ -174,7 +174,7 @@ export default function Dashboard({ session }) {
 
           <div className="space-y-3 mb-5">
             {negocios.map((n) => (
-              <div key={n.id} className="border border-[#F5EFE3] rounded-xl p-4">
+              <div key={n.id} className="border border-[#EDE0C8] rounded-xl p-4">
                 <p className="text-sm font-semibold text-[#2C2C2A] mb-1">{n.nombre}</p>
                 <p className="text-xs text-[#6b6455]">{n.direccion}</p>
                 <p className="text-xs text-[#6b6455]">
@@ -185,7 +185,7 @@ export default function Dashboard({ session }) {
           </div>
 
           {cupoLleno ? (
-            <div className="bg-[#F5EFE3] border border-[#EFDDCE] rounded-lg p-3 text-sm text-[#6b6455]">
+            <div className="bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm text-[#6b6455]">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
               necesitás sumar más.

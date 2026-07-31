@@ -84,7 +84,7 @@ export default function DashboardNav({ userEmail }) {
             >
               <span
                 className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
-                style={{ background: active ? color : '#F5EFE3', color: active ? '#fff' : '#8a8471' }}
+                style={{ background: active ? color : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
               >
                 <tab.Icon />
               </span>

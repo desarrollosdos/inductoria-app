@@ -1,9 +1,8 @@
 // Inductoria · Edge Function: admin-metrics
 // ------------------------------------------------
-// Métricas generales para el panel de Admin (visible solo para
+// Métricas completas para el panel de Admin (visible solo para
 // desarrollosdos@gmail.com). Usa service role para ver todas las
-// cuentas, no solo la del usuario logueado (a diferencia del resto
-// de la app, que siempre queda acotado por RLS a "lo mío").
+// cuentas, no solo la del usuario logueado.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -44,43 +43,83 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const [
-      { count: totalCuentas },
-      { count: totalNegocios },
-      { count: totalEmpleadosActivos },
-      { count: totalMicrocursos },
-      { data: cuentasPorPlan },
-    ] = await Promise.all([
-      supabase.from('cuentas').select('*', { count: 'exact', head: true }),
-      supabase.from('negocios').select('*', { count: 'exact', head: true }),
-      supabase.from('empleados').select('*', { count: 'exact', head: true }).is('fecha_baja', null),
-      supabase.from('microcursos').select('*', { count: 'exact', head: true }),
-      supabase.from('cuentas').select('plan'),
-    ]);
+    // -----------------------------
+    // Datos base: todas las cuentas, negocios y empleados activos
+    // -----------------------------
+    const { data: cuentas } = await supabase
+      .from('cuentas')
+      .select('id, nombre, plan, sucursales_contratadas, created_at')
+      .order('created_at', { ascending: false });
 
-    const planCounts = {};
-    (cuentasPorPlan || []).forEach((c) => {
+    const { data: negocios } = await supabase.from('negocios').select('id, cuenta_id');
+
+    const { data: empleados } = await supabase
+      .from('empleados')
+      .select('id, negocio_id')
+      .is('fecha_baja', null);
+
+    const { count: totalMicrocursos } = await supabase
+      .from('microcursos')
+      .select('*', { count: 'exact', head: true });
+
+    const negociosPorCuenta: Record<string, string[]> = {};
+    (negocios || []).forEach((n) => {
+      if (!negociosPorCuenta[n.cuenta_id]) negociosPorCuenta[n.cuenta_id] = [];
+      negociosPorCuenta[n.cuenta_id].push(n.id);
+    });
+
+    const negocioACuenta: Record<string, string> = {};
+    (negocios || []).forEach((n) => (negocioACuenta[n.id] = n.cuenta_id));
+
+    const empleadosPorCuenta: Record<string, number> = {};
+    (empleados || []).forEach((e) => {
+      const cuentaId = negocioACuenta[e.negocio_id];
+      if (!cuentaId) return;
+      empleadosPorCuenta[cuentaId] = (empleadosPorCuenta[cuentaId] || 0) + 1;
+    });
+
+    // -----------------------------
+    // Resumen
+    // -----------------------------
+    const planCounts: Record<string, number> = {};
+    (cuentas || []).forEach((c) => {
       planCounts[c.plan] = (planCounts[c.plan] || 0) + 1;
     });
 
-    // Últimas 10 cuentas creadas, para ver actividad reciente.
-    const { data: ultimasCuentas } = await supabase
-      .from('cuentas')
-      .select('id, nombre, plan, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const resumen = {
+      totalCuentas: (cuentas || []).length,
+      totalNegocios: (negocios || []).length,
+      totalEmpleadosActivos: (empleados || []).length,
+      totalMicrocursos: totalMicrocursos || 0,
+      planCounts,
+      ultimasCuentas: (cuentas || []).slice(0, 10),
+    };
 
-    return new Response(
-      JSON.stringify({
-        totalCuentas: totalCuentas || 0,
-        totalNegocios: totalNegocios || 0,
-        totalEmpleadosActivos: totalEmpleadosActivos || 0,
-        totalMicrocursos: totalMicrocursos || 0,
-        planCounts,
-        ultimasCuentas: ultimasCuentas || [],
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // -----------------------------
+    // Clientes e historial: todas las cuentas con su detalle
+    // -----------------------------
+    const clientes = (cuentas || []).map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      plan: c.plan,
+      sucursales: (negociosPorCuenta[c.id] || []).length,
+      sucursalesContratadas: c.sucursales_contratadas,
+      empleados: empleadosPorCuenta[c.id] || 0,
+      created_at: c.created_at,
+    }));
+
+    // -----------------------------
+    // Riesgos y análisis
+    // -----------------------------
+    const pagoEnRiesgo = clientes.filter((c) => ['past_due', 'suspended', 'cancelled'].includes(c.plan));
+    const sinEmpleados = clientes.filter((c) => c.empleados === 0);
+    const cupoLleno = clientes.filter((c) => c.sucursales >= c.sucursalesContratadas && c.sucursales > 0);
+
+    const riesgos = { pagoEnRiesgo, sinEmpleados, cupoLleno };
+
+    return new Response(JSON.stringify({ resumen, clientes, riesgos }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (err) {
     console.error(err);
     return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {

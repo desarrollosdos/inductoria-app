@@ -140,12 +140,12 @@ export default function Empleados({ session }) {
 
   function FilaEmpleado({ e }) {
     return (
-      <div className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+      <div className="flex items-center justify-between border-b border-[#EDE0C8] pb-2 last:border-0">
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
             {e.puesto && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#F5EFE3] text-[#C1502E] px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full">
                 {e.puesto}
               </span>
             )}
@@ -168,7 +168,11 @@ export default function Empleados({ session }) {
         session={session}
         icon={IconEmpleadosMini}
         label="Empleados"
-        right={<span className="text-sm font-bold text-[#C1502E]">{empleados.length}</span>}
+        right={
+          <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
+            {empleados.length}
+          </span>
+        }
       />
       <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -234,7 +238,7 @@ export default function Empleados({ session }) {
           )}
 
           {ultimoLink && (
-            <div className="mt-4 bg-[#F5EFE3] border border-[#EFDDCE] rounded-lg p-3 text-sm">
+            <div className="mt-4 bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm">
               <p className="text-[#2C2C2A] mb-1 font-semibold">Mandale este link al empleado:</p>
               <p className="text-[#3d382c] break-all">{ultimoLink}</p>
             </div>
@@ -244,7 +248,7 @@ export default function Empleados({ session }) {
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-[#2C2C2A]">Empleados activos ({activos.length})</h2>
-            <div className="flex gap-1 bg-[#F5EFE3] rounded-lg p-1">
+            <div className="flex gap-1 bg-[#EDE0C8] rounded-lg p-1">
               <button
                 onClick={() => setVista('alfabetico')}
                 className={`text-xs font-semibold px-3 py-1 rounded-md ${
@@ -299,7 +303,7 @@ export default function Empleados({ session }) {
             <h2 className="font-semibold text-[#8a8471] mb-3">Dados de baja ({dadosDeBaja.length})</h2>
             <div className="space-y-2">
               {dadosDeBaja.map((e) => (
-                <div key={e.id} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+                <div key={e.id} className="flex items-center justify-between border-b border-[#EDE0C8] pb-2 last:border-0">
                   <p className="text-sm text-[#8a8471]">{e.nombre}</p>
                   <p className="text-xs text-[#8a8471]">baja {new Date(e.fecha_baja).toLocaleDateString('es-AR')}</p>
                 </div>
