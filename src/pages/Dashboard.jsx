@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import DashboardNav from '../components/DashboardNav';
 
 export default function Dashboard({ session }) {
   const [cuenta, setCuenta] = useState(null);
@@ -10,11 +11,6 @@ export default function Dashboard({ session }) {
 
   const [nombreNegocio, setNombreNegocio] = useState('');
   const [creandoNegocio, setCreandoNegocio] = useState(false);
-
-  const [negocioSeleccionado, setNegocioSeleccionado] = useState('');
-  const [nombreEmpleado, setNombreEmpleado] = useState('');
-  const [creandoEmpleado, setCreandoEmpleado] = useState(false);
-  const [ultimoLink, setUltimoLink] = useState(null);
 
   useEffect(() => {
     cargarTodo();
@@ -53,7 +49,7 @@ export default function Dashboard({ session }) {
 
     const { data, error } = await supabase
       .from('cuentas')
-      .insert({ owner_id: session.user.id, nombre: nombreCuenta.trim() })
+      .insert({ owner_id: session.user.id, nombre: nombreCuenta.trim(), plan: 'inactive' })
       .select()
       .single();
 
@@ -87,30 +83,6 @@ export default function Dashboard({ session }) {
     setNombreNegocio('');
   }
 
-  async function handleCrearEmpleado(e) {
-    e.preventDefault();
-    if (!nombreEmpleado.trim() || !negocioSeleccionado) return;
-    setCreandoEmpleado(true);
-    setUltimoLink(null);
-
-    const { data, error } = await supabase
-      .from('empleados')
-      .insert({ negocio_id: negocioSeleccionado, nombre: nombreEmpleado.trim() })
-      .select()
-      .single();
-
-    setCreandoEmpleado(false);
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const link = `${window.location.origin}/empleado?token=${data.token_acceso}`;
-    setUltimoLink(link);
-    setNombreEmpleado('');
-  }
-
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
@@ -132,7 +104,7 @@ export default function Dashboard({ session }) {
             <button
               type="submit"
               disabled={creandoCuenta}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
             >
               {creandoCuenta ? 'Creando...' : 'Continuar'}
             </button>
@@ -143,93 +115,51 @@ export default function Dashboard({ session }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 px-4 pb-16 space-y-6">
-      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-        <h1 className="text-xl font-bold text-[#2C2C2A] mb-1">{cuenta.nombre}</h1>
-        <p className="text-sm text-[#6b6455]">Plan: {cuenta.plan}</p>
-      </div>
-
-      {/* Sucursales */}
-      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-        <h2 className="font-semibold text-[#2C2C2A] mb-3">Sucursales</h2>
-
-        {negocios.length === 0 && (
-          <p className="text-sm text-[#6b6455] mb-3">Todavía no cargaste ninguna sucursal.</p>
-        )}
-
-        <ul className="mb-4 space-y-1">
-          {negocios.map((n) => (
-            <li key={n.id} className="text-sm text-[#2C2C2A]">
-              {n.nombre}
-            </li>
-          ))}
-        </ul>
-
-        <form onSubmit={handleCrearNegocio} className="flex gap-2">
-          <input
-            type="text"
-            value={nombreNegocio}
-            onChange={(e) => setNombreNegocio(e.target.value)}
-            placeholder="Nombre de la sucursal (ej: Local Palermo)"
-            className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-          />
-          <button
-            type="submit"
-            disabled={creandoNegocio}
-            className="px-4 py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
-          >
-            Agregar
-          </button>
-        </form>
-      </div>
-
-      {/* Empleados */}
-      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-        <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>
-
-        {negocios.length === 0 ? (
+    <div>
+      <DashboardNav userEmail={session.user.email} />
+      <div className="max-w-4xl mx-auto mt-6 px-4 pb-16 space-y-6">
+        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+          <h1 className="text-xl font-bold text-[#2C2C2A] mb-1">{cuenta.nombre}</h1>
           <p className="text-sm text-[#6b6455]">
-            Primero cargá al menos una sucursal para poder dar de alta empleados.
+            Suscripción:{' '}
+            <span className={cuenta.plan === 'active' ? 'text-[#3F7D5C] font-semibold' : 'text-[#C1502E] font-semibold'}>
+              {cuenta.plan === 'active' ? 'Activa' : 'Inactiva'}
+            </span>
           </p>
-        ) : (
-          <form onSubmit={handleCrearEmpleado} className="space-y-3">
-            <select
-              value={negocioSeleccionado}
-              onChange={(e) => setNegocioSeleccionado(e.target.value)}
-              required
-              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-            >
-              <option value="">Elegí la sucursal</option>
-              {negocios.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.nombre}
-                </option>
-              ))}
-            </select>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+          <h2 className="font-semibold text-[#2C2C2A] mb-3">Sucursales</h2>
+
+          {negocios.length === 0 && (
+            <p className="text-sm text-[#6b6455] mb-3">Todavía no cargaste ninguna sucursal.</p>
+          )}
+
+          <ul className="mb-4 space-y-1">
+            {negocios.map((n) => (
+              <li key={n.id} className="text-sm text-[#2C2C2A]">
+                {n.nombre}
+              </li>
+            ))}
+          </ul>
+
+          <form onSubmit={handleCrearNegocio} className="flex gap-2">
             <input
               type="text"
-              required
-              value={nombreEmpleado}
-              onChange={(e) => setNombreEmpleado(e.target.value)}
-              placeholder="Nombre del empleado"
-              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+              value={nombreNegocio}
+              onChange={(e) => setNombreNegocio(e.target.value)}
+              placeholder="Nombre de la sucursal (ej: Local Palermo)"
+              className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
-              disabled={creandoEmpleado}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
+              disabled={creandoNegocio}
+              className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
             >
-              {creandoEmpleado ? 'Creando...' : 'Dar de alta'}
+              Agregar
             </button>
           </form>
-        )}
-
-        {ultimoLink && (
-          <div className="mt-4 bg-[#F5EFE3] border border-[#EFDDCE] rounded-lg p-3 text-sm">
-            <p className="text-[#2C2C2A] mb-1 font-semibold">Mandale este link al empleado:</p>
-            <p className="text-[#3d382c] break-all">{ultimoLink}</p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

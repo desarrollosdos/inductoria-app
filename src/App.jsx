@@ -3,6 +3,9 @@ import { supabase } from './supabaseClient';
 import Header from './components/Header';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Empleados from './pages/Empleados';
+import Progreso from './pages/Progreso';
+import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
 import AdminPage from './pages/AdminPage';
 
@@ -46,15 +49,16 @@ export default function App() {
     );
   }
 
+  if (!session) {
+    return (
+      <>
+        <Header />
+        <Login />
+      </>
+    );
+  }
+
   if (path === '/admin') {
-    if (!session) {
-      return (
-        <>
-          <Header />
-          <Login />
-        </>
-      );
-    }
     if (session.user.email !== ADMIN_EMAIL) {
       return (
         <>
@@ -71,10 +75,37 @@ export default function App() {
     );
   }
 
+  if (path === '/empleados') {
+    return (
+      <>
+        <Header session={session} />
+        <Empleados session={session} />
+      </>
+    );
+  }
+
+  if (path === '/progreso') {
+    return (
+      <>
+        <Header session={session} />
+        <Progreso session={session} />
+      </>
+    );
+  }
+
+  if (path === '/suscripcion') {
+    return (
+      <>
+        <Header session={session} />
+        <Suscripcion session={session} />
+      </>
+    );
+  }
+
   return (
     <>
       <Header session={session} />
-      {session ? <Dashboard session={session} /> : <Login />}
+      <Dashboard session={session} />
     </>
   );
 }
