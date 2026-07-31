@@ -112,14 +112,14 @@ export default function Dashboard({ session }) {
   }
 
   if (loading) {
-    return <p className="text-center mt-24 text-[#6b7a80]">Cargando...</p>;
+    return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
 
   if (!cuenta) {
     return (
       <div className="max-w-md mx-auto mt-8 px-4">
-        <div className="bg-white rounded-2xl p-6 border border-slate-100">
-          <h2 className="text-lg font-bold text-[#1B2A3D] mb-2">¿Cómo se llama tu negocio?</h2>
+        <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE]">
+          <h2 className="text-lg font-bold text-[#2C2C2A] mb-2">¿Cómo se llama tu negocio?</h2>
           <form onSubmit={handleCrearCuenta} className="space-y-3">
             <input
               type="text"
@@ -127,12 +127,12 @@ export default function Dashboard({ session }) {
               value={nombreCuenta}
               onChange={(e) => setNombreCuenta(e.target.value)}
               placeholder="Nombre de tu negocio"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
               disabled={creandoCuenta}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#D69A2D] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
             >
               {creandoCuenta ? 'Creando...' : 'Continuar'}
             </button>
@@ -144,22 +144,22 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4 pb-16 space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
-        <h1 className="text-xl font-bold text-[#1B2A3D] mb-1">{cuenta.nombre}</h1>
-        <p className="text-sm text-[#6b7a80]">Plan: {cuenta.plan}</p>
+      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+        <h1 className="text-xl font-bold text-[#2C2C2A] mb-1">{cuenta.nombre}</h1>
+        <p className="text-sm text-[#6b6455]">Plan: {cuenta.plan}</p>
       </div>
 
       {/* Sucursales */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
-        <h2 className="font-semibold text-[#1B2A3D] mb-3">Sucursales</h2>
+      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+        <h2 className="font-semibold text-[#2C2C2A] mb-3">Sucursales</h2>
 
         {negocios.length === 0 && (
-          <p className="text-sm text-[#6b7a80] mb-3">Todavía no cargaste ninguna sucursal.</p>
+          <p className="text-sm text-[#6b6455] mb-3">Todavía no cargaste ninguna sucursal.</p>
         )}
 
         <ul className="mb-4 space-y-1">
           {negocios.map((n) => (
-            <li key={n.id} className="text-sm text-[#1B2A3D]">
+            <li key={n.id} className="text-sm text-[#2C2C2A]">
               {n.nombre}
             </li>
           ))}
@@ -171,12 +171,12 @@ export default function Dashboard({ session }) {
             value={nombreNegocio}
             onChange={(e) => setNombreNegocio(e.target.value)}
             placeholder="Nombre de la sucursal (ej: Local Palermo)"
-            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none"
+            className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
           />
           <button
             type="submit"
             disabled={creandoNegocio}
-            className="px-4 py-2 rounded-lg font-semibold text-white bg-[#D69A2D] disabled:opacity-60"
+            className="px-4 py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
           >
             Agregar
           </button>
@@ -184,11 +184,11 @@ export default function Dashboard({ session }) {
       </div>
 
       {/* Empleados */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
-        <h2 className="font-semibold text-[#1B2A3D] mb-3">Dar de alta un empleado</h2>
+      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+        <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>
 
         {negocios.length === 0 ? (
-          <p className="text-sm text-[#6b7a80]">
+          <p className="text-sm text-[#6b6455]">
             Primero cargá al menos una sucursal para poder dar de alta empleados.
           </p>
         ) : (
@@ -197,7 +197,7 @@ export default function Dashboard({ session }) {
               value={negocioSeleccionado}
               onChange={(e) => setNegocioSeleccionado(e.target.value)}
               required
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             >
               <option value="">Elegí la sucursal</option>
               {negocios.map((n) => (
@@ -212,12 +212,12 @@ export default function Dashboard({ session }) {
               value={nombreEmpleado}
               onChange={(e) => setNombreEmpleado(e.target.value)}
               placeholder="Nombre del empleado"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
               disabled={creandoEmpleado}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#D69A2D] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
             >
               {creandoEmpleado ? 'Creando...' : 'Dar de alta'}
             </button>
@@ -225,9 +225,9 @@ export default function Dashboard({ session }) {
         )}
 
         {ultimoLink && (
-          <div className="mt-4 bg-[#F2F0EA] border border-[#DCD6C2] rounded-lg p-3 text-sm">
-            <p className="text-[#1B2A3D] mb-1 font-semibold">Mandale este link al empleado:</p>
-            <p className="text-[#4a4536] break-all">{ultimoLink}</p>
+          <div className="mt-4 bg-[#F5EFE3] border border-[#EFDDCE] rounded-lg p-3 text-sm">
+            <p className="text-[#2C2C2A] mb-1 font-semibold">Mandale este link al empleado:</p>
+            <p className="text-[#3d382c] break-all">{ultimoLink}</p>
           </div>
         )}
       </div>

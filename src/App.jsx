@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
+import Header from './components/Header';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Empleado from './pages/Empleado';
+import AdminPage from './pages/AdminPage';
+
+const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -25,12 +29,52 @@ export default function App() {
 
   // La pantalla del empleado es pública, no depende de sesión de Supabase.
   if (path === '/empleado') {
-    return <Empleado />;
+    return (
+      <>
+        <Header />
+        <Empleado />
+      </>
+    );
   }
 
   if (loading) {
-    return <p className="text-center mt-24 text-[#6b7a80]">Cargando...</p>;
+    return (
+      <>
+        <Header />
+        <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>
+      </>
+    );
   }
 
-  return session ? <Dashboard session={session} /> : <Login />;
+  if (path === '/admin') {
+    if (!session) {
+      return (
+        <>
+          <Header />
+          <Login />
+        </>
+      );
+    }
+    if (session.user.email !== ADMIN_EMAIL) {
+      return (
+        <>
+          <Header session={session} />
+          <p className="text-center mt-24 text-[#6b6455]">No tenés acceso a esta sección.</p>
+        </>
+      );
+    }
+    return (
+      <>
+        <Header session={session} />
+        <AdminPage />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Header session={session} />
+      {session ? <Dashboard session={session} /> : <Login />}
+    </>
+  );
 }

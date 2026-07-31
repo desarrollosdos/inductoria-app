@@ -37,14 +37,14 @@ export default function Empleado() {
   }, [token]);
 
   if (loading) {
-    return <p className="text-center mt-24 text-[#6b7a80]">Cargando...</p>;
+    return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
 
   if (error) {
     return (
       <div className="max-w-md mx-auto mt-24 px-4 text-center">
-        <p className="text-[#E15B4F] font-semibold">{error}</p>
-        <p className="text-sm text-[#6b7a80] mt-2">
+        <p className="text-[#C1502E] font-semibold">{error}</p>
+        <p className="text-sm text-[#6b6455] mt-2">
           Pedile a tu encargado que te reenvíe el link de acceso.
         </p>
       </div>
@@ -53,19 +53,19 @@ export default function Empleado() {
 
   return (
     <div className="max-w-md mx-auto mt-10 px-4">
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-4">
-        <h1 className="text-lg font-bold text-[#1B2A3D] mb-1">
+      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 mb-4">
+        <h1 className="text-lg font-bold text-[#2C2C2A] mb-1">
           Hola, {datos.empleado.nombre}
         </h1>
-        <p className="text-sm text-[#6b7a80]">
+        <p className="text-sm text-[#6b6455]">
           {datos.negocio.nombre} · {datos.cuenta.nombre}
         </p>
       </div>
 
       <div className="space-y-3">
         {datos.microcursos.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
-            <p className="text-sm text-[#6b7a80]">
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 text-center">
+            <p className="text-sm text-[#6b6455]">
               Todavía no hay microcursos cargados para vos. Consultá con tu encargado.
             </p>
           </div>
@@ -74,18 +74,18 @@ export default function Empleado() {
         {datos.microcursos.map((m) => (
           <div
             key={m.id}
-            className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center justify-between"
+            className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
           >
             <div>
-              <p className="font-semibold text-[#1B2A3D]">{m.titulo}</p>
-              <p className="text-xs text-[#6b7a80]">
+              <p className="font-semibold text-[#2C2C2A]">{m.titulo}</p>
+              <p className="text-xs text-[#6b6455]">
                 {m.duracion_min ? `${m.duracion_min} min` : ''}
               </p>
             </div>
             {m.completado ? (
               <span className="text-xs font-semibold text-[#3F7D5C]">Completado</span>
             ) : (
-              <span className="text-xs font-semibold text-[#D69A2D]">Pendiente</span>
+              <span className="text-xs font-semibold text-[#C1502E]">Pendiente</span>
             )}
           </div>
         ))}
