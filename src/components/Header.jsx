@@ -36,7 +36,7 @@ export default function Header({ session }) {
 
         {session && (
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-sm text-[#c9c5bd]">{session.user.email}</span>
+            <span className="hidden sm:inline text-xs font-semibold text-[#FBF3EC]">{session.user.email}</span>
             <button
               onClick={handleLogout}
               title="Salir"

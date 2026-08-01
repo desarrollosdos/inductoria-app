@@ -12,6 +12,91 @@ function IconSucursalesMini(props) {
   );
 }
 
+const FORM_VACIO = {
+  nombre: '',
+  direccion: '',
+  barrio: '',
+  localidad: '',
+  provincia: '',
+  codigo_postal: '',
+  telefono: '',
+  mail: '',
+};
+
+function CamposDireccion({ form, setForm }) {
+  return (
+    <>
+      <input
+        type="text"
+        required
+        value={form.nombre}
+        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+        placeholder="Nombre de la sucursal (ej: Local Palermo)"
+        className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+      />
+      <input
+        type="text"
+        required
+        value={form.direccion}
+        onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+        placeholder="Dirección (calle y número)"
+        className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          required
+          value={form.barrio}
+          onChange={(e) => setForm({ ...form, barrio: e.target.value })}
+          placeholder="Barrio"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+        <input
+          type="text"
+          required
+          value={form.localidad}
+          onChange={(e) => setForm({ ...form, localidad: e.target.value })}
+          placeholder="Localidad"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          required
+          value={form.provincia}
+          onChange={(e) => setForm({ ...form, provincia: e.target.value })}
+          placeholder="Provincia"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+        <input
+          type="text"
+          value={form.codigo_postal}
+          onChange={(e) => setForm({ ...form, codigo_postal: e.target.value })}
+          placeholder="Código postal (opcional)"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+      </div>
+      <input
+        type="tel"
+        required
+        value={form.telefono}
+        onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+        placeholder="Teléfono"
+        className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+      />
+      <input
+        type="email"
+        required
+        value={form.mail}
+        onChange={(e) => setForm({ ...form, mail: e.target.value })}
+        placeholder="Mail de contacto"
+        className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+      />
+    </>
+  );
+}
+
 export default function Dashboard({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
@@ -19,9 +104,13 @@ export default function Dashboard({ session }) {
   const [nombreCuenta, setNombreCuenta] = useState('');
   const [creandoCuenta, setCreandoCuenta] = useState(false);
 
-  const [form, setForm] = useState({ nombre: '', direccion: '', telefono: '', mail: '' });
+  const [form, setForm] = useState(FORM_VACIO);
   const [creandoNegocio, setCreandoNegocio] = useState(false);
   const [errorCupo, setErrorCupo] = useState(null);
+
+  const [editandoId, setEditandoId] = useState(null);
+  const [formEdit, setFormEdit] = useState(FORM_VACIO);
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   useEffect(() => {
     cargarTodo();
@@ -81,7 +170,16 @@ export default function Dashboard({ session }) {
       return;
     }
 
-    if (!form.nombre.trim() || !form.direccion.trim() || !form.telefono.trim() || !form.mail.trim()) return;
+    if (
+      !form.nombre.trim() ||
+      !form.direccion.trim() ||
+      !form.barrio.trim() ||
+      !form.localidad.trim() ||
+      !form.provincia.trim() ||
+      !form.telefono.trim() ||
+      !form.mail.trim()
+    )
+      return;
 
     setCreandoNegocio(true);
     const { data, error } = await supabase
@@ -90,6 +188,10 @@ export default function Dashboard({ session }) {
         cuenta_id: cuenta.id,
         nombre: form.nombre.trim(),
         direccion: form.direccion.trim(),
+        barrio: form.barrio.trim(),
+        localidad: form.localidad.trim(),
+        provincia: form.provincia.trim(),
+        codigo_postal: form.codigo_postal.trim() || null,
         telefono: form.telefono.trim(),
         mail: form.mail.trim(),
       })
@@ -102,7 +204,52 @@ export default function Dashboard({ session }) {
       return;
     }
     setNegocios([...negocios, data]);
-    setForm({ nombre: '', direccion: '', telefono: '', mail: '' });
+    setForm(FORM_VACIO);
+  }
+
+  function abrirEdicion(n) {
+    if (editandoId === n.id) {
+      setEditandoId(null);
+      return;
+    }
+    setEditandoId(n.id);
+    setFormEdit({
+      nombre: n.nombre || '',
+      direccion: n.direccion || '',
+      barrio: n.barrio || '',
+      localidad: n.localidad || '',
+      provincia: n.provincia || '',
+      codigo_postal: n.codigo_postal || '',
+      telefono: n.telefono || '',
+      mail: n.mail || '',
+    });
+  }
+
+  async function handleGuardarEdicion(id) {
+    setGuardandoEdit(true);
+    const { data, error } = await supabase
+      .from('negocios')
+      .update({
+        nombre: formEdit.nombre.trim(),
+        direccion: formEdit.direccion.trim(),
+        barrio: formEdit.barrio.trim(),
+        localidad: formEdit.localidad.trim(),
+        provincia: formEdit.provincia.trim(),
+        codigo_postal: formEdit.codigo_postal.trim() || null,
+        telefono: formEdit.telefono.trim(),
+        mail: formEdit.mail.trim(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    setGuardandoEdit(false);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setNegocios(negocios.map((n) => (n.id === id ? data : n)));
+    setEditandoId(null);
   }
 
   if (loading) {
@@ -174,12 +321,49 @@ export default function Dashboard({ session }) {
 
           <div className="space-y-3 mb-5">
             {negocios.map((n) => (
-              <div key={n.id} className="border border-[#EDE0C8] rounded-xl p-4">
-                <p className="text-sm font-semibold text-[#2C2C2A] mb-1">{n.nombre}</p>
-                <p className="text-xs text-[#6b6455]">{n.direccion}</p>
-                <p className="text-xs text-[#6b6455]">
-                  {n.telefono} · {n.mail}
-                </p>
+              <div key={n.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => abrirEdicion(n)}
+                  className="w-full text-left p-4"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-[#2C2C2A]">{n.nombre}</p>
+                    <span className="text-xs font-semibold text-[#C1502E] flex-shrink-0 ml-2">
+                      {editandoId === n.id ? 'Cerrar' : 'Editar'}
+                    </span>
+                  </div>
+                  {n.direccion ? (
+                    <>
+                      <p className="text-xs text-[#6b6455]">
+                        {n.direccion}
+                        {n.barrio ? `, ${n.barrio}` : ''}
+                        {n.localidad ? `, ${n.localidad}` : ''}
+                        {n.provincia ? `, ${n.provincia}` : ''}
+                        {n.codigo_postal ? ` (CP ${n.codigo_postal})` : ''}
+                      </p>
+                      <p className="text-xs text-[#6b6455]">
+                        {n.telefono} · {n.mail}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-[#C1502E]">Todavía no cargaste la dirección de esta sucursal.</p>
+                  )}
+                </button>
+
+                {editandoId === n.id && (
+                  <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
+                    <CamposDireccion form={formEdit} setForm={setFormEdit} />
+                    <button
+                      type="button"
+                      onClick={() => handleGuardarEdicion(n.id)}
+                      disabled={guardandoEdit}
+                      className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
+                    >
+                      {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -193,38 +377,7 @@ export default function Dashboard({ session }) {
           ) : (
             <form onSubmit={handleCrearNegocio} className="space-y-2">
               {errorCupo && <p className="text-xs text-[#C1502E]">{errorCupo}</p>}
-              <input
-                type="text"
-                required
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                placeholder="Nombre de la sucursal (ej: Local Palermo)"
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              />
-              <input
-                type="text"
-                required
-                value={form.direccion}
-                onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                placeholder="Dirección"
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              />
-              <input
-                type="tel"
-                required
-                value={form.telefono}
-                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                placeholder="Teléfono"
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              />
-              <input
-                type="email"
-                required
-                value={form.mail}
-                onChange={(e) => setForm({ ...form, mail: e.target.value })}
-                placeholder="Mail de contacto"
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              />
+              <CamposDireccion form={form} setForm={setForm} />
               <button
                 type="submit"
                 disabled={creandoNegocio}

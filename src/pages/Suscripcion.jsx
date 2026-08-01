@@ -12,14 +12,40 @@ function IconCard(props) {
 }
 
 // Mismos 4 estados y mismos colores que ya usás en Repunte. "inactive" es
-// propio de Inductoria (acá no hay trial), para la cuenta que nunca se
-// suscribió todavía.
+// propio de Inductoria (acá no hay trial), tratado con el mismo criterio
+// que "prueba vencida" en Repunte: fondo suave, no una pastilla sólida
+// como los otros 4, para que se lea distinto (todavía no es un problema
+// de pago, es que nunca arrancó).
 const ESTADOS = {
-  inactive: { pill: '#8a8471', card: '#8a8471', corto: 'Inactiva', largo: 'Todavía no te suscribiste' },
-  active: { pill: '#1D9E75', card: '#1D9E75', corto: 'Activa', largo: 'Suscripción activa' },
-  past_due: { pill: '#EF9F27', card: '#EF9F27', corto: 'Pago pendiente', largo: 'Suscripción con pago pendiente' },
-  suspended: { pill: '#7F77DD', card: '#7F77DD', corto: 'Suspendida', largo: 'Suscripción suspendida' },
-  cancelled: { pill: '#E24B4A', card: '#E24B4A', corto: 'Cancelada', largo: 'Suscripción cancelada' },
+  inactive: {
+    pillBg: '#faeeda',
+    pillText: '#BA7517',
+    solido: false,
+    corto: 'Inactiva',
+    largo: 'Todavía no te suscribiste',
+  },
+  active: { pillBg: '#1D9E75', pillText: '#fff', solido: true, corto: 'Activa', largo: 'Suscripción activa' },
+  past_due: {
+    pillBg: '#EF9F27',
+    pillText: '#fff',
+    solido: true,
+    corto: 'Pago pendiente',
+    largo: 'Suscripción con pago pendiente',
+  },
+  suspended: {
+    pillBg: '#7F77DD',
+    pillText: '#fff',
+    solido: true,
+    corto: 'Suspendida',
+    largo: 'Suscripción suspendida',
+  },
+  cancelled: {
+    pillBg: '#E24B4A',
+    pillText: '#fff',
+    solido: true,
+    corto: 'Cancelada',
+    largo: 'Suscripción cancelada',
+  },
 };
 
 function precioPorSucursales(n) {
@@ -37,6 +63,22 @@ export default function Suscripcion({ session }) {
 
   useEffect(() => {
     cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si volvés de MercadoPago con el botón "atrás" del navegador, a veces
+  // Chrome restaura la página desde memoria (bfcache) en vez de recargarla,
+  // y el botón se queda trabado diciendo "Redirigiendo..." para siempre.
+  // Esto lo destraba y de paso refresca el estado real de la cuenta.
+  useEffect(() => {
+    function handlePageShow(event) {
+      if (event.persisted) {
+        setIniciandoPago(false);
+        cargar();
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,8 +151,8 @@ export default function Suscripcion({ session }) {
             <span className="text-[15px] font-semibold text-[#2C2C2A]">Suscripción</span>
           </div>
           <span
-            className="text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap text-white"
-            style={{ backgroundColor: estado.pill }}
+            className="text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap"
+            style={{ backgroundColor: estado.pillBg, color: estado.pillText }}
           >
             {estado.corto}
           </span>
@@ -118,8 +160,8 @@ export default function Suscripcion({ session }) {
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div
-            className="text-white font-semibold text-sm rounded-full px-4 py-2 inline-block mb-4"
-            style={{ backgroundColor: estado.card }}
+            className="font-semibold text-sm rounded-full px-4 py-2 inline-block mb-4"
+            style={{ backgroundColor: estado.pillBg, color: estado.pillText }}
           >
             {estado.largo}
             {cuenta.plan === 'active' &&
