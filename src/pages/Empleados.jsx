@@ -91,6 +91,10 @@ export default function Empleados({ session }) {
   const [creando, setCreando] = useState(false);
   const [ultimoLink, setUltimoLink] = useState(null);
 
+  const [editandoId, setEditandoId] = useState(null);
+  const [editForm, setEditForm] = useState({ nombre: '', puesto: '', telefono: '', mail: '' });
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,6 +198,11 @@ export default function Empleados({ session }) {
   }
 
   async function handleBaja(empleadoId) {
+    const confirmado = confirm(
+      'Vas a dar de baja a este empleado. Se pierde el acceso a su información (progreso, cursos, historial). ¿Confirmás?'
+    );
+    if (!confirmado) return;
+
     const { error } = await supabase
       .from('empleados')
       .update({ fecha_baja: new Date().toISOString() })
@@ -205,6 +214,45 @@ export default function Empleados({ session }) {
     setEmpleados(
       empleados.map((e) => (e.id === empleadoId ? { ...e, fecha_baja: new Date().toISOString() } : e))
     );
+  }
+
+  function abrirEdicion(e) {
+    if (editandoId === e.id) {
+      setEditandoId(null);
+      return;
+    }
+    setEditandoId(e.id);
+    setEditForm({
+      nombre: e.nombre || '',
+      puesto: e.puesto || '',
+      telefono: e.telefono || '',
+      mail: e.mail || '',
+    });
+  }
+
+  async function handleGuardarEdicion(empleadoId) {
+    setGuardandoEdit(true);
+    const { data, error } = await supabase
+      .from('empleados')
+      .update({
+        nombre: editForm.nombre.trim(),
+        puesto: editForm.puesto.trim() || null,
+        telefono: editForm.telefono.trim() || null,
+        mail: editForm.mail.trim() || null,
+      })
+      .eq('id', empleadoId)
+      .select()
+      .single();
+
+    setGuardandoEdit(false);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setEmpleados(
+      empleados.map((e) => (e.id === empleadoId ? data : e)).sort((a, b) => a.nombre.localeCompare(b.nombre))
+    );
+    setEditandoId(null);
   }
 
   function nombreNegocio(negocioId) {
@@ -233,27 +281,97 @@ export default function Empleados({ session }) {
   const dadosDeBaja = empleados.filter((e) => e.fecha_baja);
 
   function FilaEmpleado({ e }) {
+    const abierto = editandoId === e.id;
     return (
-      <div className="flex items-center justify-between border-b border-[#EDE0C8] pb-2 last:border-0">
-        <div className="flex items-center gap-3">
-          <Avatar e={e} />
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
-              {e.puesto && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full">
-                  {e.puesto}
-                </span>
-              )}
+      <div className="border-b border-[#EDE0C8] pb-2 last:border-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar e={e} />
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
+                {e.puesto && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full">
+                    {e.puesto}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#8a8471]">
+                {nombreNegocio(e.negocio_id)} · alta {new Date(e.fecha_alta).toLocaleDateString('es-AR')}
+              </p>
             </div>
-            <p className="text-xs text-[#8a8471]">
-              {nombreNegocio(e.negocio_id)} · alta {new Date(e.fecha_alta).toLocaleDateString('es-AR')}
-            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => abrirEdicion(e)}
+              title="Editar"
+              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleBaja(e.id)}
+              title="Dar de baja"
+              className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
           </div>
         </div>
-        <button onClick={() => handleBaja(e.id)} className="text-xs font-semibold text-[#C1502E] hover:underline flex-shrink-0">
-          Dar de baja
-        </button>
+
+        {abierto && (
+          <div className="mt-3 space-y-2 bg-[#EDE0C8] rounded-lg p-3">
+            <input
+              type="text"
+              value={editForm.nombre}
+              onChange={(ev) => setEditForm({ ...editForm, nombre: ev.target.value })}
+              placeholder="Nombre"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+            />
+            <input
+              type="text"
+              value={editForm.puesto}
+              onChange={(ev) => setEditForm({ ...editForm, puesto: ev.target.value })}
+              placeholder="Puesto"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+            />
+            <input
+              type="tel"
+              value={editForm.telefono}
+              onChange={(ev) => setEditForm({ ...editForm, telefono: ev.target.value })}
+              placeholder="Teléfono"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+            />
+            <input
+              type="email"
+              value={editForm.mail}
+              onChange={(ev) => setEditForm({ ...editForm, mail: ev.target.value })}
+              placeholder="Mail"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleGuardarEdicion(e.id)}
+                disabled={guardandoEdit}
+                className="text-xs font-semibold text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:opacity-60"
+              >
+                {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+              <button
+                onClick={() => setEditandoId(null)}
+                className="text-xs font-semibold text-[#8a8471] border border-[#EFDDCE] rounded-full px-4 py-1.5"
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

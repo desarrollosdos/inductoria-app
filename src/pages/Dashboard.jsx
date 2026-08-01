@@ -329,7 +329,7 @@ export default function Dashboard({ session }) {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-[#2C2C2A]">{n.nombre}</p>
-                    <span className="text-xs font-semibold text-[#C1502E] flex-shrink-0 ml-2">
+                    <span className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0 ml-2">
                       {editandoId === n.id ? 'Cerrar' : 'Editar'}
                     </span>
                   </div>
@@ -369,7 +369,7 @@ export default function Dashboard({ session }) {
           </div>
 
           {cupoLleno ? (
-            <div className="bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm text-[#6b6455]">
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A]">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
               necesitás sumar más.
