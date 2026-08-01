@@ -138,23 +138,26 @@ export default function AdminPage({ session }) {
         </p>
 
         {/* Subsecciones, mismo patrón que el nav principal, en verde */}
-        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8">
+        <div className="flex justify-between sm:justify-start sm:gap-4 mb-8">
           {SUB_TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex flex-col items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-3 rounded-2xl border transition-colors"
-                style={{ borderColor: active ? VERDE : 'transparent', background: active ? '#fff' : 'transparent' }}
+                className="flex-1 sm:flex-none flex flex-col items-center gap-1.5 text-center"
               >
                 <span
-                  className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-colors"
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
                   style={{ background: active ? VERDE : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
                 >
                   <t.Icon />
                 </span>
-                <span className={`text-[11px] sm:text-xs font-semibold whitespace-nowrap ${active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'}`}>
+                <span
+                  className={`text-[9.5px] sm:text-xs font-semibold whitespace-nowrap ${
+                    active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
+                  }`}
+                >
                   {t.label}
                 </span>
               </button>
