@@ -18,8 +18,8 @@ function IconCard(props) {
 // de pago, es que nunca arrancó).
 const ESTADOS = {
   inactive: {
-    pillBg: '#faeeda',
-    pillText: '#BA7517',
+    pillBg: '#FCE79A',
+    pillText: '#C1502E',
     solido: false,
     corto: 'Inactiva',
     largo: 'Todavía no te suscribiste',
