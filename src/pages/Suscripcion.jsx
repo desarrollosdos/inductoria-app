@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
+import PageShell from '../components/PageShell';
 
 function IconCard(props) {
   return (
@@ -142,8 +143,8 @@ export default function Suscripcion({ session }) {
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
-      <div className="max-w-4xl mx-auto mt-4 px-4 pb-16">
-        <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+      <PageShell>
+        <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#2C2C2A] flex items-center justify-center flex-shrink-0">
               <IconCard className="text-white" />
@@ -191,7 +192,7 @@ export default function Suscripcion({ session }) {
             </>
           )}
         </div>
-      </div>
+      </PageShell>
     </div>
   );
 }

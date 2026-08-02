@@ -10,7 +10,7 @@ function IconSalir(props) {
   );
 }
 
-export default function Header({ session }) {
+export default function Header({ session, empleadoNombre }) {
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = '/';
@@ -18,7 +18,7 @@ export default function Header({ session }) {
 
   return (
     <header className="bg-[#2C2C2A]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
         <a href="/" className="flex items-center gap-3">
           <svg width="44" height="44" viewBox="0 0 120 120" aria-hidden="true">
             <rect x="15" y="10" width="90" height="100" rx="14" fill="#FBF3EC" transform="rotate(-3 60 60)" />
@@ -45,6 +45,12 @@ export default function Header({ session }) {
               <IconSalir />
             </button>
           </div>
+        )}
+
+        {/* El empleado no tiene sesión de Supabase (entra por token), así
+            que solo le mostramos su nombre, sin botón de salir. */}
+        {empleadoNombre && (
+          <span className="text-sm font-semibold text-[#FBF3EC]">{empleadoNombre}</span>
         )}
       </div>
     </header>

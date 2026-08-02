@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
+import PageShell from '../components/PageShell';
 
 function IconEmpleadosMini(props) {
   return (
@@ -379,17 +380,16 @@ export default function Empleados({ session }) {
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
-      <EstadoBar
-        session={session}
-        icon={IconEmpleadosMini}
-        label="Empleados"
-        right={
-          <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
-            {empleados.length}
-          </span>
-        }
-      />
-      <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
+      <PageShell>
+        <EstadoBar
+          icon={IconEmpleadosMini}
+          label="Empleados"
+          right={
+            <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
+              {empleados.length}
+            </span>
+          }
+        />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>
 
@@ -576,7 +576,7 @@ export default function Empleados({ session }) {
             </div>
           </div>
         )}
-      </div>
+      </PageShell>
     </div>
   );
 }

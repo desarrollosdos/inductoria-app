@@ -70,7 +70,7 @@ export default function DashboardNav({ userEmail }) {
   const tabs = isAdmin ? [...TABS, { id: 'admin', label: 'Admin', path: '/admin', Icon: IconAdmin }] : TABS;
 
   return (
-    <nav className="max-w-4xl mx-auto mt-4 mb-2 px-4">
+    <nav className="max-w-4xl mx-auto mt-4 px-4">
       <div className="flex justify-between sm:justify-start sm:gap-4">
         {tabs.map((tab) => {
           const active = path === tab.path;

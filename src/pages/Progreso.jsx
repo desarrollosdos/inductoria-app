@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
+import PageShell from '../components/PageShell';
 
 function IconProgresoMini(props) {
   return (
@@ -147,17 +148,16 @@ export default function Progreso({ session }) {
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
-      <EstadoBar
-        session={session}
-        icon={IconProgresoMini}
-        label="Progreso"
-        right={
-          <div className="w-10 h-10 rounded-full border-2 border-[#C1502E] flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-[#C1502E]">{promedioGeneral}%</span>
-          </div>
-        }
-      />
-      <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
+      <PageShell>
+        <EstadoBar
+          icon={IconProgresoMini}
+          label="Progreso"
+          right={
+            <div className="w-10 h-10 rounded-full border-2 border-[#C1502E] flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-bold text-[#C1502E]">{promedioGeneral}%</span>
+            </div>
+          }
+        />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Progreso del equipo</h2>
           <p className="text-sm text-[#6b6455]">
@@ -227,7 +227,7 @@ export default function Progreso({ session }) {
             </div>
           )}
         </div>
-      </div>
+      </PageShell>
     </div>
   );
 }

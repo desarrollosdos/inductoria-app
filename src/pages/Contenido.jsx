@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
+import PageShell from '../components/PageShell';
 
 function IconContenidoMini(props) {
   return (
@@ -157,17 +158,16 @@ export default function Contenido({ session }) {
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
-      <EstadoBar
-        session={session}
-        icon={IconContenidoMini}
-        label="Contenido"
-        right={
-          <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
-            {contenidos.length}
-          </span>
-        }
-      />
-      <div className="max-w-4xl mx-auto mt-4 px-4 pb-16 space-y-6">
+      <PageShell>
+        <EstadoBar
+          icon={IconContenidoMini}
+          label="Contenido"
+          right={
+            <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
+              {contenidos.length}
+            </span>
+          }
+        />
         <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
           Esta es tu <strong>biblioteca de contenido</strong>: todo lo que subís acá (manuales, audios
           transcriptos, apuntes) queda guardado como "pendiente". El siguiente paso, todavía no
@@ -307,7 +307,7 @@ export default function Contenido({ session }) {
             </div>
           )}
         </div>
-      </div>
+      </PageShell>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
+import PageShell from '../components/PageShell';
 
 const VERDE = '#3F7D5C';
 
@@ -118,11 +119,10 @@ export default function AdminPage({ session }) {
   const cuentasActivas = clientes.filter((c) => c.plan === 'active').length;
 
   return (
-    <div className="max-w-4xl mx-auto pb-16">
+    <div>
       <DashboardNav userEmail={session.user.email} />
-
-      <div className="mt-4 px-4">
-        <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 mb-2 flex items-center justify-between">
+      <PageShell>
+        <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#2C2C2A] flex items-center justify-center flex-shrink-0">
               <IconAlerta className="text-white" />
@@ -133,12 +133,13 @@ export default function AdminPage({ session }) {
             {cuentasActivas} activas
           </span>
         </div>
-        <p className="text-xs text-[#8a8471] mb-6">
+
+        <p className="text-xs text-[#8a8471] -mt-2">
           Las métricas de acá reflejan los datos cargados, no una conciliación con MercadoPago.
         </p>
 
         {/* Subsecciones, mismo patrón que el nav principal, en verde */}
-        <div className="flex justify-between sm:justify-start sm:gap-4 mb-8">
+        <div className="flex justify-between sm:justify-start sm:gap-4">
           {SUB_TABS.map((t) => {
             const active = tab === t.id;
             return (
@@ -166,7 +167,7 @@ export default function AdminPage({ session }) {
         </div>
 
         {tab === 'resumen' && (
-          <div className="space-y-6">
+          <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Tarjeta label="Cuentas" valor={resumen.totalCuentas} />
               <Tarjeta label="Sucursales" valor={resumen.totalNegocios} />
@@ -207,7 +208,7 @@ export default function AdminPage({ session }) {
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {tab === 'clientes' && (
@@ -235,7 +236,7 @@ export default function AdminPage({ session }) {
         )}
 
         {tab === 'riesgos' && (
-          <div className="space-y-6">
+          <>
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
               <h2 className="font-semibold text-[#2C2C2A] mb-3">
                 Pago en riesgo ({riesgos.pagoEnRiesgo.length})
@@ -287,7 +288,7 @@ export default function AdminPage({ session }) {
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {tab === 'precio' && (
@@ -316,7 +317,7 @@ export default function AdminPage({ session }) {
             </div>
           </div>
         )}
-      </div>
+      </PageShell>
     </div>
   );
 }
