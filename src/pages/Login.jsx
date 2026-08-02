@@ -1,6 +1,21 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
+function IconEstrella(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#C1502E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polygon points="12 2 15 9 22 9.5 16.5 14.5 18 22 12 18 6 22 7.5 14.5 2 9.5 9 9" />
+    </svg>
+  );
+}
+
+const BENEFICIOS = [
+  'Armás cursos cortos con lo que ya usás para explicar (manuales, audios)',
+  'Cumplís con la Ley 19.587 (seguridad e higiene) sin armar nada de cero',
+  'Preparás a tu equipo para el carnet de manipulación de alimentos (Art. 21, Código Alimentario Argentino)',
+  'Ves el progreso de cada empleado en un solo lugar',
+];
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [enviado, setEnviado] = useState(false);
@@ -27,7 +42,11 @@ export default function Login() {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-16 px-4">
+    <div className="max-w-md mx-auto mt-12 px-4">
+      <h1 className="text-2xl font-bold text-[#C1502E] mb-2">Entrená a tu personal sin perder tiempo.</h1>
+      <p className="text-lg font-bold text-[#2C2C2A] mb-1">Dejá de explicar lo mismo a cada persona nueva.</p>
+      <p className="text-sm text-[#6b6455] mb-8">Entrá para armar los cursos de tu equipo.</p>
+
       {enviado ? (
         <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm text-center">
           <h2 className="text-lg font-bold text-[#2C2C2A] mb-2">Revisá tu mail</h2>
@@ -35,19 +54,9 @@ export default function Login() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm">
-          <ul className="space-y-2 mb-6">
-            {[
-              'Subís lo que ya usás para capacitar y armamos cursos cortos',
-              'Tu equipo aprende solo, sin que repitas todo de nuevo',
-              'Cumplís con la Ley 19.587 con un curso ya armado',
-              'Seguís el progreso de cada empleado en un solo lugar',
-            ].map((texto) => (
-              <li key={texto} className="flex items-start gap-2 text-sm text-[#3d382c]">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#C1502E] flex-shrink-0" />
-                {texto}
-              </li>
-            ))}
-          </ul>
+          <h2 className="text-lg font-bold text-[#2C2C2A] mb-1">Iniciar sesión</h2>
+          <p className="text-sm text-[#6b6455] mb-4">Te mandamos un link a tu mail, sin contraseñas.</p>
+
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
               type="email"
@@ -66,6 +75,20 @@ export default function Login() {
               {enviando ? 'Enviando...' : 'Enviarme el link'}
             </button>
           </form>
+
+          <div className="border-t border-[#EFDDCE] my-5" />
+
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-3">
+            Adentro podrás hacer
+          </p>
+          <ul className="space-y-2.5">
+            {BENEFICIOS.map((texto) => (
+              <li key={texto} className="flex items-start gap-2 text-sm text-[#3d382c]">
+                <IconEstrella className="mt-0.5 flex-shrink-0" />
+                {texto}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
