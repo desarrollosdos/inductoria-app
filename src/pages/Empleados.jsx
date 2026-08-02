@@ -304,6 +304,20 @@ export default function Empleados({ session }) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              onClick={() => {
+                const link = `${window.location.origin}/empleado?token=${e.token_acceso}`;
+                navigator.clipboard.writeText(link);
+                alert('Link copiado');
+              }}
+              title="Copiar link de acceso"
+              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+            <button
               onClick={() => abrirEdicion(e)}
               title="Editar"
               className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
