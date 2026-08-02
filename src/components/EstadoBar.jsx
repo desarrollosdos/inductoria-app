@@ -1,6 +1,6 @@
 export default function EstadoBar({ icon: Icon, label, right, iconBg = '#2C2C2A' }) {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4">
+    <div className="max-w-4xl mx-auto px-4 mt-4">
       <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
