@@ -50,7 +50,7 @@ function recortarACuadrado(file) {
 }
 
 function Avatar({ e, size = 36 }) {
-  const estilo = { width: size, height: size };
+  const estilo = { width: size, height: size, border: '2px solid #C1502E' };
   if (e.foto_url) {
     return (
       <img

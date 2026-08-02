@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 function Avatar({ nombre, fotoUrl, size = 72 }) {
-  const estilo = { width: size, height: size };
+  const estilo = { width: size, height: size, border: '2px solid #C1502E' };
   if (fotoUrl) {
     return <img src={fotoUrl} alt={nombre} style={estilo} className="rounded-full object-cover" />;
   }
@@ -83,16 +83,19 @@ export default function Empleado({ onDatosCargados }) {
   return (
     <div className="max-w-2xl mx-auto mt-4 px-4 pb-16">
       {/* Perfil */}
-      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 mb-6 flex items-center gap-4">
+      <div className="bg-[#FBEAE3] rounded-2xl border border-[#F3D5C7] p-6 mb-6 flex items-center gap-4">
         <Avatar nombre={empleado.nombre} fotoUrl={empleado.foto_url} />
         <div>
           <h1 className="text-lg font-bold text-[#2C2C2A]">{empleado.nombre}</h1>
-          <p className="text-sm text-[#6b6455]">
+          <p className="text-sm font-medium text-[#3d382c]">
             {empleado.puesto ? `${empleado.puesto} · ` : ''}
             {negocio.nombre} · {cuenta.nombre}
           </p>
-          <p className="text-xs text-[#8a8471] mt-1">
-            {completados.length} de {microcursos.length} curso{microcursos.length === 1 ? '' : 's'} completado
+          <p className="text-xs font-semibold text-[#5c5647] mt-1">
+            <span className="text-[#C1502E]">{completados.length}</span>
+            <span className="text-[#C1502E]">/</span>
+            <span className="text-[#C1502E]">{microcursos.length}</span>
+            {' '}curso{microcursos.length === 1 ? '' : 's'} completado
             {completados.length === 1 ? '' : 's'}
           </p>
         </div>

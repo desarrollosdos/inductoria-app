@@ -13,7 +13,7 @@ function IconProgresoMini(props) {
 }
 
 function Avatar({ e, size = 32 }) {
-  const estilo = { width: size, height: size };
+  const estilo = { width: size, height: size, border: '2px solid #C1502E' };
   if (e.foto_url) {
     return <img src={e.foto_url} alt={e.nombre} style={estilo} className="rounded-full object-cover flex-shrink-0" />;
   }
