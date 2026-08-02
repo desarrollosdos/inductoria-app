@@ -28,15 +28,6 @@ export default function Login() {
 
   return (
     <div className="max-w-md mx-auto mt-16 px-4">
-      <div className="flex justify-center mb-6">
-        <svg width="64" height="64" viewBox="0 0 120 120">
-          <rect x="15" y="10" width="90" height="100" rx="14" fill="#2C2C2A" transform="rotate(-3 60 60)" />
-          <circle cx="60" cy="33" r="14" fill="#C1502E" transform="rotate(-3 60 60)" />
-          <rect x="40" y="57" width="40" height="6" rx="3" fill="#C1502E" transform="rotate(-3 60 60)" />
-          <rect x="40" y="70" width="40" height="6" rx="3" fill="#8a8a86" transform="rotate(-3 60 60)" />
-        </svg>
-      </div>
-
       {enviado ? (
         <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm text-center">
           <h2 className="text-lg font-bold text-[#2C2C2A] mb-2">Revisá tu mail</h2>
@@ -44,10 +35,19 @@ export default function Login() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm">
-          <h1 className="text-xl font-bold text-[#2C2C2A] mb-1 text-center">Inductoria</h1>
-          <p className="text-sm text-[#6b6455] mb-5 text-center">
-            Capacitación simple y optimizada para tu equipo. Entrá con tu mail, sin contraseña.
-          </p>
+          <ul className="space-y-2 mb-6">
+            {[
+              'Subís lo que ya usás para capacitar y armamos cursos cortos',
+              'Tu equipo aprende solo, sin que repitas todo de nuevo',
+              'Cumplís con la Ley 19.587 con un curso ya armado',
+              'Seguís el progreso de cada empleado en un solo lugar',
+            ].map((texto) => (
+              <li key={texto} className="flex items-start gap-2 text-sm text-[#3d382c]">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#C1502E] flex-shrink-0" />
+                {texto}
+              </li>
+            ))}
+          </ul>
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
               type="email"
