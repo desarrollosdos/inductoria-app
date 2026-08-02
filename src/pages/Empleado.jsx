@@ -83,7 +83,7 @@ export default function Empleado({ onDatosCargados }) {
   return (
     <div className="max-w-2xl mx-auto mt-4 px-4 pb-16">
       {/* Perfil */}
-      <div className="bg-[#FBEAE3] rounded-2xl border border-[#F3D5C7] p-6 mb-6 flex items-center gap-4">
+      <div className="bg-[#E9F1F5] rounded-2xl border border-[#CFE0E8] p-6 mb-6 flex items-center gap-4">
         <Avatar nombre={empleado.nombre} fotoUrl={empleado.foto_url} />
         <div>
           <h1 className="text-lg font-bold text-[#2C2C2A]">{empleado.nombre}</h1>
