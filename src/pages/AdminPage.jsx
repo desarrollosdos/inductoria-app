@@ -118,10 +118,10 @@ export default function AdminPage({ session }) {
   const cuentasActivas = clientes.filter((c) => c.plan === 'active').length;
 
   return (
-    <div className="max-w-5xl mx-auto pb-16">
+    <div className="max-w-4xl mx-auto pb-16">
       <DashboardNav userEmail={session.user.email} />
 
-      <div className="mt-8 px-4">
+      <div className="mt-4 px-4">
         <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 mb-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#2C2C2A] flex items-center justify-center flex-shrink-0">

@@ -15,6 +15,7 @@ const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [empleadoNombre, setEmpleadoNombre] = useState(null);
 
   const path = window.location.pathname;
 
@@ -32,11 +33,13 @@ export default function App() {
   }, []);
 
   // La pantalla del empleado es pública, no depende de sesión de Supabase.
+  // Apenas Empleado.jsx carga los datos, nos avisa el nombre para
+  // mostrarlo en el header, igual que se ve el mail del dueño.
   if (path === '/empleado') {
     return (
       <>
-        <Header />
-        <Empleado />
+        <Header empleadoNombre={empleadoNombre} />
+        <Empleado onDatosCargados={setEmpleadoNombre} />
       </>
     );
   }

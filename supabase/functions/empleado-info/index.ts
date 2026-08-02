@@ -1,13 +1,9 @@
 // Inductoria · Edge Function: empleado-info
 // ------------------------------------------------
 // El empleado no tiene login de Supabase, entra con un link que trae un
-// token (?token=xxxx). Esta función valida ese token a mano (no hay
-// RLS que lo cubra, porque no hay auth.uid() del lado del empleado) y
-// devuelve su nombre, la sucursal/cuenta a la que pertenece, y la lista
-// de microcursos aprobados con su progreso.
-//
-// Requiere la anon key como Bearer token (Verify JWT queda activado,
-// como en las demás funciones), no requiere que haya un usuario logueado.
+// token (?token=xxxx). Esta función valida ese token a mano y devuelve
+// todo lo necesario para "Mi perfil": sus datos, y la lista de cursos
+// (pendientes/completados) con fecha límite si tiene.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -37,10 +33,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1. Buscar al empleado por token, y que siga activo (sin fecha_baja).
     const { data: empleado, error: empleadoError } = await supabase
       .from('empleados')
-      .select('id, nombre, negocio_id, fecha_baja')
+      .select('id, nombre, puesto, foto_url, fecha_alta, negocio_id, fecha_baja')
       .eq('token_acceso', token)
       .maybeSingle();
 
@@ -53,7 +48,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Traer la sucursal y la cuenta a la que pertenece.
     const { data: negocio, error: negocioError } = await supabase
       .from('negocios')
       .select('id, nombre, cuenta_id')
@@ -70,26 +64,23 @@ Deno.serve(async (req) => {
 
     if (cuentaError) throw cuentaError;
 
-    // 3. Microcursos aprobados de esa cuenta (compartidos entre todas
-    // sus sucursales, ya que hoy el contenido vive a nivel cuenta).
     const { data: microcursos, error: microcursosError } = await supabase
       .from('microcursos')
-      .select('id, titulo, duracion_min')
+      .select('id, titulo, duracion_min, fecha_limite')
       .eq('cuenta_id', negocio.cuenta_id)
       .eq('estado', 'aprobado')
       .order('created_at', { ascending: true });
 
     if (microcursosError) throw microcursosError;
 
-    // 4. Progreso de este empleado puntual, para cruzarlo con la lista.
     const { data: progreso, error: progresoError } = await supabase
       .from('progreso_empleado')
-      .select('microcurso_id, completado, puntaje')
+      .select('microcurso_id, completado, puntaje, fecha_completado')
       .eq('empleado_id', empleado.id);
 
     if (progresoError) throw progresoError;
 
-    const progresoPorCurso = {};
+    const progresoPorCurso: Record<string, any> = {};
     (progreso || []).forEach((p) => {
       progresoPorCurso[p.microcurso_id] = p;
     });
@@ -98,13 +89,20 @@ Deno.serve(async (req) => {
       id: m.id,
       titulo: m.titulo,
       duracion_min: m.duracion_min,
+      fecha_limite: m.fecha_limite,
       completado: progresoPorCurso[m.id]?.completado || false,
       puntaje: progresoPorCurso[m.id]?.puntaje ?? null,
+      fecha_completado: progresoPorCurso[m.id]?.fecha_completado ?? null,
     }));
 
     return new Response(
       JSON.stringify({
-        empleado: { nombre: empleado.nombre },
+        empleado: {
+          nombre: empleado.nombre,
+          puesto: empleado.puesto,
+          foto_url: empleado.foto_url,
+          fecha_alta: empleado.fecha_alta,
+        },
         negocio: { nombre: negocio.nombre },
         cuenta: { nombre: cuenta.nombre },
         microcursos: microcursosConProgreso,
