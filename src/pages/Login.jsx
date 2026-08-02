@@ -38,12 +38,12 @@ export default function Login() {
       </div>
 
       {enviado ? (
-        <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] text-center">
+        <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm text-center">
           <h2 className="text-lg font-bold text-[#2C2C2A] mb-2">Revisá tu mail</h2>
           <p className="text-sm text-[#6b6455]">Te mandamos un link para entrar a {email}.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE]">
+        <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm">
           <h1 className="text-xl font-bold text-[#2C2C2A] mb-1 text-center">Inductoria</h1>
           <p className="text-sm text-[#6b6455] mb-5 text-center">
             Capacitación simple y optimizada para tu equipo. Entrá con tu mail, sin contraseña.
