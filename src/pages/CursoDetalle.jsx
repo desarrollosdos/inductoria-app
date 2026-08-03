@@ -113,7 +113,7 @@ export default function CursoDetalle() {
     return (
       <div className="max-w-md mx-auto mt-8 px-4 pb-16">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">Evaluación</p>
-        <h1 className="font-bold text-[#C1502E] mb-6 text-[clamp(0.9rem,4.5vw,1.125rem)] whitespace-nowrap overflow-hidden">
+        <h1 className="font-bold text-[#C1502E] mb-6 text-[clamp(0.95rem,4.5vw,1.125rem)] leading-snug break-words">
           {titulo}
         </h1>
 
@@ -167,7 +167,7 @@ export default function CursoDetalle() {
       <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
         Paso {pasoActual + 1} de {pasos.length}
       </p>
-      <h1 className="font-bold text-[#C1502E] mb-4 text-[clamp(0.9rem,4.5vw,1.125rem)] whitespace-nowrap overflow-hidden">
+      <h1 className="font-bold text-[#C1502E] mb-4 text-[clamp(0.95rem,4.5vw,1.125rem)] leading-snug break-words">
         {titulo}
       </h1>
 

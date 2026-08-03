@@ -328,7 +328,7 @@ export default function Dashboard({ session }) {
                   className="w-full text-left p-4"
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-[#2C2C2A]">{n.nombre}</p>
+                    <p className="text-sm font-semibold text-[#C1502E]">{n.nombre}</p>
                     <span className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0 ml-2">
                       {editandoId === n.id ? 'Cerrar' : 'Editar'}
                     </span>
