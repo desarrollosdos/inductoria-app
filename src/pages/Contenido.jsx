@@ -418,14 +418,14 @@ export default function Contenido({ session }) {
                               guardandoEdit ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
-                            className="text-xs font-semibold text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                            className="text-xs font-semibold text-[#B98A2E] bg-[#FBF0DC] rounded-full px-4 py-1.5 disabled:opacity-60"
                           >
                             {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-1.5"
+                            className="text-xs font-semibold text-[#1D9E75] bg-[#eef9f4] rounded-full px-4 py-1.5"
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
@@ -443,14 +443,14 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleEliminar(c.id)}
-                            className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5"
+                            className="text-xs font-semibold text-[#C1502E] bg-[#FBEAE3] rounded-full px-4 py-1.5"
                           >
                             Eliminar
                           </button>
                           <button
                             type="button"
                             onClick={() => setAbiertoId(null)}
-                            className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-4 py-1.5"
+                            className="text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-1.5"
                           >
                             Salir
                           </button>
@@ -496,7 +496,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion}
-                                className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-1.5 disabled:opacity-60"
+                                className="text-xs font-semibold text-[#1D9E75] bg-[#eef9f4] rounded-full px-4 py-1.5 disabled:opacity-60"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
@@ -504,14 +504,14 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleDescartarCurso}
                                 disabled={procesandoAccion}
-                                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 disabled:opacity-60"
+                                className="text-xs font-semibold text-[#C1502E] bg-[#FBEAE3] rounded-full px-4 py-1.5 disabled:opacity-60"
                               >
                                 Descartar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setAbiertoId(null)}
-                                className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-4 py-1.5"
+                                className="text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-1.5"
                               >
                                 Salir
                               </button>

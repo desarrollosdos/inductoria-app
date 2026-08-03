@@ -164,10 +164,10 @@ export default function Progreso({ session }) {
             <p className="text-sm text-[#6b6455]">Todavía no tenés cursos aprobados cargados.</p>
           ) : (
             <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center flex-shrink-0">
+              <span className="w-8 h-8 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                 {totalCursos}
               </span>
-              <p className="text-sm text-[#6b6455]">cursos aprobados</p>
+              <p className="text-sm font-medium text-[#3d382c]">cursos aprobados</p>
             </div>
           )}
         </div>
