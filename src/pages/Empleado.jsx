@@ -122,7 +122,7 @@ export default function Empleado({ onDatosCargados }) {
                   className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
                 >
                   <div>
-                    <p className="font-semibold text-[#2C2C2A]">{m.titulo}</p>
+                    <p className="font-bold text-[#C1502E]">{m.titulo}</p>
                     <p className="text-xs text-[#8a8471]">
                       {m.duracion_min ? `${m.duracion_min} min` : ''}
                       {m.fecha_limite && (
@@ -155,7 +155,7 @@ export default function Empleado({ onDatosCargados }) {
                     <IconBadge />
                   </span>
                   <div>
-                    <p className="font-semibold text-[#2C2C2A]">{m.titulo}</p>
+                    <p className="font-bold text-[#C1502E]">{m.titulo}</p>
                     <p className="text-xs text-[#8a8471]">
                       {m.fecha_completado
                         ? `Completado el ${new Date(m.fecha_completado).toLocaleDateString('es-AR')}`
