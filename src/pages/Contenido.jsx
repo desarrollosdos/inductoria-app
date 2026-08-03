@@ -14,6 +14,20 @@ function IconContenidoMini(props) {
   );
 }
 
+function IconVarita(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m15 4 1.5 1.5M18.5 7.5 20 9M3 21l7-7M13 7l4 4M9 3v2M3 9h2M17 15v2M19 17h2" />
+    </svg>
+  );
+}
+
+const ESTADO_INFO = {
+  pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Pendiente' },
+  aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
+  procesado: { bg: '#F0EAFB', color: '#7F5FD1', label: 'Curso generado' },
+};
+
 export default function Contenido({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [contenidos, setContenidos] = useState([]);
@@ -27,6 +41,13 @@ export default function Contenido({ session }) {
   const [tituloEdit, setTituloEdit] = useState('');
   const [textoEdit, setTextoEdit] = useState('');
   const [guardandoEdit, setGuardandoEdit] = useState(false);
+
+  const [generandoId, setGenerandoId] = useState(null);
+  const [errorGenerar, setErrorGenerar] = useState(null);
+
+  const [borrador, setBorrador] = useState(null); // { microcurso, pasos }
+  const [cargandoBorrador, setCargandoBorrador] = useState(false);
+  const [procesandoAccion, setProcesandoAccion] = useState(false);
 
   useEffect(() => {
     cargarTodo();
@@ -81,14 +102,36 @@ export default function Contenido({ session }) {
     setTexto('');
   }
 
-  function abrirItem(c) {
+  async function abrirItem(c) {
     if (abiertoId === c.id) {
       setAbiertoId(null);
+      setBorrador(null);
       return;
     }
     setAbiertoId(c.id);
     setTituloEdit(c.archivo_original || '');
     setTextoEdit(c.texto_procesado || '');
+    setErrorGenerar(null);
+    setBorrador(null);
+
+    if (c.estado === 'procesado' && c.microcurso_id) {
+      setCargandoBorrador(true);
+      const { data: microcurso } = await supabase
+        .from('microcursos')
+        .select('*')
+        .eq('id', c.microcurso_id)
+        .maybeSingle();
+
+      if (microcurso) {
+        const { data: pasos } = await supabase
+          .from('pasos')
+          .select('*')
+          .eq('microcurso_id', microcurso.id)
+          .order('orden', { ascending: true });
+        setBorrador({ microcurso, pasos: pasos || [] });
+      }
+      setCargandoBorrador(false);
+    }
   }
 
   async function handleGuardarEdit(id) {
@@ -137,6 +180,55 @@ export default function Contenido({ session }) {
     setAbiertoId(null);
   }
 
+  async function handleGenerarCurso(id) {
+    setGenerandoId(id);
+    setErrorGenerar(null);
+
+    const { data, error } = await supabase.functions.invoke('procesar-contenido', {
+      method: 'POST',
+      body: { contenido_id: id },
+    });
+
+    setGenerandoId(null);
+
+    if (error || data?.error) {
+      setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
+      return;
+    }
+
+    await cargarTodo();
+    const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
+    setAbiertoId(id);
+    abrirItem(actualizado);
+  }
+
+  async function handleAprobarCurso() {
+    if (!borrador) return;
+    setProcesandoAccion(true);
+    await supabase.from('microcursos').update({ estado: 'aprobado' }).eq('id', borrador.microcurso.id);
+    setProcesandoAccion(false);
+    setAbiertoId(null);
+    setBorrador(null);
+    cargarTodo();
+  }
+
+  async function handleDescartarCurso() {
+    if (!borrador) return;
+    if (!confirm('¿Descartar este curso generado? El contenido vuelve a quedar disponible para generar de nuevo.'))
+      return;
+
+    setProcesandoAccion(true);
+    await supabase.from('microcursos').delete().eq('id', borrador.microcurso.id);
+    await supabase
+      .from('contenidos')
+      .update({ estado: 'aprobado', microcurso_id: null })
+      .eq('id', abiertoId);
+    setProcesandoAccion(false);
+    setAbiertoId(null);
+    setBorrador(null);
+    cargarTodo();
+  }
+
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
@@ -169,9 +261,9 @@ export default function Contenido({ session }) {
           }
         />
         <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
-          Esta es tu <strong>biblioteca de contenido</strong>: todo lo que subís acá (manuales, audios
-          transcriptos, apuntes) queda guardado como "pendiente". El siguiente paso, todavía no
-          conectado, es que la IA lo convierta solo en cursos con pasos y evaluación.
+          Esta es tu <strong>biblioteca de contenido</strong>: subís el material (manuales, audios
+          transcriptos, apuntes), lo marcás como aprobado, y desde ahí la IA lo convierte en un curso
+          con pasos y evaluación, listo para que vos lo revises antes de publicarlo.
         </div>
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -226,31 +318,25 @@ export default function Contenido({ session }) {
             <div className="space-y-3">
               {contenidos.map((c) => {
                 const abierto = abiertoId === c.id;
+                const estadoInfo = ESTADO_INFO[c.estado] || ESTADO_INFO.pendiente;
                 return (
                   <div key={c.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => abrirItem(c)}
-                      className="w-full text-left p-4"
-                    >
+                    <button type="button" onClick={() => abrirItem(c)} className="w-full text-left p-4">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-sm font-semibold text-[#2C2C2A]">
                           {c.archivo_original || 'Sin título'}
                         </p>
                         <span
                           className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2"
-                          style={{
-                            background: c.estado === 'aprobado' ? '#eef9f4' : '#EDE0C8',
-                            color: c.estado === 'aprobado' ? '#1D9E75' : '#8a8471',
-                          }}
+                          style={{ background: estadoInfo.bg, color: estadoInfo.color }}
                         >
-                          {c.estado === 'aprobado' ? 'Aprobado' : 'Pendiente'}
+                          {estadoInfo.label}
                         </span>
                       </div>
                       {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
                     </button>
 
-                    {abierto && (
+                    {abierto && c.estado !== 'procesado' && (
                       <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
                         <input
                           type="text"
@@ -265,6 +351,7 @@ export default function Contenido({ session }) {
                           rows={6}
                           className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
                         />
+                        {errorGenerar && <p className="text-xs text-[#C1502E]">{errorGenerar}</p>}
                         <div className="flex flex-wrap gap-2 pt-1">
                           <button
                             type="button"
@@ -284,6 +371,17 @@ export default function Contenido({ session }) {
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
+                          {c.estado === 'aprobado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerarCurso(c.id)}
+                              disabled={generandoId === c.id}
+                              className="text-xs font-semibold text-white bg-[#7F5FD1] rounded-full px-4 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
+                            >
+                              <IconVarita />
+                              {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleEliminar(c.id)}
@@ -299,6 +397,71 @@ export default function Contenido({ session }) {
                             Salir
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {abierto && c.estado === 'procesado' && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
+                        {cargandoBorrador ? (
+                          <p className="text-sm text-[#6b6455]">Cargando el curso generado...</p>
+                        ) : borrador ? (
+                          <div className="space-y-3">
+                            <div className="bg-[#F0EAFB] rounded-lg p-3">
+                              <p className="text-sm font-semibold text-[#2C2C2A]">{borrador.microcurso.titulo}</p>
+                              <p className="text-xs text-[#6b6455]">
+                                {borrador.pasos.length} paso{borrador.pasos.length === 1 ? '' : 's'} ·{' '}
+                                {(borrador.microcurso.preguntas || []).length} pregunta
+                                {(borrador.microcurso.preguntas || []).length === 1 ? '' : 's'}
+                              </p>
+                            </div>
+                            {borrador.pasos.map((p) => (
+                              <div key={p.id} className="border border-[#EDE0C8] rounded-lg p-3">
+                                <p className="text-sm font-semibold text-[#2C2C2A] mb-1">{p.titulo}</p>
+                                <p className="text-xs text-[#6b6455]">{p.contenido}</p>
+                              </div>
+                            ))}
+                            {(borrador.microcurso.preguntas || []).map((preg, i) => (
+                              <div key={i} className="border border-[#EDE0C8] rounded-lg p-3">
+                                <p className="text-xs font-semibold text-[#2C2C2A] mb-1">{preg.pregunta}</p>
+                                <ul className="text-xs text-[#6b6455] space-y-0.5">
+                                  {preg.opciones.map((op, j) => (
+                                    <li key={j} className={j === preg.correcta ? 'text-[#1D9E75] font-semibold' : ''}>
+                                      {j === preg.correcta ? '✓ ' : '· '}
+                                      {op}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleAprobarCurso}
+                                disabled={procesandoAccion}
+                                className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-1.5 disabled:opacity-60"
+                              >
+                                {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleDescartarCurso}
+                                disabled={procesandoAccion}
+                                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 disabled:opacity-60"
+                              >
+                                Descartar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAbiertoId(null)}
+                                className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-4 py-1.5"
+                              >
+                                Salir
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-[#C1502E]">No se pudo cargar el curso generado.</p>
+                        )}
                       </div>
                     )}
                   </div>
