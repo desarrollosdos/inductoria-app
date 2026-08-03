@@ -335,14 +335,16 @@ export default function Dashboard({ session }) {
                   </div>
                   {n.direccion ? (
                     <>
-                      <p className="text-xs text-[#6b6455]">
-                        {n.direccion}
-                        {n.barrio ? `, ${n.barrio}` : ''}
-                        {n.localidad ? `, ${n.localidad}` : ''}
-                        {n.provincia ? `, ${n.provincia}` : ''}
-                        {n.codigo_postal ? ` (CP ${n.codigo_postal})` : ''}
-                      </p>
-                      <p className="text-xs text-[#6b6455]">
+                      <p className="text-xs text-[#6b6455]">{n.direccion}</p>
+                      {(n.codigo_postal || n.localidad) && (
+                        <p className="text-xs text-[#6b6455]">
+                          ({n.codigo_postal}
+                          {n.codigo_postal && n.localidad ? ', ' : ''}
+                          {n.localidad})
+                        </p>
+                      )}
+                      <p className="text-xs text-[#6b6455]">Argentina</p>
+                      <p className="text-xs text-[#6b6455] mt-1">
                         {n.telefono} · {n.mail}
                       </p>
                     </>

@@ -36,6 +36,8 @@ export default function Contenido({ session }) {
   const [titulo, setTitulo] = useState('');
   const [texto, setTexto] = useState('');
   const [subiendo, setSubiendo] = useState(false);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [errorArchivo, setErrorArchivo] = useState(null);
 
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
@@ -100,6 +102,35 @@ export default function Contenido({ session }) {
     setContenidos([data, ...contenidos]);
     setTitulo('');
     setTexto('');
+  }
+
+  function handleArchivo(file) {
+    if (!file) return;
+    setErrorArchivo(null);
+
+    const esTexto = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+    if (!esTexto) {
+      setErrorArchivo(
+        'Por ahora solo se puede subir archivo .txt. PDF y audio todavía no están armados, es el próximo paso.'
+      );
+      return;
+    }
+
+    const lector = new FileReader();
+    lector.onload = (e) => {
+      setTexto(e.target.result);
+      if (!titulo.trim()) {
+        setTitulo(file.name.replace(/\.txt$/i, ''));
+      }
+    };
+    lector.onerror = () => setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
+    lector.readAsText(file);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setArrastrando(false);
+    handleArchivo(e.dataTransfer.files?.[0]);
   }
 
   async function abrirItem(c) {
@@ -276,8 +307,8 @@ export default function Contenido({ session }) {
             <h2 className="font-semibold text-[#2C2C2A]">Subir contenido nuevo</h2>
           </div>
           <p className="text-xs text-[#8a8471] mb-3">
-            Por ahora se hace pegando texto acá abajo. Subir un PDF o un audio directo todavía no está
-            armado, es el próximo paso.
+            Pegá el texto acá abajo, o arrastrá un archivo .txt. PDF y audio directo todavía no están
+            armados, es el próximo paso.
           </p>
           <form onSubmit={handleSubir} className="space-y-2">
             <input
@@ -287,6 +318,33 @@ export default function Contenido({ session }) {
               placeholder="Título (ej: Manual de caja)"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setArrastrando(true);
+              }}
+              onDragLeave={() => setArrastrando(false)}
+              onDrop={handleDrop}
+              className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-lg px-3 py-3 text-xs cursor-pointer transition-colors ${
+                arrastrando
+                  ? 'border-[#C1502E] bg-[#FBEAE3] text-[#C1502E]'
+                  : 'border-[#EFDDCE] text-[#8a8471]'
+              }`}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v12" />
+                <path d="M7 8l5-5 5 5" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+              Arrastrá un archivo .txt acá, o hacé clic para elegirlo
+              <input
+                type="file"
+                accept=".txt,text/plain"
+                onChange={(e) => handleArchivo(e.target.files?.[0])}
+                className="hidden"
+              />
+            </label>
+            {errorArchivo && <p className="text-xs text-[#C1502E]">{errorArchivo}</p>}
             <textarea
               required
               value={texto}

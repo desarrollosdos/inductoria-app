@@ -159,12 +159,17 @@ export default function Progreso({ session }) {
           }
         />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <h2 className="font-semibold text-[#2C2C2A] mb-1">Progreso del equipo</h2>
-          <p className="text-sm text-[#6b6455]">
-            {totalCursos === 0
-              ? 'Todavía no tenés cursos aprobados cargados.'
-              : `${totalCursos} curso${totalCursos === 1 ? '' : 's'} aprobado${totalCursos === 1 ? '' : 's'} en total.`}
-          </p>
+          <h2 className="font-semibold text-[#2C2C2A] mb-3">Progreso del equipo</h2>
+          {totalCursos === 0 ? (
+            <p className="text-sm text-[#6b6455]">Todavía no tenés cursos aprobados cargados.</p>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center flex-shrink-0">
+                {totalCursos}
+              </span>
+              <p className="text-sm text-[#6b6455]">cursos aprobados</p>
+            </div>
+          )}
         </div>
 
         {filas.length > 0 && (

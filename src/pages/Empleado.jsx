@@ -122,7 +122,16 @@ export default function Empleado({ onDatosCargados }) {
                   className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
                 >
                   <div>
-                    <p className="font-bold text-[#C1502E]">{m.titulo}</p>
+                    <p>
+                      {m.titulo.includes(':') ? (
+                        <>
+                          <span className="font-bold text-[#C1502E]">{m.titulo.split(':')[0]}:</span>
+                          <span className="text-[#2C2C2A]">{m.titulo.split(':').slice(1).join(':')}</span>
+                        </>
+                      ) : (
+                        <span className="font-bold text-[#C1502E]">{m.titulo}</span>
+                      )}
+                    </p>
                     <p className="text-xs text-[#8a8471]">
                       {m.duracion_min ? `${m.duracion_min} min` : ''}
                       {m.fecha_limite && (
@@ -155,7 +164,16 @@ export default function Empleado({ onDatosCargados }) {
                     <IconBadge />
                   </span>
                   <div>
-                    <p className="font-bold text-[#C1502E]">{m.titulo}</p>
+                    <p>
+                      {m.titulo.includes(':') ? (
+                        <>
+                          <span className="font-bold text-[#C1502E]">{m.titulo.split(':')[0]}:</span>
+                          <span className="text-[#2C2C2A]">{m.titulo.split(':').slice(1).join(':')}</span>
+                        </>
+                      ) : (
+                        <span className="font-bold text-[#C1502E]">{m.titulo}</span>
+                      )}
+                    </p>
                     <p className="text-xs text-[#8a8471]">
                       {m.fecha_completado
                         ? `Completado el ${new Date(m.fecha_completado).toLocaleDateString('es-AR')}`
