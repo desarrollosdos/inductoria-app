@@ -8,6 +8,7 @@ import Contenido from './pages/Contenido';
 import Progreso from './pages/Progreso';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
+import CursoDetalle from './pages/CursoDetalle';
 import AdminPage from './pages/AdminPage';
 
 const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
@@ -40,6 +41,15 @@ export default function App() {
       <>
         <Header empleadoNombre={empleadoNombre} />
         <Empleado onDatosCargados={setEmpleadoNombre} />
+      </>
+    );
+  }
+
+  if (path === '/curso') {
+    return (
+      <>
+        <Header empleadoNombre={empleadoNombre} />
+        <CursoDetalle />
       </>
     );
   }
