@@ -8,6 +8,7 @@ import Contenido from './pages/Contenido';
 import Progreso from './pages/Progreso';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
+import CursoDetalle from './pages/CursoDetalle';
 import AdminPage from './pages/AdminPage';
 
 const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
@@ -15,6 +16,7 @@ const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [empleadoNombre, setEmpleadoNombre] = useState(null);
 
   const path = window.location.pathname;
 
@@ -32,11 +34,22 @@ export default function App() {
   }, []);
 
   // La pantalla del empleado es pública, no depende de sesión de Supabase.
+  // Apenas Empleado.jsx carga los datos, nos avisa el nombre para
+  // mostrarlo en el header, igual que se ve el mail del dueño.
   if (path === '/empleado') {
     return (
       <>
-        <Header />
-        <Empleado />
+        <Header empleadoNombre={empleadoNombre} />
+        <Empleado onDatosCargados={setEmpleadoNombre} />
+      </>
+    );
+  }
+
+  if (path === '/curso') {
+    return (
+      <>
+        <Header empleadoNombre={empleadoNombre} />
+        <CursoDetalle />
       </>
     );
   }
@@ -94,6 +107,15 @@ export default function App() {
     );
   }
 
+  if (path === '/sucursales') {
+    return (
+      <>
+        <Header session={session} />
+        <Dashboard session={session} />
+      </>
+    );
+  }
+
   if (path === '/progreso') {
     return (
       <>
@@ -103,19 +125,10 @@ export default function App() {
     );
   }
 
-  if (path === '/suscripcion') {
-    return (
-      <>
-        <Header session={session} />
-        <Suscripcion session={session} />
-      </>
-    );
-  }
-
   return (
     <>
       <Header session={session} />
-      <Dashboard session={session} />
+      <Suscripcion session={session} />
     </>
   );
 }

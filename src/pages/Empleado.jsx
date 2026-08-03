@@ -116,7 +116,11 @@ export default function Empleado({ onDatosCargados }) {
             {pendientes.map((m) => {
               const vencido = m.fecha_limite && new Date(m.fecha_limite) < new Date();
               return (
-                <div key={m.id} className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between">
+                <a
+                  key={m.id}
+                  href={`/curso?token=${token}&curso=${m.id}`}
+                  className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
+                >
                   <div>
                     <p className="font-semibold text-[#2C2C2A]">{m.titulo}</p>
                     <p className="text-xs text-[#8a8471]">
@@ -133,7 +137,7 @@ export default function Empleado({ onDatosCargados }) {
                   <span className="text-xs font-semibold text-white bg-[#D69A2D] rounded-full px-3 py-1 flex-shrink-0">
                     Pendiente
                   </span>
-                </div>
+                </a>
               );
             })}
           </div>
