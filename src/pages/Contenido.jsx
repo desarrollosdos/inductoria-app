@@ -418,7 +418,7 @@ export default function Contenido({ session }) {
                               guardandoEdit ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
-                            className="text-xs font-semibold text-[#C1502E] bg-[#FCE38A] rounded-full px-4 py-1.5 disabled:opacity-60"
+                            className="text-xs font-semibold text-[#C1502E] bg-[#FCE38A] rounded-full px-4 py-1.5 disabled:cursor-not-allowed"
                           >
                             {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                           </button>
