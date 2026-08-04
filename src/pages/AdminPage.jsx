@@ -72,10 +72,20 @@ function IconCostoIA(props) {
   );
 }
 
+function IconVisitas(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 const SUB_TABS = [
   { id: 'resumen', label: 'Resumen', Icon: IconResumen },
   { id: 'clientes', label: 'Clientes e historial', Icon: IconClientes },
   { id: 'riesgos', label: 'Riesgos y análisis', Icon: IconRiesgos },
+  { id: 'visitas', label: 'Visitas', Icon: IconVisitas },
   { id: 'costo', label: 'Costo de IA', Icon: IconCostoIA },
   { id: 'precio', label: 'Precio', Icon: IconPrecio },
 ];
@@ -99,6 +109,10 @@ export default function AdminPage({ session }) {
   const [cargandoCosto, setCargandoCosto] = useState(false);
   const [errorCosto, setErrorCosto] = useState(null);
 
+  const [visitas, setVisitas] = useState(null);
+  const [cargandoVisitas, setCargandoVisitas] = useState(false);
+  const [errorVisitas, setErrorVisitas] = useState(null);
+
   const [precioBase, setPrecioBase] = useState(null);
   const [precioInput, setPrecioInput] = useState('');
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
@@ -113,8 +127,24 @@ export default function AdminPage({ session }) {
     if (tab === 'costo' && !costoIA) {
       cargarCostoIA();
     }
+    if (tab === 'visitas' && !visitas) {
+      cargarVisitas();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  async function cargarVisitas() {
+    setCargandoVisitas(true);
+    setErrorVisitas(null);
+    const { data, error } = await supabase.functions.invoke('admin-visitas', { method: 'GET' });
+    setCargandoVisitas(false);
+
+    if (error || data?.error) {
+      setErrorVisitas(data?.error || 'No se pudieron cargar las visitas.');
+      return;
+    }
+    setVisitas(data);
+  }
 
   async function cargarPrecio() {
     const { data } = await supabase.from('configuracion_precio').select('precio_base').eq('id', 1).maybeSingle();
@@ -361,6 +391,42 @@ export default function AdminPage({ session }) {
                 </div>
               )}
             </div>
+          </>
+        )}
+
+        {tab === 'visitas' && (
+          <>
+            {cargandoVisitas ? (
+              <p className="text-center text-[#6b6455] py-8">Cargando...</p>
+            ) : errorVisitas ? (
+              <p className="text-center text-[#C1502E] py-8">{errorVisitas}</p>
+            ) : visitas ? (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <Tarjeta label="Hoy" valor={visitas.hoy} />
+                  <Tarjeta label="Este mes" valor={visitas.mes} />
+                  <Tarjeta label="Total histórico" valor={visitas.total} />
+                </div>
+
+                <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+                  <h2 className="font-semibold text-[#2C2C2A] mb-4">Últimos 14 días</h2>
+                  {visitas.porDia.length === 0 ? (
+                    <p className="text-sm text-[#6b6455]">Todavía no hay visitas registradas.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {visitas.porDia.map((d) => (
+                        <div key={d.fecha} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+                          <span className="text-sm text-[#2C2C2A]">
+                            {new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </span>
+                          <span className="text-sm font-semibold text-[#C1502E]">{d.cantidad}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
           </>
         )}
 
