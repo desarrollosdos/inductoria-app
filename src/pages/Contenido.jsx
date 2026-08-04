@@ -39,6 +39,9 @@ export default function Contenido({ session }) {
   const [arrastrando, setArrastrando] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState(null);
 
+  const [cursosBase, setCursosBase] = useState([]);
+  const [agregandoBaseId, setAgregandoBaseId] = useState(null);
+
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
   const [textoEdit, setTextoEdit] = useState('');
@@ -74,7 +77,35 @@ export default function Contenido({ session }) {
       setContenidos(contenidosData || []);
     }
 
+    const { data: baseData } = await supabase
+      .from('cursos_base')
+      .select('*')
+      .order('orden', { ascending: true });
+    setCursosBase(baseData || []);
+
     setLoading(false);
+  }
+
+  async function handleAgregarBase(curso) {
+    setAgregandoBaseId(curso.id);
+    const { data, error } = await supabase
+      .from('contenidos')
+      .insert({
+        cuenta_id: cuenta.id,
+        tipo: 'texto',
+        archivo_original: curso.titulo,
+        texto_procesado: curso.texto,
+        estado: 'pendiente',
+      })
+      .select()
+      .single();
+
+    setAgregandoBaseId(null);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setContenidos([data, ...contenidos]);
   }
 
   async function handleSubir(e) {
@@ -296,6 +327,37 @@ export default function Contenido({ session }) {
           transcriptos, apuntes), lo marcás como aprobado, y desde ahí la IA lo convierte en un curso
           con pasos y evaluación, listo para que vos lo revises antes de publicarlo.
         </div>
+
+        {cursosBase.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-1">Biblioteca de cursos (opcionales)</h2>
+            <p className="text-xs text-[#8a8471] mb-3">
+              Cursos ya redactados, listos para agregar a tu negocio con un clic. Después los vas a
+              poder revisar y editar antes de aprobarlos, igual que cualquier otro contenido.
+            </p>
+            <div className="space-y-2">
+              {cursosBase.map((curso) => {
+                const yaAgregado = contenidos.some((c) => c.archivo_original === curso.titulo);
+                return (
+                  <div
+                    key={curso.id}
+                    className="flex items-center justify-between gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
+                  >
+                    <p className="text-sm font-semibold text-[#2C2C2A]">{curso.titulo}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleAgregarBase(curso)}
+                      disabled={yaAgregado || agregandoBaseId === curso.id}
+                      className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                    >
+                      {yaAgregado ? 'Ya agregado' : agregandoBaseId === curso.id ? 'Agregando...' : 'Agregar'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div className="flex items-center gap-2 mb-1">
