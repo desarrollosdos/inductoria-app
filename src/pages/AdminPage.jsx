@@ -97,6 +97,7 @@ export default function AdminPage({ session }) {
 
   const [costoIA, setCostoIA] = useState(null);
   const [cargandoCosto, setCargandoCosto] = useState(false);
+  const [errorCosto, setErrorCosto] = useState(null);
 
   const [precioBase, setPrecioBase] = useState(null);
   const [precioInput, setPrecioInput] = useState('');
@@ -125,9 +126,15 @@ export default function AdminPage({ session }) {
 
   async function cargarCostoIA() {
     setCargandoCosto(true);
+    setErrorCosto(null);
     const { data, error } = await supabase.functions.invoke('admin-costo-ia', { method: 'GET' });
     setCargandoCosto(false);
-    if (!error) setCostoIA(data);
+
+    if (error || data?.error) {
+      setErrorCosto(data?.error || 'No se pudo cargar el costo de IA.');
+      return;
+    }
+    setCostoIA(data);
   }
 
   async function handleGuardarPrecio(e) {
@@ -359,9 +366,11 @@ export default function AdminPage({ session }) {
 
         {tab === 'costo' && (
           <>
-            {cargandoCosto || !costoIA ? (
+            {cargandoCosto ? (
               <p className="text-center text-[#6b6455] py-8">Cargando...</p>
-            ) : (
+            ) : errorCosto ? (
+              <p className="text-center text-[#C1502E] py-8">{errorCosto}</p>
+            ) : costoIA ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <Tarjeta label="Costo IA (mes actual)" valor={`US$ ${costoIA.totalUsdMes.toFixed(2)}`} />
@@ -394,7 +403,7 @@ export default function AdminPage({ session }) {
                   )}
                 </div>
               </>
-            )}
+            ) : null}
           </>
         )}
 
