@@ -472,7 +472,7 @@ export default function Contenido({ session }) {
                           className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
                         />
                         {errorGenerar && <p className="text-xs text-[#C1502E]">{errorGenerar}</p>}
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                           <button
                             type="button"
                             onClick={() => handleGuardarEdit(c.id)}
@@ -480,14 +480,14 @@ export default function Contenido({ session }) {
                               guardandoEdit ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
-                            className="text-xs font-semibold text-[#C1502E] bg-[#FCE38A] rounded-full px-4 py-1.5 disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FCE38A] rounded-full px-4 py-2 disabled:cursor-not-allowed"
                           >
                             {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-1.5"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2"
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
@@ -496,7 +496,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="text-xs font-semibold text-white bg-[#7F5FD1] rounded-full px-4 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
+                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#7F5FD1] rounded-full px-4 py-2 disabled:opacity-60"
                             >
                               <IconVarita />
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
@@ -505,14 +505,14 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleEliminar(c.id)}
-                            className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-2"
                           >
                             Eliminar
                           </button>
                           <button
                             type="button"
                             onClick={() => setAbiertoId(null)}
-                            className="text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-1.5"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-2"
                           >
                             Salir
                           </button>
@@ -553,12 +553,12 @@ export default function Contenido({ session }) {
                                 </ul>
                               </div>
                             ))}
-                            <div className="flex flex-wrap gap-2 pt-1">
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                               <button
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion}
-                                className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-1.5 disabled:opacity-60"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
@@ -566,14 +566,14 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleDescartarCurso}
                                 disabled={procesandoAccion}
-                                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 disabled:opacity-60"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
                               >
                                 Descartar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setAbiertoId(null)}
-                                className="text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-1.5"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] rounded-full px-4 py-2"
                               >
                                 Salir
                               </button>
