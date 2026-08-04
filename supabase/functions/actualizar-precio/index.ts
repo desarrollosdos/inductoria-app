@@ -11,6 +11,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -36,10 +38,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Mismo criterio que usa admin-metrics para decidir quién es admin.
-    // Si en admin-metrics el chequeo se llama distinto, avisame y lo ajusto.
-    const adminEmail = Deno.env.get('ADMIN_EMAIL');
-    if (!adminEmail || user.email !== adminEmail) {
+    // Mismo criterio que admin-metrics.
+    if (user.email !== ADMIN_EMAIL) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
