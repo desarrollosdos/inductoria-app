@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
+import { precioTotalMensual } from '../lib/precio';
 
 function IconCard(props) {
   return (
@@ -49,16 +50,10 @@ const ESTADOS = {
   },
 };
 
-function precioPorSucursales(n) {
-  if (n <= 1) return 12000;
-  if (n <= 4) return n * 10000;
-  if (n <= 9) return n * 9000;
-  return n * 8000;
-}
-
 export default function Suscripcion({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
+  const [precioBase, setPrecioBase] = useState(12000);
   const [loading, setLoading] = useState(true);
   const [iniciandoPago, setIniciandoPago] = useState(false);
 
@@ -100,6 +95,13 @@ export default function Suscripcion({ session }) {
       setNegocios(negociosData || []);
     }
 
+    const { data: configData } = await supabase
+      .from('configuracion_precio')
+      .select('precio_base')
+      .eq('id', 1)
+      .maybeSingle();
+    if (configData) setPrecioBase(configData.precio_base);
+
     setLoading(false);
   }
 
@@ -138,7 +140,7 @@ export default function Suscripcion({ session }) {
 
   const estado = ESTADOS[cuenta.plan] || ESTADOS.inactive;
   const cantidadSucursales = Math.max(negocios.length, cuenta.sucursales_contratadas || 1);
-  const precioMensual = precioPorSucursales(cantidadSucursales);
+  const precioMensual = precioTotalMensual(cantidadSucursales, precioBase);
 
   return (
     <div>

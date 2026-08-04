@@ -119,6 +119,24 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
     const claudeData = await claudeRes.json();
     const textoRespuesta = claudeData.content?.[0]?.text || '';
 
+    // Costo real según tokens que devuelve la propia API (no una estimación).
+    // Precios de Claude Haiku 4.5: USD 1.00 / millón de tokens de entrada,
+    // USD 5.00 / millón de tokens de salida.
+    const usage = claudeData.usage || {};
+    const inputTokens = usage.input_tokens || 0;
+    const outputTokens = usage.output_tokens || 0;
+    const costoUsd = (inputTokens / 1_000_000) * 1.0 + (outputTokens / 1_000_000) * 5.0;
+
+    const { error: usageError } = await supabase.from('ai_usage_log').insert({
+      cuenta_id: contenido.cuenta_id,
+      contenido_id: contenidoId,
+      model: 'claude-haiku-4-5-20251001',
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      costo_usd: costoUsd,
+    });
+    if (usageError) console.error('No se pudo registrar el costo de IA:', usageError);
+
     // Por si Claude envuelve el JSON en ```json ... ``` a pesar de que se lo pedimos limpio.
     const jsonLimpio = textoRespuesta.replace(/```json|```/g, '').trim();
 

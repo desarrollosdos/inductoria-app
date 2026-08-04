@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
+import { TIERS_PRECIO, precioPorSucursal } from '../lib/precio';
 
 const VERDE = '#3F7D5C';
 
@@ -62,10 +63,20 @@ function IconPrecio(props) {
   );
 }
 
+function IconCostoIA(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 2a5 5 0 0 1 5 5c0 1.5-.7 2.6-1.5 3.5-.6.7-1 1.3-1 2.5h-5c0-1.2-.4-1.8-1-2.5C7.7 9.6 7 8.5 7 7a5 5 0 0 1 5-5Z" />
+      <path d="M9.5 17h5M10 20h4" />
+    </svg>
+  );
+}
+
 const SUB_TABS = [
   { id: 'resumen', label: 'Resumen', Icon: IconResumen },
   { id: 'clientes', label: 'Clientes e historial', Icon: IconClientes },
   { id: 'riesgos', label: 'Riesgos y análisis', Icon: IconRiesgos },
+  { id: 'costo', label: 'Costo de IA', Icon: IconCostoIA },
   { id: 'precio', label: 'Precio', Icon: IconPrecio },
 ];
 
@@ -84,9 +95,64 @@ export default function AdminPage({ session }) {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('resumen');
 
+  const [costoIA, setCostoIA] = useState(null);
+  const [cargandoCosto, setCargandoCosto] = useState(false);
+
+  const [precioBase, setPrecioBase] = useState(null);
+  const [precioInput, setPrecioInput] = useState('');
+  const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+  const [mensajePrecio, setMensajePrecio] = useState(null);
+
   useEffect(() => {
     cargarMetricas();
+    cargarPrecio();
   }, []);
+
+  useEffect(() => {
+    if (tab === 'costo' && !costoIA) {
+      cargarCostoIA();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function cargarPrecio() {
+    const { data } = await supabase.from('configuracion_precio').select('precio_base').eq('id', 1).maybeSingle();
+    if (data) {
+      setPrecioBase(data.precio_base);
+      setPrecioInput(String(data.precio_base));
+    }
+  }
+
+  async function cargarCostoIA() {
+    setCargandoCosto(true);
+    const { data, error } = await supabase.functions.invoke('admin-costo-ia', { method: 'GET' });
+    setCargandoCosto(false);
+    if (!error) setCostoIA(data);
+  }
+
+  async function handleGuardarPrecio(e) {
+    e.preventDefault();
+    setMensajePrecio(null);
+    const valor = Number(precioInput);
+    if (!valor || valor <= 0) {
+      setMensajePrecio({ tipo: 'error', texto: 'Ingresá un precio válido.' });
+      return;
+    }
+
+    setGuardandoPrecio(true);
+    const { data, error } = await supabase.functions.invoke('actualizar-precio', {
+      method: 'POST',
+      body: { precio_base: valor },
+    });
+    setGuardandoPrecio(false);
+
+    if (error || data?.error) {
+      setMensajePrecio({ tipo: 'error', texto: data?.error || 'No se pudo actualizar el precio.' });
+      return;
+    }
+    setPrecioBase(data.precio_base);
+    setMensajePrecio({ tipo: 'ok', texto: 'Precio actualizado.' });
+  }
 
   async function cargarMetricas() {
     setCargando(true);
@@ -291,29 +357,96 @@ export default function AdminPage({ session }) {
           </>
         )}
 
+        {tab === 'costo' && (
+          <>
+            {cargandoCosto || !costoIA ? (
+              <p className="text-center text-[#6b6455] py-8">Cargando...</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <Tarjeta label="Costo IA (mes actual)" valor={`US$ ${costoIA.totalUsdMes.toFixed(2)}`} />
+                  <Tarjeta label="Costo IA (total)" valor={`US$ ${costoIA.totalUsd.toFixed(2)}`} />
+                </div>
+                <p className="text-xs text-[#8a8471]">
+                  {costoIA.generaciones} curso{costoIA.generaciones === 1 ? '' : 's'} generado
+                  {costoIA.generaciones === 1 ? '' : 's'} con IA en total, costo real según tokens
+                  de Claude Haiku 4.5 (no estimado).
+                </p>
+
+                <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+                  <h2 className="font-semibold text-[#2C2C2A] mb-4">Costo por cuenta</h2>
+                  {costoIA.porCuenta.length === 0 ? (
+                    <p className="text-sm text-[#6b6455]">Todavía no se generó ningún curso con IA.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {costoIA.porCuenta.map((c, i) => (
+                        <div key={i} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+                          <div>
+                            <p className="text-sm font-semibold text-[#2C2C2A]">{c.nombre}</p>
+                            <p className="text-xs text-[#8a8471]">
+                              {c.generaciones} generación{c.generaciones === 1 ? '' : 'es'}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-[#C1502E]">US$ {c.usd.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {tab === 'precio' && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-1">Precio por cantidad de sucursales</h2>
             <p className="text-sm text-[#6b6455] mb-4">
-              De referencia por ahora, no editable desde acá (no es un precio único como en Repunte).
+              Cambiá el precio de 1 sucursal acá abajo. Los tramos por volumen (2-4, 5-9, 10+) se
+              recalculan solos, guardando la misma proporción de descuento que tenían.
             </p>
+
+            <form onSubmit={handleGuardarPrecio} className="flex items-end gap-2 mb-5">
+              <div className="flex-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] block mb-1">
+                  Precio 1 sucursal ($/mes)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={precioInput}
+                  onChange={(e) => setPrecioInput(e.target.value)}
+                  className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={guardandoPrecio}
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              >
+                {guardandoPrecio ? 'Guardando...' : 'Guardar'}
+              </button>
+            </form>
+
+            {mensajePrecio && (
+              <p className={`text-xs mb-4 ${mensajePrecio.tipo === 'error' ? 'text-[#C1502E]' : 'text-[#1D9E75]'}`}>
+                {mensajePrecio.texto}
+              </p>
+            )}
+
             <div className="space-y-2">
-              <div className="flex justify-between border-b border-[#F5EFE3] pb-2">
-                <span className="text-sm text-[#2C2C2A]">1 sucursal</span>
-                <span className="text-sm font-semibold text-[#C1502E]">$12.000/mes</span>
-              </div>
-              <div className="flex justify-between border-b border-[#F5EFE3] pb-2">
-                <span className="text-sm text-[#2C2C2A]">2 a 4 sucursales</span>
-                <span className="text-sm font-semibold text-[#C1502E]">$10.000 c/u</span>
-              </div>
-              <div className="flex justify-between border-b border-[#F5EFE3] pb-2">
-                <span className="text-sm text-[#2C2C2A]">5 a 9 sucursales</span>
-                <span className="text-sm font-semibold text-[#C1502E]">$9.000 c/u</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-[#2C2C2A]">10 o más sucursales</span>
-                <span className="text-sm font-semibold text-[#C1502E]">$8.000 c/u</span>
-              </div>
+              {TIERS_PRECIO.map((t) => {
+                const referencia = t.hasta === 1 ? 1 : t.hasta === 4 ? 2 : t.hasta === 9 ? 5 : 10;
+                const precioTramo = precioPorSucursal(referencia, precioBase || 12000);
+                return (
+                  <div key={t.etiqueta} className="flex justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+                    <span className="text-sm text-[#2C2C2A]">{t.etiqueta}</span>
+                    <span className="text-sm font-semibold text-[#C1502E]">
+                      ${precioTramo.toLocaleString('es-AR')} c/u
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
