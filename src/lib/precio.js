@@ -15,7 +15,8 @@ export const TIERS_PRECIO = [
 
 export function precioPorSucursal(cantidadSucursales, precioBase) {
   const tier = TIERS_PRECIO.find((t) => cantidadSucursales <= t.hasta);
-  return Math.round(precioBase * tier.factor);
+  const valor = precioBase * tier.factor;
+  return Math.round(valor / 100) * 100;
 }
 
 export function precioTotalMensual(cantidadSucursales, precioBase) {
