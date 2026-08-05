@@ -75,6 +75,7 @@ export default function Progreso({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [filas, setFilas] = useState([]);
   const [totalCursos, setTotalCursos] = useState(0);
+  const [cursosRanking, setCursosRanking] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -134,6 +135,7 @@ export default function Progreso({ session }) {
     (cursosData || []).forEach((c) => (tituloPorCurso[c.id] = c.titulo));
 
     let progresoPorEmpleado = {};
+    const conteoPorCurso = {};
     if (empleadoIds.length > 0) {
       const { data: progresoData } = await supabase
         .from('progreso_empleado')
@@ -159,9 +161,21 @@ export default function Progreso({ session }) {
             titulo,
             especial: esCursoSeguridadEHigiene(titulo),
           });
+          conteoPorCurso[p.microcurso_id] = (conteoPorCurso[p.microcurso_id] || 0) + 1;
         }
       });
     }
+
+    const cursosRanking = Object.entries(conteoPorCurso)
+      .map(([microcurso_id, cantidad]) => ({
+        microcurso_id,
+        titulo: tituloPorCurso[microcurso_id] || 'Curso',
+        cantidad,
+        especial: esCursoSeguridadEHigiene(tituloPorCurso[microcurso_id]),
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 5);
+    setCursosRanking(cursosRanking);
 
     const negociosPorId = {};
     (negociosData || []).forEach((n) => (negociosPorId[n.id] = n.nombre));
@@ -206,6 +220,11 @@ export default function Progreso({ session }) {
   // y quién viene más activo.
   const yaArrancaron = filas.filter((f) => f.completados > 0).length;
   const masActivo = filas.length > 0 ? [...filas].sort((a, b) => b.completados - a.completados)[0] : null;
+  const podio = [...filas]
+    .filter((f) => f.completados > 0)
+    .sort((a, b) => b.completados - a.completados)
+    .slice(0, 3);
+  const sinArrancar = filas.filter((f) => f.completados === 0);
 
   return (
     <div>
@@ -256,6 +275,81 @@ export default function Progreso({ session }) {
               ) : (
                 <p className="text-sm text-[#8a8471] mt-1">Todavía nadie</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {podio.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-4">Ranking del equipo</h2>
+            <div className="space-y-3">
+              {podio.map((f, i) => (
+                <div key={f.id} className="flex items-center gap-3">
+                  <span
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                      i === 0
+                        ? 'bg-[#F0C349] text-[#7A3A1D]'
+                        : i === 1
+                        ? 'bg-[#D8D8D8] text-[#3d382c]'
+                        : 'bg-[#D89B6B] text-white'
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <Avatar e={f} size={30} />
+                  <p className="text-sm font-semibold text-[#2C2C2A] flex-1 truncate">{f.nombre}</p>
+                  <p className="text-xs font-semibold text-[#C1502E]">
+                    {f.completados} curso{f.completados === 1 ? '' : 's'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {cursosRanking.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
+            <div className="space-y-2">
+              {cursosRanking.map((c) => {
+                const maxCantidad = cursosRanking[0].cantidad;
+                const porcentajeBarra = maxCantidad > 0 ? Math.round((c.cantidad / maxCantidad) * 100) : 0;
+                return (
+                  <div key={c.microcurso_id}>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm text-[#3d382c] font-medium truncate">
+                        {c.titulo}
+                        {c.especial && <span className="ml-1 text-[#C1502E]">★</span>}
+                      </p>
+                      <span className="text-xs font-semibold text-[#8a8471] flex-shrink-0 ml-2">
+                        {c.cantidad} empleado{c.cantidad === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#C1502E] rounded-full"
+                        style={{ width: `${porcentajeBarra}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {sinArrancar.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-1">Todavía no arrancaron ({sinArrancar.length})</h2>
+            <p className="text-xs text-[#8a8471] mb-3">Puede que necesiten un empujón para empezar.</p>
+            <div className="space-y-2">
+              {sinArrancar.map((f) => (
+                <div key={f.id} className="flex items-center gap-3">
+                  <Avatar e={f} size={26} />
+                  <p className="text-sm text-[#2C2C2A]">{f.nombre}</p>
+                  <p className="text-xs text-[#8a8471]">· {f.negocioNombre}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
