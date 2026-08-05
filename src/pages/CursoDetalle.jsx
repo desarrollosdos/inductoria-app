@@ -1,80 +1,46 @@
 import { useEffect, useState } from 'react';
+import { esCursoSeguridadEHigiene, BadgeCurso, BadgeEspecial } from '../components/Badges';
 
-function esCursoSeguridadEHigiene(titulo) {
-  const t = (titulo || '').toLowerCase();
-  return t.includes('seguridad') && t.includes('higiene');
+// Si el contenido del paso viene en varias líneas (cosas puntuales), se
+// muestra como lista con viñetas, mucho más práctico de leer que un
+// párrafo corrido. Si es un solo bloque de texto, se muestra como párrafo.
+function ContenidoPaso({ texto }) {
+  const lineas = (texto || '')
+    .split('\n')
+    .map((l) => l.replace(/^[\s•\-*]+/, '').trim())
+    .filter(Boolean);
+
+  if (lineas.length > 1) {
+    return (
+      <ul className="space-y-2 list-disc pl-5 marker:text-[#C1502E]">
+        {lineas.map((l, i) => (
+          <li key={i} className="text-[15px] text-[#2C2C2A] font-medium leading-relaxed">
+            {l}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return <p className="text-[15px] text-[#2C2C2A] font-medium leading-relaxed">{texto}</p>;
 }
 
-// Badge estándar: círculo terracota, para cualquier curso.
-function BadgeCurso({ size = 72 }) {
+// Título del curso: siempre se muestra completo. Se achica con el ancho
+// disponible pero puede pasar a una segunda línea si hace falta, en vez
+// de cortarse.
+function TituloCurso({ titulo, className = '' }) {
+  const partes = titulo.includes(':') ? [titulo.split(':')[0], titulo.split(':').slice(1).join(':')] : null;
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size}>
-      <circle cx="50" cy="50" r="44" fill="#FBEAE3" stroke="#C1502E" strokeWidth="4" />
-      <path
-        d="M32 51 L44 63 L70 35"
-        fill="none"
-        stroke="#C1502E"
-        strokeWidth="7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-// Badge especial: medalla dorada con cinta, exclusiva para Seguridad e Higiene.
-function BadgeEspecial({ size = 110 }) {
-  return (
-    <svg viewBox="0 0 100 150" width={size} height={size * 1.5}>
-      <defs>
-        <linearGradient id="oroMedalla" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FCE9A8" />
-          <stop offset="50%" stopColor="#F0C349" />
-          <stop offset="100%" stopColor="#D89B2A" />
-        </linearGradient>
-      </defs>
-
-      {/* Cintas */}
-      <path d="M38 62 L38 130 L47 118 L53 132 L53 62 Z" fill="#C1502E" />
-      <path d="M62 62 L62 130 L53 118 L47 132 L47 62 Z" fill="#A5401F" />
-
-      {/* Borde dentado */}
-      <path
-        d="M 50.0,4.0 L 55.5,11.4 L 63.0,6.1 L 65.9,14.8 L 74.7,12.0 L 74.7,21.3 L 84.0,21.3 L 81.2,30.1 L 89.9,33.0 L 84.6,40.5 L 92.0,46.0 L 84.6,51.5 L 89.9,59.0 L 81.2,61.9 L 84.0,70.7 L 74.7,70.7 L 74.7,80.0 L 65.9,77.2 L 63.0,85.9 L 55.5,80.6 L 50.0,88.0 L 44.5,80.6 L 37.0,85.9 L 34.1,77.2 L 25.3,80.0 L 25.3,70.7 L 16.0,70.7 L 18.8,61.9 L 10.1,59.0 L 15.4,51.5 L 8.0,46.0 L 15.4,40.5 L 10.1,33.0 L 18.8,30.1 L 16.0,21.3 L 25.3,21.3 L 25.3,12.0 L 34.1,14.8 L 37.0,6.1 L 44.5,11.4 Z"
-        fill="url(#oroMedalla)"
-        stroke="#C1502E"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-
-      {/* Círculo interior */}
-      <circle cx="50" cy="46" r="30" fill="url(#oroMedalla)" stroke="#C1502E" strokeWidth="2.5" />
-      <circle cx="50" cy="46" r="25" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="1" />
-
-      {/* Texto adentro */}
-      <text
-        x="50"
-        y="43"
-        textAnchor="middle"
-        fontSize="8.5"
-        fontWeight="800"
-        fill="#7A3A1D"
-        fontFamily="Arial, sans-serif"
-      >
-        SEGURIDAD
-      </text>
-      <text
-        x="50"
-        y="53"
-        textAnchor="middle"
-        fontSize="8.5"
-        fontWeight="800"
-        fill="#7A3A1D"
-        fontFamily="Arial, sans-serif"
-      >
-        E HIGIENE
-      </text>
-    </svg>
+    <h1 className={`text-[clamp(1.05rem,4.2vw,1.4rem)] leading-snug break-words ${className}`}>
+      {partes ? (
+        <>
+          <span className="font-bold text-[#C1502E]">{partes[0]}:</span>
+          <span className="text-[#2C2C2A]">{partes[1]}</span>
+        </>
+      ) : (
+        <span className="font-bold text-[#C1502E]">{titulo}</span>
+      )}
+    </h1>
   );
 }
 
@@ -197,7 +163,7 @@ export default function CursoDetalle() {
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto mt-24 px-4 text-center">
+      <div className="max-w-md sm:max-w-xl mx-auto mt-24 px-4 sm:px-0 text-center">
         <p className="text-[#C1502E] font-semibold">{error}</p>
         <a href={`/empleado?token=${token}`} className="text-sm text-[#6b6455] underline mt-2 inline-block">
           Volver a Mi perfil
@@ -209,7 +175,7 @@ export default function CursoDetalle() {
   if (resultado) {
     const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
     return (
-      <div className="max-w-md mx-auto mt-16 px-4 text-center">
+      <div className="max-w-md sm:max-w-xl mx-auto mt-16 px-4 sm:px-0 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
           <div className="flex justify-center mb-3">
             {esEspecial ? <BadgeEspecial /> : <BadgeCurso />}
@@ -243,18 +209,9 @@ export default function CursoDetalle() {
   if (enEvaluacion) {
     const todasRespondidas = respuestas.every((r) => r !== null);
     return (
-      <div className="max-w-md mx-auto mt-8 px-4 pb-16">
+      <div className="max-w-md sm:max-w-2xl mx-auto mt-8 px-4 sm:px-0 pb-16">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">Evaluación</p>
-        <h1 className="mb-6 text-[clamp(0.8rem,4vw,1rem)] whitespace-nowrap overflow-hidden">
-          {titulo.includes(':') ? (
-            <>
-              <span className="font-bold text-[#C1502E]">{titulo.split(':')[0]}:</span>
-              <span className="text-[#2C2C2A]">{titulo.split(':').slice(1).join(':')}</span>
-            </>
-          ) : (
-            <span className="font-bold text-[#C1502E]">{titulo}</span>
-          )}
-        </h1>
+        <TituloCurso titulo={titulo} className="mb-6" />
 
         <div className="space-y-5">
           {preguntas.map((p, i) => (
@@ -302,20 +259,11 @@ export default function CursoDetalle() {
   const esUltimoPaso = pasoActual === pasos.length - 1;
 
   return (
-    <div className="max-w-md mx-auto mt-8 px-4 pb-16">
+    <div className="max-w-md sm:max-w-2xl mx-auto mt-8 px-4 sm:px-0 pb-16">
       <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
         Paso {pasoActual + 1} de {pasos.length}
       </p>
-      <h1 className="mb-4 text-[clamp(0.8rem,4vw,1rem)] whitespace-nowrap overflow-hidden">
-        {titulo.includes(':') ? (
-          <>
-            <span className="font-bold text-[#C1502E]">{titulo.split(':')[0]}:</span>
-            <span className="text-[#2C2C2A]">{titulo.split(':').slice(1).join(':')}</span>
-          </>
-        ) : (
-          <span className="font-bold text-[#C1502E]">{titulo}</span>
-        )}
-      </h1>
+      <TituloCurso titulo={titulo} className="mb-4" />
 
       <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden mb-6">
         <div
@@ -324,9 +272,9 @@ export default function CursoDetalle() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-        <h2 className="font-bold text-[#2C2C2A] mb-3">{paso.titulo}</h2>
-        <p className="text-sm text-[#3d382c] leading-relaxed">{paso.contenido}</p>
+      <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 sm:p-8">
+        <h2 className="font-bold text-[#2C2C2A] text-base sm:text-lg mb-3">{paso.titulo}</h2>
+        <ContenidoPaso texto={paso.contenido} />
       </div>
 
       <div className="flex gap-2 mt-4">

@@ -3,53 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
-
-function esCursoSeguridadEHigiene(titulo) {
-  const t = (titulo || '').toLowerCase();
-  return t.includes('seguridad') && t.includes('higiene');
-}
-
-// Badge estándar: circulito terracota. El especial (Seguridad e Higiene)
-// se ve como un escudito dorado, para distinguirse a simple vista.
-function BadgeMini({ especial, titulo }) {
-  if (especial) {
-    return (
-      <div title={titulo} className="flex-shrink-0">
-        <svg viewBox="0 0 100 110" width="22" height="24">
-          <path
-            d="M50 4 L88 18 V50 C88 76 71 94 50 106 C29 94 12 76 12 50 V18 Z"
-            fill="#F6D06B"
-            stroke="#C1502E"
-            strokeWidth="6"
-          />
-          <path
-            d="M35 52 L46 63 L67 38"
-            fill="none"
-            stroke="#C1502E"
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    );
-  }
-  return (
-    <div title={titulo} className="flex-shrink-0">
-      <svg viewBox="0 0 100 100" width="20" height="20">
-        <circle cx="50" cy="50" r="44" fill="#FBEAE3" stroke="#C1502E" strokeWidth="6" />
-        <path
-          d="M32 51 L44 63 L70 35"
-          fill="none"
-          stroke="#C1502E"
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-}
+import { esCursoSeguridadEHigiene, BadgeConTitulo } from '../components/Badges';
 
 function IconProgresoMini(props) {
   return (
@@ -383,9 +337,14 @@ export default function Progreso({ session }) {
                       <div className="h-full bg-[#3F7D5C] rounded-full" style={{ width: `${porcentaje}%` }} />
                     </div>
                     {f.badges.length > 0 && (
-                      <div className="flex items-center gap-1.5 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {f.badges.map((b) => (
-                          <BadgeMini key={b.microcurso_id} especial={b.especial} titulo={b.titulo} />
+                          <BadgeConTitulo
+                            key={b.microcurso_id}
+                            titulo={b.titulo}
+                            especial={b.especial}
+                            size={40}
+                          />
                         ))}
                       </div>
                     )}
