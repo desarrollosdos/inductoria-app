@@ -1,6 +1,6 @@
 // Inductoria · Edge Function: admin-visitas
 // ---------------------------------------------
-// Totales de visitas a la landing para el panel de Admin. Solo el admin.
+// Totales de visitas (landing y app) para el panel de Admin. Solo el admin.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
     const { data: visitas, error } = await supabase
       .from('landing_visitas')
-      .select('created_at')
+      .select('created_at, origen')
       .order('created_at', { ascending: false })
       .limit(20000);
 
@@ -56,29 +56,45 @@ Deno.serve(async (req) => {
     inicioMes.setDate(1);
     inicioMes.setHours(0, 0, 0, 0);
 
-    let visitasHoy = 0;
-    let visitasMes = 0;
-    const porDiaMapa: Record<string, number> = {};
+    const contadores = {
+      landing: { total: 0, hoy: 0, mes: 0 },
+      app: { total: 0, hoy: 0, mes: 0 },
+    };
+
+    const porDiaMapa: Record<string, { landing: number; app: number }> = {};
 
     (visitas || []).forEach((v) => {
+      const origen = v.origen === 'app' ? 'app' : 'landing';
       const fecha = new Date(v.created_at);
-      if (fecha >= hoy) visitasHoy++;
-      if (fecha >= inicioMes) visitasMes++;
+
+      contadores[origen].total++;
+      if (fecha >= hoy) contadores[origen].hoy++;
+      if (fecha >= inicioMes) contadores[origen].mes++;
 
       const clave = fecha.toISOString().slice(0, 10);
-      porDiaMapa[clave] = (porDiaMapa[clave] || 0) + 1;
+      if (!porDiaMapa[clave]) porDiaMapa[clave] = { landing: 0, app: 0 };
+      porDiaMapa[clave][origen]++;
     });
 
     const porDia = Object.entries(porDiaMapa)
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
       .slice(0, 14)
-      .map(([fecha, cantidad]) => ({ fecha, cantidad }));
+      .map(([fecha, cantidades]) => ({
+        fecha,
+        landing: cantidades.landing,
+        app: cantidades.app,
+        total: cantidades.landing + cantidades.app,
+      }));
 
     return new Response(
       JSON.stringify({
-        total: (visitas || []).length,
-        hoy: visitasHoy,
-        mes: visitasMes,
+        landing: contadores.landing,
+        app: contadores.app,
+        total: {
+          total: contadores.landing.total + contadores.app.total,
+          hoy: contadores.landing.hoy + contadores.app.hoy,
+          mes: contadores.landing.mes + contadores.app.mes,
+        },
         porDia,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

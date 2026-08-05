@@ -403,9 +403,43 @@ export default function AdminPage({ session }) {
             ) : visitas ? (
               <>
                 <div className="grid grid-cols-3 gap-4">
-                  <Tarjeta label="Hoy" valor={visitas.hoy} />
-                  <Tarjeta label="Este mes" valor={visitas.mes} />
-                  <Tarjeta label="Total histórico" valor={visitas.total} />
+                  <Tarjeta label="Hoy (total)" valor={visitas.total.hoy} />
+                  <Tarjeta label="Este mes (total)" valor={visitas.total.mes} />
+                  <Tarjeta label="Total histórico" valor={visitas.total.total} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-3">Landing</p>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-[#6b6455]">Hoy</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.landing.hoy}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-[#6b6455]">Este mes</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.landing.mes}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[#6b6455]">Total</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.landing.total}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-3">App</p>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-[#6b6455]">Hoy</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.app.hoy}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-[#6b6455]">Este mes</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.app.mes}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[#6b6455]">Total</span>
+                      <span className="font-semibold text-[#2C2C2A]">{visitas.app.total}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -419,7 +453,10 @@ export default function AdminPage({ session }) {
                           <span className="text-sm text-[#2C2C2A]">
                             {new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
-                          <span className="text-sm font-semibold text-[#C1502E]">{d.cantidad}</span>
+                          <span className="text-xs text-[#8a8471]">
+                            landing {d.landing} · app {d.app}
+                          </span>
+                          <span className="text-sm font-semibold text-[#C1502E]">{d.total}</span>
                         </div>
                       ))}
                     </div>
