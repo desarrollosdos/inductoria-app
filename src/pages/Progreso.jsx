@@ -337,14 +337,9 @@ export default function Progreso({ session }) {
                       <div className="h-full bg-[#3F7D5C] rounded-full" style={{ width: `${porcentaje}%` }} />
                     </div>
                     {f.badges.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <div className="flex flex-col gap-1 mt-2">
                         {f.badges.map((b) => (
-                          <BadgeConTitulo
-                            key={b.microcurso_id}
-                            titulo={b.titulo}
-                            especial={b.especial}
-                            size={40}
-                          />
+                          <BadgeConTitulo key={b.microcurso_id} titulo={b.titulo} especial={b.especial} />
                         ))}
                       </div>
                     )}

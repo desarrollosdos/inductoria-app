@@ -28,7 +28,9 @@ export function BadgeCurso({ size = 72 }) {
 }
 
 // Badge especial: medalla dorada con cinta, exclusiva para Seguridad e Higiene.
-export function BadgeEspecial({ size = 110 }) {
+// conTexto=false omite el texto de adentro (para versiones chicas donde no
+// entraría legible, como en Progreso).
+export function BadgeEspecial({ size = 110, conTexto = true }) {
   return (
     <svg viewBox="0 0 100 150" width={size} height={size * 1.5} className="flex-shrink-0">
       <defs>
@@ -56,24 +58,32 @@ export function BadgeEspecial({ size = 110 }) {
       <circle cx="50" cy="46" r="30" fill="url(#oroMedalla)" stroke="#C1502E" strokeWidth="2.5" />
       <circle cx="50" cy="46" r="25" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="1" />
 
-      {/* Texto adentro */}
-      <text x="50" y="43" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#7A3A1D" fontFamily="Arial, sans-serif">
-        SEGURIDAD
-      </text>
-      <text x="50" y="53" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#7A3A1D" fontFamily="Arial, sans-serif">
-        E HIGIENE
-      </text>
+      {/* Texto adentro (solo en la versión grande) */}
+      {conTexto && (
+        <>
+          <text x="50" y="43" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#7A3A1D" fontFamily="Arial, sans-serif">
+            SEGURIDAD
+          </text>
+          <text x="50" y="53" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#7A3A1D" fontFamily="Arial, sans-serif">
+            E HIGIENE
+          </text>
+        </>
+      )}
     </svg>
   );
 }
 
-// Badge + nombre del curso debajo, siempre visible (no depende de hover,
-// que en mobile no existe). Usado en Progreso.jsx, uno por curso completado.
-export function BadgeConTitulo({ titulo, especial, size = 44 }) {
+// Badge chico + nombre del curso a la derecha, en fila. Usado en Progreso.jsx,
+// uno por curso completado. El nombre siempre se ve (no depende de hover).
+export function BadgeConTitulo({ titulo, especial, size = 24 }) {
   return (
-    <div className="flex flex-col items-center text-center" style={{ width: size + 12 }}>
-      {especial ? <BadgeEspecial size={size} /> : <BadgeCurso size={size} />}
-      <p className="text-[9px] leading-tight text-[#6b6455] font-medium mt-1 line-clamp-2">{titulo}</p>
+    <div className="flex items-center gap-1.5">
+      {especial ? (
+        <BadgeEspecial size={size * 0.73} conTexto={false} />
+      ) : (
+        <BadgeCurso size={size} />
+      )}
+      <p className="text-xs text-[#3d382c] font-medium">{titulo}</p>
     </div>
   );
 }
