@@ -4,6 +4,19 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 
+const PUESTOS_CATALOGO = [
+  'Vendedor/a',
+  'Cajero/a',
+  'Encargado/a',
+  'Estilista / Peluquero/a',
+  'Manicura / Cosmetóloga',
+  'Recepcionista',
+  'Repositor/a',
+  'Kiosquero/a',
+  'Panadero/a',
+  'Otro',
+];
+
 function IconEmpleadosMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -81,6 +94,7 @@ export default function Empleados({ session }) {
   const [negocioSeleccionado, setNegocioSeleccionado] = useState('');
   const [nombreEmpleado, setNombreEmpleado] = useState('');
   const [puesto, setPuesto] = useState('');
+  const [puestoCustom, setPuestoCustom] = useState('');
   const [telefonoEmpleado, setTelefonoEmpleado] = useState('');
   const [mailEmpleado, setMailEmpleado] = useState('');
   const [fotoBlob, setFotoBlob] = useState(null);
@@ -93,7 +107,7 @@ export default function Empleados({ session }) {
   const [ultimoLink, setUltimoLink] = useState(null);
 
   const [editandoId, setEditandoId] = useState(null);
-  const [editForm, setEditForm] = useState({ nombre: '', puesto: '', telefono: '', mail: '' });
+  const [editForm, setEditForm] = useState({ nombre: '', puesto: '', puestoCustom: '', telefono: '', mail: '' });
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   useEffect(() => {
@@ -173,7 +187,7 @@ export default function Empleados({ session }) {
       .insert({
         negocio_id: negocioSeleccionado,
         nombre: nombreEmpleado.trim(),
-        puesto: puesto.trim() || null,
+        puesto: (puesto === 'Otro' ? puestoCustom.trim() : puesto.trim()) || null,
         telefono: telefonoEmpleado.trim() || null,
         mail: mailEmpleado.trim() || null,
         foto_url: fotoUrl,
@@ -191,6 +205,7 @@ export default function Empleados({ session }) {
     setUltimoLink(link);
     setNombreEmpleado('');
     setPuesto('');
+    setPuestoCustom('');
     setTelefonoEmpleado('');
     setMailEmpleado('');
     setFotoBlob(null);
@@ -223,9 +238,12 @@ export default function Empleados({ session }) {
       return;
     }
     setEditandoId(e.id);
+    const puestoActual = e.puesto || '';
+    const estaEnCatalogo = PUESTOS_CATALOGO.includes(puestoActual);
     setEditForm({
       nombre: e.nombre || '',
-      puesto: e.puesto || '',
+      puesto: estaEnCatalogo ? puestoActual : puestoActual ? 'Otro' : '',
+      puestoCustom: estaEnCatalogo ? '' : puestoActual,
       telefono: e.telefono || '',
       mail: e.mail || '',
     });
@@ -233,11 +251,12 @@ export default function Empleados({ session }) {
 
   async function handleGuardarEdicion(empleadoId) {
     setGuardandoEdit(true);
+    const puestoFinal = editForm.puesto === 'Otro' ? editForm.puestoCustom.trim() : editForm.puesto.trim();
     const { data, error } = await supabase
       .from('empleados')
       .update({
         nombre: editForm.nombre.trim(),
-        puesto: editForm.puesto.trim() || null,
+        puesto: puestoFinal || null,
         telefono: editForm.telefono.trim() || null,
         mail: editForm.mail.trim() || null,
       })
@@ -349,13 +368,27 @@ export default function Empleados({ session }) {
               placeholder="Nombre"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
-            <input
-              type="text"
+            <select
               value={editForm.puesto}
               onChange={(ev) => setEditForm({ ...editForm, puesto: ev.target.value })}
-              placeholder="Puesto"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-            />
+            >
+              <option value="">Elegí el puesto</option>
+              {PUESTOS_CATALOGO.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            {editForm.puesto === 'Otro' && (
+              <input
+                type="text"
+                value={editForm.puestoCustom}
+                onChange={(ev) => setEditForm({ ...editForm, puestoCustom: ev.target.value })}
+                placeholder="Especificá el puesto"
+                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+              />
+            )}
             <input
               type="tel"
               value={editForm.telefono}
@@ -481,14 +514,29 @@ export default function Empleados({ session }) {
                 placeholder="Nombre del empleado"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
-              <input
-                type="text"
+              <select
                 required
                 value={puesto}
                 onChange={(e) => setPuesto(e.target.value)}
-                placeholder="Puesto (ej: cajera, vendedora, mesera)"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              />
+              >
+                <option value="">Elegí el puesto</option>
+                {PUESTOS_CATALOGO.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              {puesto === 'Otro' && (
+                <input
+                  type="text"
+                  required
+                  value={puestoCustom}
+                  onChange={(e) => setPuestoCustom(e.target.value)}
+                  placeholder="Especificá el puesto"
+                  className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                />
+              )}
               <input
                 type="tel"
                 value={telefonoEmpleado}
@@ -505,7 +553,13 @@ export default function Empleados({ session }) {
               />
               <button
                 type="submit"
-                disabled={creando || !negocioSeleccionado || !nombreEmpleado.trim() || !puesto.trim()}
+                disabled={
+                  creando ||
+                  !negocioSeleccionado ||
+                  !nombreEmpleado.trim() ||
+                  !puesto ||
+                  (puesto === 'Otro' && !puestoCustom.trim())
+                }
                 className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
               >
                 {creando ? 'Creando...' : 'Dar de alta'}

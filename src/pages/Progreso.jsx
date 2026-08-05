@@ -4,6 +4,53 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 
+function esCursoSeguridadEHigiene(titulo) {
+  const t = (titulo || '').toLowerCase();
+  return t.includes('seguridad') && t.includes('higiene');
+}
+
+// Badge estándar: circulito terracota. El especial (Seguridad e Higiene)
+// se ve como un escudito dorado, para distinguirse a simple vista.
+function BadgeMini({ especial, titulo }) {
+  if (especial) {
+    return (
+      <div title={titulo} className="flex-shrink-0">
+        <svg viewBox="0 0 100 110" width="22" height="24">
+          <path
+            d="M50 4 L88 18 V50 C88 76 71 94 50 106 C29 94 12 76 12 50 V18 Z"
+            fill="#F6D06B"
+            stroke="#C1502E"
+            strokeWidth="6"
+          />
+          <path
+            d="M35 52 L46 63 L67 38"
+            fill="none"
+            stroke="#C1502E"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+  return (
+    <div title={titulo} className="flex-shrink-0">
+      <svg viewBox="0 0 100 100" width="20" height="20">
+        <circle cx="50" cy="50" r="44" fill="#FBEAE3" stroke="#C1502E" strokeWidth="6" />
+        <path
+          d="M32 51 L44 63 L70 35"
+          fill="none"
+          stroke="#C1502E"
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 function IconProgresoMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -78,16 +125,24 @@ export default function Progreso({ session }) {
 
     const empleadoIds = (empleadosData || []).map((e) => e.id);
 
+    const { data: cursosData } = await supabase
+      .from('microcursos')
+      .select('id, titulo')
+      .eq('cuenta_id', cuentaData.id)
+      .eq('estado', 'aprobado');
+    const tituloPorCurso = {};
+    (cursosData || []).forEach((c) => (tituloPorCurso[c.id] = c.titulo));
+
     let progresoPorEmpleado = {};
     if (empleadoIds.length > 0) {
       const { data: progresoData } = await supabase
         .from('progreso_empleado')
-        .select('empleado_id, completado, fecha_completado')
+        .select('empleado_id, microcurso_id, completado, fecha_completado')
         .in('empleado_id', empleadoIds);
 
       (progresoData || []).forEach((p) => {
         if (!progresoPorEmpleado[p.empleado_id]) {
-          progresoPorEmpleado[p.empleado_id] = { completados: 0, ultimaActividad: null };
+          progresoPorEmpleado[p.empleado_id] = { completados: 0, ultimaActividad: null, badges: [] };
         }
         if (p.completado) {
           progresoPorEmpleado[p.empleado_id].completados++;
@@ -98,6 +153,12 @@ export default function Progreso({ session }) {
           ) {
             progresoPorEmpleado[p.empleado_id].ultimaActividad = p.fecha_completado;
           }
+          const titulo = tituloPorCurso[p.microcurso_id] || 'Curso';
+          progresoPorEmpleado[p.empleado_id].badges.push({
+            microcurso_id: p.microcurso_id,
+            titulo,
+            especial: esCursoSeguridadEHigiene(titulo),
+          });
         }
       });
     }
@@ -110,6 +171,7 @@ export default function Progreso({ session }) {
       negocioNombre: negociosPorId[e.negocio_id] || '—',
       completados: progresoPorEmpleado[e.id]?.completados || 0,
       ultimaActividad: progresoPorEmpleado[e.id]?.ultimaActividad || null,
+      badges: progresoPorEmpleado[e.id]?.badges || [],
     }));
 
     setFilas(filasArmadas);
@@ -226,6 +288,13 @@ export default function Progreso({ session }) {
                     <div className="w-full h-2 bg-[#EDE0C8] rounded-full overflow-hidden">
                       <div className="h-full bg-[#3F7D5C] rounded-full" style={{ width: `${porcentaje}%` }} />
                     </div>
+                    {f.badges.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {f.badges.map((b) => (
+                          <BadgeMini key={b.microcurso_id} especial={b.especial} titulo={b.titulo} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

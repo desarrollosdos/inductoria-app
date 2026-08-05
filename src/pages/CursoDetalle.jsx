@@ -1,5 +1,49 @@
 import { useEffect, useState } from 'react';
 
+function esCursoSeguridadEHigiene(titulo) {
+  const t = (titulo || '').toLowerCase();
+  return t.includes('seguridad') && t.includes('higiene');
+}
+
+// Badge estándar: círculo terracota, para cualquier curso.
+function BadgeCurso({ size = 72 }) {
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size}>
+      <circle cx="50" cy="50" r="44" fill="#FBEAE3" stroke="#C1502E" strokeWidth="4" />
+      <path
+        d="M32 51 L44 63 L70 35"
+        fill="none"
+        stroke="#C1502E"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Badge especial: escudo dorado con cinta, exclusivo para Seguridad e Higiene.
+function BadgeEspecial({ size = 88 }) {
+  return (
+    <svg viewBox="0 0 100 110" width={size} height={size}>
+      <path
+        d="M50 4 L88 18 V50 C88 76 71 94 50 106 C29 94 12 76 12 50 V18 Z"
+        fill="#F6D06B"
+        stroke="#C1502E"
+        strokeWidth="4"
+      />
+      <path
+        d="M35 52 L46 63 L67 38"
+        fill="none"
+        stroke="#C1502E"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function CursoDetalle() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token');
@@ -14,6 +58,13 @@ export default function CursoDetalle() {
   const [respuestas, setRespuestas] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
+
+  const [chatAbierto, setChatAbierto] = useState(false);
+  const [pregunta, setPregunta] = useState('');
+  const [historialChat, setHistorialChat] = useState([]);
+  const [enviandoPregunta, setEnviandoPregunta] = useState(false);
+  const [errorChat, setErrorChat] = useState(null);
+  const [preguntasRestantes, setPreguntasRestantes] = useState(null);
 
   useEffect(() => {
     if (!token || !microcursoId) {
@@ -68,6 +119,44 @@ export default function CursoDetalle() {
     setResultado(data);
   }
 
+  async function handleEnviarPregunta(e) {
+    e.preventDefault();
+    if (!pregunta.trim() || enviandoPregunta) return;
+
+    const preguntaActual = pregunta.trim();
+    setEnviandoPregunta(true);
+    setErrorChat(null);
+
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      const res = await fetch(`${base}/functions/v1/preguntar-curso`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, microcurso_id: microcursoId, pregunta: preguntaActual }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorChat(data.error || 'No se pudo enviar la pregunta.');
+        return;
+      }
+
+      setHistorialChat((h) => [...h, { pregunta: preguntaActual, respuesta: data.respuesta }]);
+      setPreguntasRestantes(data.preguntas_restantes);
+      setPregunta('');
+    } catch {
+      setErrorChat('No se pudo enviar la pregunta. Probá de nuevo.');
+    } finally {
+      setEnviandoPregunta(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
@@ -84,9 +173,18 @@ export default function CursoDetalle() {
   }
 
   if (resultado) {
+    const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
     return (
       <div className="max-w-md mx-auto mt-16 px-4 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
+          <div className="flex justify-center mb-3">
+            {esEspecial ? <BadgeEspecial /> : <BadgeCurso />}
+          </div>
+          {esEspecial && (
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#C1502E] mb-3">
+              Badge especial · Seguridad e Higiene
+            </p>
+          )}
           <div className="w-16 h-16 rounded-full bg-[#eef9f4] text-[#1D9E75] flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
             {resultado.puntaje}%
           </div>
@@ -212,6 +310,65 @@ export default function CursoDetalle() {
         >
           {esUltimoPaso ? 'Ir a la evaluación' : 'Siguiente'}
         </button>
+      </div>
+
+      <div className="mt-4">
+        {!chatAbierto ? (
+          <button
+            onClick={() => setChatAbierto(true)}
+            className="w-full py-2 rounded-lg font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3]"
+          >
+            ¿Tenés una duda puntual?
+          </button>
+        ) : (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-[#2C2C2A]">Preguntá sobre este curso</p>
+              <button onClick={() => setChatAbierto(false)} className="text-xs text-[#8a8471]">
+                Cerrar
+              </button>
+            </div>
+
+            {historialChat.length > 0 && (
+              <div className="space-y-3 mb-3 max-h-64 overflow-y-auto">
+                {historialChat.map((h, i) => (
+                  <div key={i}>
+                    <p className="text-xs font-semibold text-[#2C2C2A] mb-1">Vos: {h.pregunta}</p>
+                    <p className="text-sm text-[#3d382c] bg-[#FBF7EA] rounded-lg p-2">{h.respuesta}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {errorChat && <p className="text-xs text-[#C1502E] mb-2">{errorChat}</p>}
+
+            <form onSubmit={handleEnviarPregunta} className="flex gap-2">
+              <input
+                type="text"
+                value={pregunta}
+                onChange={(e) => setPregunta(e.target.value)}
+                placeholder="Escribí tu duda..."
+                disabled={enviandoPregunta}
+                className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+              />
+              <button
+                type="submit"
+                disabled={enviandoPregunta || !pregunta.trim()}
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+              >
+                {enviandoPregunta ? '...' : 'Enviar'}
+              </button>
+            </form>
+
+            {preguntasRestantes !== null && (
+              <p className="text-[10px] text-[#8a8471] mt-2">
+                {preguntasRestantes > 0
+                  ? `Te quedan ${preguntasRestantes} preguntas hoy.`
+                  : 'Llegaste al límite de preguntas de hoy.'}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
