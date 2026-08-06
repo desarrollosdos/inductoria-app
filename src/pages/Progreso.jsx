@@ -321,7 +321,34 @@ export default function Progreso({ session }) {
                       <Avatar e={f} />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
+                            {totalCursos > 0 && f.completados < totalCursos && (
+                              <>
+                                <button
+                                  onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
+                                  title="Ver PIN de acceso"
+                                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                                >
+                                  PIN
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const link = `${window.location.origin}/empleado?token=${f.token_acceso}`;
+                                    navigator.clipboard.writeText(link);
+                                    alert('Link copiado');
+                                  }}
+                                  title="Copiar link de acceso"
+                                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
+                                >
+                                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
                           <p className="text-xs text-[#8a8471]">
                             {f.completados}/{totalCursos} cursos · {f.negocioNombre}
                           </p>
@@ -341,23 +368,6 @@ export default function Progreso({ session }) {
                         {f.badges.map((b) => (
                           <BadgeConTitulo key={b.microcurso_id} titulo={b.titulo} especial={b.especial} />
                         ))}
-                      </div>
-                    )}
-                    {totalCursos > 0 && f.completados < totalCursos && (
-                      <div className="flex items-center justify-between gap-2 mt-2 bg-[#FBF7EA] border border-[#EFDDCE] rounded-lg px-3 py-2">
-                        <p className="text-[11px] text-[#8a8471] truncate">
-                          Link + PIN <span className="font-bold text-[#2C2C2A] tracking-widest">{f.pin}</span>
-                        </p>
-                        <button
-                          onClick={() => {
-                            const link = `${window.location.origin}/empleado?token=${f.token_acceso}`;
-                            navigator.clipboard.writeText(link);
-                            alert(`Link copiado. PIN de ${f.nombre}: ${f.pin}`);
-                          }}
-                          className="text-[11px] font-semibold text-[#C1502E] flex-shrink-0"
-                        >
-                          Copiar link
-                        </button>
                       </div>
                     )}
                   </div>
