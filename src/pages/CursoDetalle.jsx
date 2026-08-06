@@ -60,6 +60,11 @@ function CursoDetalleInterno() {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
+  const [acuseChecked, setAcuseChecked] = useState(false);
+  const [enviandoAcuse, setEnviandoAcuse] = useState(false);
+  const [acuseFecha, setAcuseFecha] = useState(null);
+  const [errorAcuse, setErrorAcuse] = useState(null);
+
   const [chatAbierto, setChatAbierto] = useState(false);
   const [pregunta, setPregunta] = useState('');
   const [historialChat, setHistorialChat] = useState([]);
@@ -118,6 +123,38 @@ function CursoDetalleInterno() {
       return;
     }
     setResultado(data);
+  }
+
+  async function handleConfirmarAcuse() {
+    if (!acuseChecked || enviandoAcuse) return;
+    setEnviandoAcuse(true);
+    setErrorAcuse(null);
+
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      const res = await fetch(`${base}/functions/v1/confirmar-acuse`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, microcurso_id: microcursoId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorAcuse(data.error || 'No se pudo confirmar el acuse. Probá de nuevo.');
+        return;
+      }
+      setAcuseFecha(data.fecha);
+    } catch {
+      setErrorAcuse('No se pudo confirmar el acuse. Probá de nuevo.');
+    } finally {
+      setEnviandoAcuse(false);
+    }
   }
 
   async function handleEnviarPregunta(e) {
@@ -200,6 +237,42 @@ function CursoDetalleInterno() {
               · {resultado.correctas}/{resultado.total} correctas
             </span>
           </div>
+
+          {esEspecial && (
+            <div className="text-left bg-[#FBF7EA] border border-[#EFDDCE] rounded-xl p-4 mb-4">
+              {acuseFecha ? (
+                <p className="text-sm font-semibold text-[#185FA5]">
+                  ✓ Acuse de recibido confirmado el{' '}
+                  {new Date(acuseFecha).toLocaleDateString('es-AR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                  , {new Date(acuseFecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs.
+                </p>
+              ) : (
+                <>
+                  <label className="flex items-start gap-2 text-sm text-[#2C2C2A] font-medium mb-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acuseChecked}
+                      onChange={(e) => setAcuseChecked(e.target.checked)}
+                      className="mt-0.5 flex-shrink-0"
+                    />
+                    Confirmo que leí y entendí el contenido de este curso de Seguridad e Higiene.
+                  </label>
+                  {errorAcuse && <p className="text-xs text-[#C1502E] mb-2">{errorAcuse}</p>}
+                  <button
+                    onClick={handleConfirmarAcuse}
+                    disabled={!acuseChecked || enviandoAcuse}
+                    className="w-full py-2 rounded-lg font-semibold text-white bg-[#185FA5] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                  >
+                    {enviandoAcuse ? 'Confirmando...' : 'Confirmar acuse de recibido'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div>
             <a
