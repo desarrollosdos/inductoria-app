@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
-import { esCursoSeguridadEHigiene, BadgeConTitulo, TituloCursoInline } from '../components/Badges';
+import { esCursoSeguridadEHigiene, CursoCompletadoFila, TituloCursoInline } from '../components/Badges';
 
 function IconProgresoMini(props) {
   return (
@@ -271,7 +271,7 @@ export default function Progreso({ session }) {
                 return (
                   <div key={c.microcurso_id}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-[13px] font-medium truncate">
                         <TituloCursoInline titulo={c.titulo} />
                         {c.especial && <span className="ml-1 text-[#C1502E]">★</span>}
                       </p>
@@ -321,8 +321,8 @@ export default function Progreso({ session }) {
                       <Avatar e={f} />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
+                          <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {totalCursos > 0 && f.completados < totalCursos && (
                               <>
                                 <button
@@ -348,10 +348,10 @@ export default function Progreso({ session }) {
                                 </button>
                               </>
                             )}
+                            <p className="text-xs font-medium text-[#3d382c] whitespace-nowrap">
+                              {f.completados}/{totalCursos} cursos · {f.negocioNombre}
+                            </p>
                           </div>
-                          <p className="text-xs text-[#8a8471]">
-                            {f.completados}/{totalCursos} cursos · {f.negocioNombre}
-                          </p>
                         </div>
                         {f.ultimaActividad && (
                           <p className="text-[10px] text-[#8a8471]">
@@ -364,9 +364,9 @@ export default function Progreso({ session }) {
                       <div className="h-full bg-[#3F7D5C] rounded-full" style={{ width: `${porcentaje}%` }} />
                     </div>
                     {f.badges.length > 0 && (
-                      <div className="flex flex-col gap-1 mt-2">
+                      <div className="flex flex-col gap-1.5 mt-2">
                         {f.badges.map((b) => (
-                          <BadgeConTitulo key={b.microcurso_id} titulo={b.titulo} especial={b.especial} />
+                          <CursoCompletadoFila key={b.microcurso_id} titulo={b.titulo} especial={b.especial} />
                         ))}
                       </div>
                     )}

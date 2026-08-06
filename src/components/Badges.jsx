@@ -24,13 +24,26 @@ export function TituloCursoInline({ titulo, className = '' }) {
     <span className={className}>
       {tieneDosPuntos ? (
         <>
-          <span className="font-bold text-[#C1502E]">{titulo.split(':')[0]}:</span>
-          <span>{titulo.split(':').slice(1).join(':')}</span>
+          <span className="font-semibold text-[#C1502E]">{titulo.split(':')[0]}:</span>
+          <span> {titulo.split(':').slice(1).join(':').trim()}</span>
         </>
       ) : (
-        <span className="font-bold text-[#C1502E]">{titulo}</span>
+        <span className="font-semibold text-[#C1502E]">{titulo}</span>
       )}
     </span>
+  );
+}
+
+// Fila compacta: tilde de color (sin círculo de fondo) + nombre del curso.
+// Usado en Progreso.jsx para la lista de cursos completados por empleado.
+export function CursoCompletadoFila({ titulo, especial }) {
+  return (
+    <div className="flex items-center gap-2">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={especial ? '#185FA5' : '#3B6D11'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+        <path d="M4 12.5 L9.5 18 L20 6" />
+      </svg>
+      <TituloCursoInline titulo={titulo} className="text-[13px]" />
+    </div>
   );
 }
 
