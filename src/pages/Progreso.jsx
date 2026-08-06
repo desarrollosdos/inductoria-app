@@ -73,7 +73,7 @@ export default function Progreso({ session }) {
 
     const { data: empleadosData } = await supabase
       .from('empleados')
-      .select('id, nombre, negocio_id, fecha_alta, foto_url')
+      .select('id, nombre, negocio_id, fecha_alta, foto_url, token_acceso, pin')
       .in('negocio_id', negocioIds)
       .is('fecha_baja', null)
       .order('fecha_alta', { ascending: false });
@@ -341,6 +341,23 @@ export default function Progreso({ session }) {
                         {f.badges.map((b) => (
                           <BadgeConTitulo key={b.microcurso_id} titulo={b.titulo} especial={b.especial} />
                         ))}
+                      </div>
+                    )}
+                    {totalCursos > 0 && f.completados < totalCursos && (
+                      <div className="flex items-center justify-between gap-2 mt-2 bg-[#FBF7EA] border border-[#EFDDCE] rounded-lg px-3 py-2">
+                        <p className="text-[11px] text-[#8a8471] truncate">
+                          Link + PIN <span className="font-bold text-[#2C2C2A] tracking-widest">{f.pin}</span>
+                        </p>
+                        <button
+                          onClick={() => {
+                            const link = `${window.location.origin}/empleado?token=${f.token_acceso}`;
+                            navigator.clipboard.writeText(link);
+                            alert(`Link copiado. PIN de ${f.nombre}: ${f.pin}`);
+                          }}
+                          className="text-[11px] font-semibold text-[#C1502E] flex-shrink-0"
+                        >
+                          Copiar link
+                        </button>
                       </div>
                     )}
                   </div>
