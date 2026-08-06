@@ -72,14 +72,19 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-    const prompt = `Convertí el siguiente material de capacitación de un comercio en un microcurso desarrollado para un empleado nuevo. Tiene que quedar completo y útil por sí solo, no un resumen apurado: alguien que lea solo esto tiene que entender el tema a fondo, sin necesidad de preguntar nada más.
+    const prompt = `Convertí el siguiente material de capacitación de un comercio en un curso completo y serio para un empleado nuevo, con el mismo nivel de profundidad y formato que usaría una plataforma de capacitación profesional (no un resumen ni un apunte rápido).
 
-Reglas:
-- Entre 3 y 5 pasos, cada uno con un título corto.
-- Cada paso tiene que tener entre 180 y 280 palabras (no menos). Desarrollá bien cada idea: explicá el POR QUÉ de cada cosa, no solo el QUÉ, y sumá al menos un ejemplo concreto o una situación típica del día a día del comercio cuando ayude a entender mejor.
-- Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (por ejemplo: cosas que sí hacer, cosas que no hacer, checklist de apertura), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones.
-- El texto tiene que ser claro, directo, en segunda persona ("vos"), tono argentino, como si un compañero con experiencia se lo explicara a el que recién arranca.
-- 3 a 5 preguntas de opción múltiple (3 opciones cada una) que evalúen los puntos clave de los pasos, no detalles menores.
+Estructura obligatoria, siempre 5 pasos, en este orden:
+1. Marco y por qué importa: contexto de por qué este tema es relevante para el puesto (si el material menciona una norma, ley o estándar, citala acá con precisión; si no menciona ninguna, explicá el motivo práctico/de negocio).
+2 a 4. Desarrollo práctico: el contenido concreto dividido en 3 pasos temáticos coherentes (por ejemplo, separado por proceso, por situación, o por tipo de tarea, según lo que tenga sentido para el material).
+5. Qué hacer ante problemas o casos límite, y cierre: qué hacer cuando algo sale mal o hay dudas, y una idea final que resuma el punto central del curso.
+
+Reglas de contenido:
+- Cada uno de los 5 pasos tiene que tener entre 200 y 280 palabras. No menos. Esto no es negociable: un paso de 3 líneas no sirve para capacitar a nadie.
+- Desarrollá el POR QUÉ de cada cosa, no solo el QUÉ. Sumá contexto y al menos un ejemplo concreto o situación típica del día a día del comercio en cada paso donde ayude a entender mejor.
+- Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (cosas que sí hacer, cosas que no hacer, checklist), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones. Podés combinar: un párrafo de contexto seguido de una lista con guiones dentro del mismo paso.
+- Tono serio y profesional, pero en segunda persona ("vos"), tono argentino, sin sonar acartonado ni como un trámite burocrático — como si un compañero con experiencia real le explicara el tema a alguien que recién arranca.
+- Exactamente 5 preguntas de opción múltiple (3 opciones cada una), una por cada paso, que evalúen el punto central de ESE paso puntual, no detalles menores ni trivia.
 - No inventes información que no esté en el material original. Si el material es corto, desarrollá y explicá mejor lo que SÍ está (con más contexto, ejemplos y aplicación práctica), pero no agregues datos, cifras o normas que no estén en el original.
 
 Material original:
