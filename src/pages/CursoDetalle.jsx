@@ -176,8 +176,13 @@ function CursoDetalleInterno() {
   if (resultado) {
     const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
     return (
-      <div className="max-w-md sm:max-w-xl mx-auto mt-16 px-4 sm:px-0 text-center">
+      <div className="max-w-md sm:max-w-xl mx-auto mt-10 px-4 sm:px-0 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
+            Completaste
+          </p>
+          <TituloCurso titulo={curso.titulo} className="mb-5" />
+
           <div className="flex justify-center mb-3">
             {esEspecial ? <BadgeEspecial /> : <BadgeCurso />}
           </div>
@@ -186,19 +191,24 @@ function CursoDetalleInterno() {
               Badge especial · Seguridad e Higiene
             </p>
           )}
-          <div className="w-16 h-16 rounded-full bg-[#eef9f4] text-[#1D9E75] border-[3px] border-[#1D9E75] flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-            {resultado.puntaje}%
+
+          <h1 className="text-lg font-bold text-[#2C2C2A] mb-3">¡Listo!</h1>
+
+          <div className="inline-flex items-center gap-2 bg-[#eef9f4] border-2 border-[#1D9E75] rounded-full px-4 py-1.5 mb-4">
+            <span className="text-base font-bold text-[#1D9E75]">{resultado.puntaje}%</span>
+            <span className="text-xs text-[#3d382c] font-medium">
+              · {resultado.correctas}/{resultado.total} correctas
+            </span>
           </div>
-          <h1 className="text-lg font-bold text-[#2C2C2A] mb-1">¡Listo!</h1>
-          <p className="text-sm text-[#3d382c] font-medium mb-6">
-            Respondiste bien {resultado.correctas} de {resultado.total} preguntas.
-          </p>
-          <a
-            href={`/empleado?token=${token}`}
-            className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
-          >
-            Volver a Mi perfil
-          </a>
+
+          <div>
+            <a
+              href={`/empleado?token=${token}`}
+              className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
+            >
+              Volver a Mi perfil
+            </a>
+          </div>
         </div>
       </div>
     );
