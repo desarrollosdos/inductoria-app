@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import { TituloCursoInline } from '../components/Badges';
 
 function IconContenidoMini(props) {
   return (
@@ -42,6 +43,8 @@ export default function Contenido({ session }) {
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
 
+  const [cursosPublicados, setCursosPublicados] = useState([]);
+
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
   const [textoEdit, setTextoEdit] = useState('');
@@ -69,12 +72,26 @@ export default function Contenido({ session }) {
     setCuenta(cuentaData);
 
     if (cuentaData) {
+      const { data: publicadosData } = await supabase
+        .from('microcursos')
+        .select('id, titulo, created_at')
+        .eq('cuenta_id', cuentaData.id)
+        .eq('estado', 'aprobado')
+        .order('created_at', { ascending: false });
+      setCursosPublicados(publicadosData || []);
+
+      const idsPublicados = new Set((publicadosData || []).map((m) => m.id));
+
       const { data: contenidosData } = await supabase
         .from('contenidos')
         .select('*')
         .eq('cuenta_id', cuentaData.id)
         .order('created_at', { ascending: false });
-      setContenidos(contenidosData || []);
+
+      // Los contenidos cuyo curso ya quedó publicado (aprobado) salen de la
+      // lista editable: ya están en "Cursos disponibles para tus empleados",
+      // de solo lectura.
+      setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
     }
 
     const { data: baseData } = await supabase
@@ -88,24 +105,41 @@ export default function Contenido({ session }) {
 
   async function handleAgregarBase(curso) {
     setAgregandoBaseId(curso.id);
-    const { data, error } = await supabase
-      .from('contenidos')
+
+    // Los cursos de biblioteca ya vienen armados (pasos y preguntas
+    // redactados a mano), así que se publican directo, sin pasar por
+    // texto→aprobar→generar con IA como el resto del contenido.
+    const { data: microcurso, error } = await supabase
+      .from('microcursos')
       .insert({
         cuenta_id: cuenta.id,
-        tipo: 'texto',
-        archivo_original: curso.titulo,
-        texto_procesado: curso.texto,
-        estado: 'pendiente',
+        titulo: curso.titulo,
+        duracion_min: curso.duracion_min || 14,
+        estado: 'aprobado',
+        preguntas: curso.preguntas || [],
       })
       .select()
       .single();
 
-    setAgregandoBaseId(null);
-    if (error) {
+    if (error || !microcurso) {
       console.error(error);
+      setAgregandoBaseId(null);
       return;
     }
-    setContenidos([data, ...contenidos]);
+
+    const pasosAInsertar = (curso.pasos || []).map((p) => ({
+      microcurso_id: microcurso.id,
+      orden: p.orden,
+      titulo: p.titulo,
+      contenido: p.contenido,
+    }));
+    if (pasosAInsertar.length > 0) {
+      const { error: pasosError } = await supabase.from('pasos').insert(pasosAInsertar);
+      if (pasosError) console.error(pasosError);
+    }
+
+    setAgregandoBaseId(null);
+    setCursosPublicados([microcurso, ...cursosPublicados]);
   }
 
   async function handleSubir(e) {
@@ -332,25 +366,25 @@ export default function Contenido({ session }) {
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-1">Biblioteca de cursos (opcionales)</h2>
             <p className="text-xs text-[#8a8471] mb-3">
-              Cursos ya redactados, listos para agregar a tu negocio con un clic. Después los vas a
-              poder revisar y editar antes de aprobarlos, igual que cualquier otro contenido.
+              Cursos ya redactados y listos, se agregan con un clic directo a tus empleados, sin
+              pasos intermedios ni edición.
             </p>
             <div className="space-y-2">
               {cursosBase.map((curso) => {
-                const yaAgregado = contenidos.some((c) => c.archivo_original === curso.titulo);
+                const yaAgregado = cursosPublicados.some((m) => m.titulo === curso.titulo);
                 return (
                   <div
                     key={curso.id}
                     className="flex items-center justify-between gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
                   >
-                    <p className="text-sm font-semibold text-[#2C2C2A]">{curso.titulo}</p>
+                    <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium" />
                     <button
                       type="button"
                       onClick={() => handleAgregarBase(curso)}
                       disabled={yaAgregado || agregandoBaseId === curso.id}
                       className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
                     >
-                      {yaAgregado ? 'Ya agregado' : agregandoBaseId === curso.id ? 'Agregando...' : 'Agregar'}
+                      {yaAgregado ? 'Ya agregado' : agregandoBaseId === curso.id ? 'Agregando...' : 'Agregar a los cursos'}
                     </button>
                   </div>
                 );
@@ -496,7 +530,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#7F5FD1] rounded-full px-4 py-2 disabled:opacity-60"
+                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
                             >
                               <IconVarita />
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
@@ -590,6 +624,33 @@ export default function Contenido({ session }) {
             </div>
           )}
         </div>
+
+        {cursosPublicados.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="font-semibold text-[#2C2C2A]">Cursos disponibles para tus empleados</h2>
+              <span className="w-6 h-6 rounded-full bg-[#1B2A3D] text-white font-bold text-xs flex items-center justify-center">
+                {cursosPublicados.length}
+              </span>
+            </div>
+            <p className="text-xs text-[#8a8471] mb-3">
+              Ya están publicados y visibles para tu equipo. No se pueden editar desde acá.
+            </p>
+            <div className="space-y-2">
+              {cursosPublicados.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
+                >
+                  <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 bg-[#1B2A3D] text-white">
+                    Agregado
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </PageShell>
     </div>
   );
