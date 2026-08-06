@@ -202,7 +202,7 @@ export default function Empleados({ session }) {
     }
 
     const link = `${window.location.origin}/empleado?token=${data.token_acceso}`;
-    setUltimoLink(link);
+    setUltimoLink({ link, pin: data.pin });
     setNombreEmpleado('');
     setPuesto('');
     setPuestoCustom('');
@@ -322,6 +322,13 @@ export default function Empleados({ session }) {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => alert(`PIN de ${e.nombre}: ${e.pin}`)}
+              title="Ver PIN de acceso"
+              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center text-[10px] font-bold"
+            >
+              PIN
+            </button>
             <button
               onClick={() => {
                 const link = `${window.location.origin}/empleado?token=${e.token_acceso}`;
@@ -570,7 +577,14 @@ export default function Empleados({ session }) {
           {ultimoLink && (
             <div className="mt-4 bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm">
               <p className="text-[#2C2C2A] mb-1 font-semibold">Mandale este link al empleado:</p>
-              <p className="text-[#3d382c] break-all">{ultimoLink}</p>
+              <p className="text-[#3d382c] break-all mb-2">{ultimoLink.link}</p>
+              <p className="text-[#2C2C2A] font-semibold">
+                Y este PIN, por separado (WhatsApp aparte, o de palabra):{' '}
+                <span className="text-[#C1502E] text-base tracking-widest">{ultimoLink.pin}</span>
+              </p>
+              <p className="text-[10px] text-[#8a8471] mt-1">
+                Se lo va a pedir la primera vez que abra el link en su celular, así nos aseguramos que sea él.
+              </p>
             </div>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { esCursoSeguridadEHigiene, BadgeCurso, BadgeEspecial } from '../components/Badges';
+import PinGate from '../components/PinGate';
 
 // Si el contenido del paso viene en varias líneas (cosas puntuales), se
 // muestra como lista con viñetas, mucho más práctico de leer que un
@@ -44,7 +45,7 @@ function TituloCurso({ titulo, className = '' }) {
   );
 }
 
-export default function CursoDetalle() {
+function CursoDetalleInterno() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token');
   const microcursoId = params.get('curso');
@@ -353,5 +354,16 @@ export default function CursoDetalle() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CursoDetalle() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+
+  return (
+    <PinGate token={token}>
+      <CursoDetalleInterno />
+    </PinGate>
   );
 }
