@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PinGate from '../components/PinGate';
 
 function Avatar({ nombre, fotoUrl, size = 72 }) {
   const estilo = { width: size, height: size, border: '2px solid #C1502E' };
@@ -24,7 +25,7 @@ function IconBadge(props) {
   );
 }
 
-export default function Empleado({ onDatosCargados }) {
+function EmpleadoInterno({ onDatosCargados }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [datos, setDatos] = useState(null);
@@ -189,5 +190,16 @@ export default function Empleado({ onDatosCargados }) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Empleado({ onDatosCargados }) {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+
+  return (
+    <PinGate token={token}>
+      <EmpleadoInterno onDatosCargados={onDatosCargados} />
+    </PinGate>
   );
 }
