@@ -88,6 +88,12 @@ export default function Empleados({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+
+  const puestosBase = PUESTOS_CATALOGO.filter((p) => p !== 'Otro');
+  const puestosPersonalizados = [...new Set(empleados.map((e) => e.puesto).filter(Boolean))].filter(
+    (p) => !puestosBase.includes(p)
+  );
+  const puestosDisponibles = [...puestosBase, ...puestosPersonalizados.sort(), 'Otro'];
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState('alfabetico'); // 'alfabetico' | 'sucursal'
 
@@ -238,7 +244,7 @@ export default function Empleados({ session }) {
     }
     setEditandoId(e.id);
     const puestoActual = e.puesto || '';
-    const estaEnCatalogo = PUESTOS_CATALOGO.includes(puestoActual);
+    const estaEnCatalogo = puestosDisponibles.includes(puestoActual);
     setEditForm({
       nombre: e.nombre || '',
       puesto: estaEnCatalogo ? puestoActual : puestoActual ? 'Otro' : '',
@@ -359,7 +365,7 @@ export default function Empleados({ session }) {
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             >
               <option value="">Elegí el puesto</option>
-              {PUESTOS_CATALOGO.map((p) => (
+              {puestosDisponibles.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -398,7 +404,7 @@ export default function Empleados({ session }) {
               </button>
               <button
                 onClick={() => setEditandoId(null)}
-                className="text-xs font-semibold text-[#8a8471] border border-[#EFDDCE] rounded-full px-4 py-1.5"
+                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5"
               >
                 Salir
               </button>
@@ -506,7 +512,7 @@ export default function Empleados({ session }) {
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               >
                 <option value="">Elegí el puesto</option>
-                {PUESTOS_CATALOGO.map((p) => (
+                {puestosDisponibles.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>

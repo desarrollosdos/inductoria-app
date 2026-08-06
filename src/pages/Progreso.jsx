@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
-import { esCursoSeguridadEHigiene, BadgeConTitulo } from '../components/Badges';
+import { esCursoSeguridadEHigiene, BadgeConTitulo, TituloCursoInline } from '../components/Badges';
 
 function IconProgresoMini(props) {
   return (
@@ -271,8 +271,8 @@ export default function Progreso({ session }) {
                 return (
                   <div key={c.microcurso_id}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm text-[#3d382c] font-medium truncate">
-                        {c.titulo}
+                      <p className="text-sm font-medium truncate">
+                        <TituloCursoInline titulo={c.titulo} />
                         {c.especial && <span className="ml-1 text-[#C1502E]">★</span>}
                       </p>
                       <span className="text-xs font-semibold text-[#8a8471] flex-shrink-0 ml-2">
@@ -328,7 +328,7 @@ export default function Progreso({ session }) {
                                 <button
                                   onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
                                   title="Ver PIN de acceso"
-                                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                                  className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0"
                                 >
                                   PIN
                                 </button>
