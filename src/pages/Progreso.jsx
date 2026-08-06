@@ -25,6 +25,17 @@ function Avatar({ e, size = 32 }) {
   );
 }
 
+function colorPorPorcentaje(pct) {
+  // Amarillo (#EAB308) en 0% -> Verde (#1D9E75) en 100%, transición continua.
+  const amarillo = [234, 179, 8];
+  const verde = [29, 158, 117];
+  const t = Math.min(Math.max(pct / 100, 0), 1);
+  const r = Math.round(amarillo[0] + (verde[0] - amarillo[0]) * t);
+  const g = Math.round(amarillo[1] + (verde[1] - amarillo[1]) * t);
+  const b = Math.round(amarillo[2] + (verde[2] - amarillo[2]) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export default function Progreso({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [filas, setFilas] = useState([]);
@@ -266,8 +277,7 @@ export default function Progreso({ session }) {
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
             <div className="space-y-2">
               {cursosRanking.map((c) => {
-                const maxCantidad = cursosRanking[0].cantidad;
-                const porcentajeBarra = maxCantidad > 0 ? Math.round((c.cantidad / maxCantidad) * 100) : 0;
+                const porcentajeBarra = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
                 return (
                   <div key={c.microcurso_id}>
                     <div className="flex items-center justify-between mb-1">
@@ -281,8 +291,8 @@ export default function Progreso({ session }) {
                     </div>
                     <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#C1502E] rounded-full"
-                        style={{ width: `${porcentajeBarra}%` }}
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${porcentajeBarra}%`, backgroundColor: colorPorPorcentaje(porcentajeBarra) }}
                       />
                     </div>
                   </div>
