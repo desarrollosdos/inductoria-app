@@ -2,7 +2,7 @@
 // ------------------------------------------------
 // El dueño aprieta "Generar curso con IA" sobre un contenido puntual.
 // Esto le manda el texto a Claude (Haiku, el modelo más barato), le pide
-// que lo convierta en 2-4 pasos cortos + 3 preguntas de opción múltiple,
+// que lo convierta en pasos desarrollados + preguntas de opción múltiple,
 // y crea un microcurso en estado "pendiente" (borrador, el dueño todavía
 // tiene que revisarlo y aprobarlo antes de que lo vea un empleado).
 //
@@ -72,13 +72,15 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-    const prompt = `Convertí el siguiente material de capacitación de un comercio en un microcurso corto para un empleado nuevo.
+    const prompt = `Convertí el siguiente material de capacitación de un comercio en un microcurso desarrollado para un empleado nuevo. Tiene que quedar completo y útil por sí solo, no un resumen apurado: alguien que lea solo esto tiene que entender el tema a fondo, sin necesidad de preguntar nada más.
 
 Reglas:
-- Entre 2 y 4 pasos, cada uno con un título corto y un texto de no más de 150 palabras.
-- El texto de cada paso tiene que ser claro, directo, en segunda persona ("vos"), tono argentino.
-- 3 preguntas de opción múltiple (3 opciones cada una) que evalúen los puntos clave de los pasos.
-- No inventes información que no esté en el material original.
+- Entre 3 y 5 pasos, cada uno con un título corto.
+- Cada paso tiene que tener entre 180 y 280 palabras (no menos). Desarrollá bien cada idea: explicá el POR QUÉ de cada cosa, no solo el QUÉ, y sumá al menos un ejemplo concreto o una situación típica del día a día del comercio cuando ayude a entender mejor.
+- Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (por ejemplo: cosas que sí hacer, cosas que no hacer, checklist de apertura), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones.
+- El texto tiene que ser claro, directo, en segunda persona ("vos"), tono argentino, como si un compañero con experiencia se lo explicara a el que recién arranca.
+- 3 a 5 preguntas de opción múltiple (3 opciones cada una) que evalúen los puntos clave de los pasos, no detalles menores.
+- No inventes información que no esté en el material original. Si el material es corto, desarrollá y explicá mejor lo que SÍ está (con más contexto, ejemplos y aplicación práctica), pero no agregues datos, cifras o normas que no estén en el original.
 
 Material original:
 """
@@ -102,7 +104,7 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
