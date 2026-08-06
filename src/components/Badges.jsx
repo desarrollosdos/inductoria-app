@@ -14,6 +14,26 @@ export function esCursoSeguridadEHigiene(titulo) {
   return t.includes('seguridad') && t.includes('higiene');
 }
 
+// Estándar de nombre de curso en toda la app: la parte hasta los ":"
+// va en terracota y negrita, el resto en texto normal. Si no hay ":",
+// todo el título va en terracota y negrita.
+export function TituloCursoInline({ titulo, className = '' }) {
+  if (!titulo) return null;
+  const tieneDosPuntos = titulo.includes(':');
+  return (
+    <span className={className}>
+      {tieneDosPuntos ? (
+        <>
+          <span className="font-bold text-[#C1502E]">{titulo.split(':')[0]}:</span>
+          <span>{titulo.split(':').slice(1).join(':')}</span>
+        </>
+      ) : (
+        <span className="font-bold text-[#C1502E]">{titulo}</span>
+      )}
+    </span>
+  );
+}
+
 // Badge estándar: círculo verde relleno, para cualquier curso.
 export function BadgeCurso({ size = 72 }) {
   return (
@@ -55,7 +75,7 @@ export function BadgeConTitulo({ titulo, especial, size = 24 }) {
   return (
     <div className="flex items-center gap-1.5">
       {especial ? <BadgeEspecial size={size} /> : <BadgeCurso size={size} />}
-      <p className="text-xs text-[#3d382c] font-medium">{titulo}</p>
+      <TituloCursoInline titulo={titulo} className="text-xs font-medium" />
     </div>
   );
 }
