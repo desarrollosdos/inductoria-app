@@ -282,7 +282,7 @@ export default function Progreso({ session }) {
                   <div key={c.microcurso_id}>
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-[13px] font-medium truncate">
-                        <TituloCursoInline titulo={c.titulo} />
+                        <TituloCursoInline titulo={c.titulo} corto />
                         {c.especial && <span className="ml-1 text-[#C1502E]">★</span>}
                       </p>
                       <span className="text-xs font-semibold text-[#8a8471] flex-shrink-0 ml-2">

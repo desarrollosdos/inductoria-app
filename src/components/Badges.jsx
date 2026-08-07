@@ -17,9 +17,15 @@ export function esCursoSeguridadEHigiene(titulo) {
 // Estándar de nombre de curso en toda la app: la parte hasta los ":"
 // va en terracota y negrita, el resto en texto normal. Si no hay ":",
 // todo el título va en terracota y negrita.
-export function TituloCursoInline({ titulo, className = '' }) {
+export function TituloCursoInline({ titulo, className = '', corto = false }) {
   if (!titulo) return null;
   const tieneDosPuntos = titulo.includes(':');
+
+  if (corto) {
+    const soloAntes = tieneDosPuntos ? titulo.split(':')[0] : titulo;
+    return <span className={`font-semibold text-[#C1502E] ${className}`}>{soloAntes}</span>;
+  }
+
   return (
     <span className={className}>
       {tieneDosPuntos ? (
@@ -42,7 +48,7 @@ export function CursoCompletadoFila({ titulo, especial }) {
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={especial ? '#185FA5' : '#3B6D11'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
         <path d="M4 12.5 L9.5 18 L20 6" />
       </svg>
-      <TituloCursoInline titulo={titulo} className="text-[13px]" />
+      <TituloCursoInline titulo={titulo} className="text-[13px]" corto />
     </div>
   );
 }
