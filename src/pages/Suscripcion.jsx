@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
+import CancelarSuscripcionModal from '../components/CancelarSuscripcionModal';
 import { precioTotalMensual } from '../lib/precio';
 
 function IconCard(props) {
@@ -56,6 +57,7 @@ export default function Suscripcion({ session }) {
   const [precioBase, setPrecioBase] = useState(12000);
   const [loading, setLoading] = useState(true);
   const [iniciandoPago, setIniciandoPago] = useState(false);
+  const [mostrarCancelar, setMostrarCancelar] = useState(false);
 
   useEffect(() => {
     cargar();
@@ -193,8 +195,29 @@ export default function Suscripcion({ session }) {
               </button>
             </>
           )}
+
+          {cuenta.plan === 'active' && (
+            <div>
+              <button
+                onClick={() => setMostrarCancelar(true)}
+                className="text-xs text-[#6b6455] underline"
+              >
+                Cancelar suscripción
+              </button>
+            </div>
+          )}
         </div>
       </PageShell>
+
+      {mostrarCancelar && (
+        <CancelarSuscripcionModal
+          onClose={() => setMostrarCancelar(false)}
+          onCancelled={() => {
+            setMostrarCancelar(false);
+            cargar();
+          }}
+        />
+      )}
     </div>
   );
 }
