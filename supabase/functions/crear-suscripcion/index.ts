@@ -1,8 +1,12 @@
 // Inductoria · Edge Function: crear-suscripcion
 // ------------------------------------------------
 // Crea la suscripción (preapproval) en MercadoPago cuando el dueño
-// hace clic en "Suscribirme". El precio se calcula según la cantidad
-// de sucursales que tenga contratadas.
+// hace clic en "Suscribirme". El precio se calcula igual que en
+// Suscripcion.jsx: precio_base configurable desde Admin, con las
+// mismas proporciones por volumen de src/lib/precio.js (duplicadas
+// acá porque las Edge Functions no pueden importar directo desde
+// src/lib — si alguna vez cambian las proporciones, hay que tocar
+// los dos lugares).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -11,11 +15,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function precioPorSucursales(n: number): number {
-  if (n <= 1) return 12000;
-  if (n <= 4) return n * 10000;
-  if (n <= 9) return n * 9000;
-  return n * 8000;
+// Mismos tiers y proporciones que src/lib/precio.js
+const TIERS_PRECIO = [
+  { hasta: 1, factor: 12000 / 12000 },
+  { hasta: 4, factor: 10000 / 12000 },
+  { hasta: 9, factor: 9000 / 12000 },
+  { hasta: Infinity, factor: 8000 / 12000 },
+];
+
+function precioTotalMensual(cantidadSucursales: number, precioBase: number): number {
+  const tier = TIERS_PRECIO.find((t) => cantidadSucursales <= t.hasta)!;
+  const precioPorSucursal = Math.round((precioBase * tier.factor) / 100) * 100;
+  return precioPorSucursal * cantidadSucursales;
 }
 
 Deno.serve(async (req) => {
@@ -70,7 +81,16 @@ Deno.serve(async (req) => {
       .eq('cuenta_id', cuentaId);
 
     const cantidadSucursales = Math.max(negociosCount || 1, cuenta.sucursales_contratadas || 1);
-    const monto = precioPorSucursales(cantidadSucursales);
+
+    // Precio base configurable desde Admin, mismo que lee Suscripcion.jsx.
+    const { data: configPrecio } = await supabase
+      .from('configuracion_precio')
+      .select('precio_base')
+      .eq('id', 1)
+      .maybeSingle();
+
+    const precioBase = configPrecio?.precio_base || 12000;
+    const monto = precioTotalMensual(cantidadSucursales, precioBase);
 
     const mpToken = Deno.env.get('MP_ACCESS_TOKEN')!;
     const appUrl = Deno.env.get('APP_URL') || 'https://app.inductoria.com.ar';
