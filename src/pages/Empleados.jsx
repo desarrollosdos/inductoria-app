@@ -5,6 +5,14 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 
+// Cuentas que siempre tienen acceso completo, sin importar el estado de
+// la suscripción (equipo interno / pruebas).
+const CUENTAS_EXENTAS = [
+  'desarrollosdos@gmail.com',
+  'lucasanzone@gmail.com',
+  'sofiasanzone@gmail.com',
+];
+
 const PUESTOS_CATALOGO = [
   'Vendedor/a',
   'Cajero/a',
@@ -316,7 +324,10 @@ export default function Empleados({ session }) {
     );
   }
 
-  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
+  const hasAccess =
+    CUENTAS_EXENTAS.includes(session.user.email) ||
+    cuenta.plan === 'active' ||
+    cuenta.plan === 'past_due';
   const activos = empleados.filter((e) => !e.fecha_baja);
   const dadosDeBaja = empleados.filter((e) => e.fecha_baja);
 

@@ -5,6 +5,14 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 
+// Cuentas que siempre tienen acceso completo, sin importar el estado de
+// la suscripción (equipo interno / pruebas).
+const CUENTAS_EXENTAS = [
+  'desarrollosdos@gmail.com',
+  'lucasanzone@gmail.com',
+  'sofiasanzone@gmail.com',
+];
+
 function IconSucursalesMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -17,7 +25,6 @@ function IconSucursalesMini(props) {
 const FORM_VACIO = {
   nombre: '',
   direccion: '',
-  barrio: '',
   localidad: '',
   provincia: '',
   codigo_postal: '',
@@ -44,24 +51,14 @@ function CamposDireccion({ form, setForm }) {
         placeholder="Dirección (calle y número)"
         className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
       />
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          type="text"
-          required
-          value={form.barrio}
-          onChange={(e) => setForm({ ...form, barrio: e.target.value })}
-          placeholder="Barrio"
-          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-        />
-        <input
-          type="text"
-          required
-          value={form.localidad}
-          onChange={(e) => setForm({ ...form, localidad: e.target.value })}
-          placeholder="Localidad"
-          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-        />
-      </div>
+      <input
+        type="text"
+        required
+        value={form.localidad}
+        onChange={(e) => setForm({ ...form, localidad: e.target.value })}
+        placeholder="Localidad"
+        className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+      />
       <div className="grid grid-cols-2 gap-2">
         <input
           type="text"
@@ -182,7 +179,6 @@ export default function Dashboard({ session }) {
     if (
       !form.nombre.trim() ||
       !form.direccion.trim() ||
-      !form.barrio.trim() ||
       !form.localidad.trim() ||
       !form.provincia.trim() ||
       !form.telefono.trim() ||
@@ -197,7 +193,6 @@ export default function Dashboard({ session }) {
         cuenta_id: cuenta.id,
         nombre: form.nombre.trim(),
         direccion: form.direccion.trim(),
-        barrio: form.barrio.trim(),
         localidad: form.localidad.trim(),
         provincia: form.provincia.trim(),
         codigo_postal: form.codigo_postal.trim() || null,
@@ -225,7 +220,6 @@ export default function Dashboard({ session }) {
     setFormEdit({
       nombre: n.nombre || '',
       direccion: n.direccion || '',
-      barrio: n.barrio || '',
       localidad: n.localidad || '',
       provincia: n.provincia || '',
       codigo_postal: n.codigo_postal || '',
@@ -246,7 +240,6 @@ export default function Dashboard({ session }) {
       .update({
         nombre: formEdit.nombre.trim(),
         direccion: formEdit.direccion.trim(),
-        barrio: formEdit.barrio.trim(),
         localidad: formEdit.localidad.trim(),
         provincia: formEdit.provincia.trim(),
         codigo_postal: formEdit.codigo_postal.trim() || null,
@@ -297,7 +290,10 @@ export default function Dashboard({ session }) {
     );
   }
 
-  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
+  const hasAccess =
+    CUENTAS_EXENTAS.includes(session.user.email) ||
+    cuenta.plan === 'active' ||
+    cuenta.plan === 'past_due';
   const cupoLleno = negocios.length >= cuenta.sucursales_contratadas;
 
   return (

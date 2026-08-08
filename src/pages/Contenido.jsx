@@ -4,6 +4,14 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
+
+// Cuentas que siempre tienen acceso completo, sin importar el estado de
+// la suscripción (equipo interno / pruebas).
+const CUENTAS_EXENTAS = [
+  'desarrollosdos@gmail.com',
+  'lucasanzone@gmail.com',
+  'sofiasanzone@gmail.com',
+];
 import { TituloCursoInline } from '../components/Badges';
 
 function IconContenidoMini(props) {
@@ -368,7 +376,10 @@ export default function Contenido({ session }) {
     );
   }
 
-  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
+  const hasAccess =
+    CUENTAS_EXENTAS.includes(session.user.email) ||
+    cuenta.plan === 'active' ||
+    cuenta.plan === 'past_due';
 
   return (
     <div>
