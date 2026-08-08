@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import { TituloCursoInline } from '../components/Badges';
 
 function IconContenidoMini(props) {
@@ -57,6 +58,8 @@ export default function Contenido({ session }) {
   const [cargandoBorrador, setCargandoBorrador] = useState(false);
   const [procesandoAccion, setProcesandoAccion] = useState(false);
 
+  const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,6 +107,11 @@ export default function Contenido({ session }) {
   }
 
   async function handleAgregarBase(curso) {
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setAgregandoBaseId(curso.id);
 
     // Los cursos de biblioteca ya vienen armados (pasos y preguntas
@@ -145,6 +153,12 @@ export default function Contenido({ session }) {
   async function handleSubir(e) {
     e.preventDefault();
     if (!texto.trim()) return;
+
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setSubiendo(true);
 
     const { data, error } = await supabase
@@ -277,6 +291,11 @@ export default function Contenido({ session }) {
   }
 
   async function handleGenerarCurso(id) {
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setGenerandoId(id);
     setErrorGenerar(null);
 
@@ -300,6 +319,12 @@ export default function Contenido({ session }) {
 
   async function handleAprobarCurso() {
     if (!borrador) return;
+
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setProcesandoAccion(true);
     await supabase.from('microcursos').update({ estado: 'aprobado' }).eq('id', borrador.microcurso.id);
     setProcesandoAccion(false);
@@ -342,6 +367,8 @@ export default function Contenido({ session }) {
       </div>
     );
   }
+
+  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
 
   return (
     <div>
@@ -652,6 +679,10 @@ export default function Contenido({ session }) {
           </div>
         )}
       </PageShell>
+
+      {mostrarSuscripcion && (
+        <SuscripcionRequeridaModal onClose={() => setMostrarSuscripcion(false)} />
+      )}
     </div>
   );
 }

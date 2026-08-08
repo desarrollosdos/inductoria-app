@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 
 function IconSucursalesMini(props) {
   return (
@@ -113,6 +114,8 @@ export default function Dashboard({ session }) {
   const [formEdit, setFormEdit] = useState(FORM_VACIO);
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
+  const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,6 +164,11 @@ export default function Dashboard({ session }) {
   async function handleCrearNegocio(e) {
     e.preventDefault();
     setErrorCupo(null);
+
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
 
     if (negocios.length >= cuenta.sucursales_contratadas) {
       setErrorCupo(
@@ -227,6 +235,11 @@ export default function Dashboard({ session }) {
   }
 
   async function handleGuardarEdicion(id) {
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setGuardandoEdit(true);
     const { data, error } = await supabase
       .from('negocios')
@@ -284,6 +297,7 @@ export default function Dashboard({ session }) {
     );
   }
 
+  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
   const cupoLleno = negocios.length >= cuenta.sucursales_contratadas;
 
   return (
@@ -390,6 +404,10 @@ export default function Dashboard({ session }) {
           )}
         </div>
       </PageShell>
+
+      {mostrarSuscripcion && (
+        <SuscripcionRequeridaModal onClose={() => setMostrarSuscripcion(false)} />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 
 const PUESTOS_CATALOGO = [
   'Vendedor/a',
@@ -116,6 +117,8 @@ export default function Empleados({ session }) {
   const [editForm, setEditForm] = useState({ nombre: '', puesto: '', puestoCustom: '', telefono: '', mail: '' });
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
+  const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,8 +173,14 @@ export default function Empleados({ session }) {
   async function handleCrearEmpleado(e) {
     e.preventDefault();
     if (!nombreEmpleado.trim() || !negocioSeleccionado) return;
+
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setCreando(true);
-    setUltimoLink(null);
+    setUltimoCreado(null);
 
     let fotoUrl = null;
     if (fotoBlob) {
@@ -255,6 +264,11 @@ export default function Empleados({ session }) {
   }
 
   async function handleGuardarEdicion(empleadoId) {
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+
     setGuardandoEdit(true);
     const puestoFinal = editForm.puesto === 'Otro' ? editForm.puestoCustom.trim() : editForm.puesto.trim();
     const { data, error } = await supabase
@@ -302,6 +316,7 @@ export default function Empleados({ session }) {
     );
   }
 
+  const hasAccess = cuenta.plan === 'active' || cuenta.plan === 'past_due';
   const activos = empleados.filter((e) => !e.fecha_baja);
   const dadosDeBaja = empleados.filter((e) => e.fecha_baja);
 
@@ -642,6 +657,10 @@ export default function Empleados({ session }) {
           </div>
         )}
       </PageShell>
+
+      {mostrarSuscripcion && (
+        <SuscripcionRequeridaModal onClose={() => setMostrarSuscripcion(false)} />
+      )}
     </div>
   );
 }
