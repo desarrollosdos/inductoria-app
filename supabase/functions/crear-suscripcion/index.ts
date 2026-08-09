@@ -7,6 +7,11 @@
 // acá porque las Edge Functions no pueden importar directo desde
 // src/lib — si alguna vez cambian las proporciones, hay que tocar
 // los dos lugares).
+//
+// A proposito NO se manda payer_email a MercadoPago: si se manda,
+// MercadoPago exige que la cuenta de MercadoPago que paga tenga
+// exactamente ese mail, y no nos importa que coincida con el mail
+// de la cuenta de Inductoria, solo que se pague.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -104,7 +109,6 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         reason: `Inductoria - ${cuenta.nombre}`,
         external_reference: cuentaId,
-        payer_email: user.email,
         back_url: `${appUrl}/suscripcion`,
         auto_recurring: {
           frequency: 1,
