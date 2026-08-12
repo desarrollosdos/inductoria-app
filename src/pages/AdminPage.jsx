@@ -15,6 +15,19 @@ function etiquetaPlan(plan) {
   return plan;
 }
 
+function formatUltimaConexion(fecha) {
+  if (!fecha) return 'Nunca se conectó';
+  const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (1000 * 60 * 60 * 24));
+  const fechaTexto = new Date(fecha).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  if (dias <= 0) return `Hoy (${fechaTexto})`;
+  if (dias === 1) return `Ayer (${fechaTexto})`;
+  return `Hace ${dias} días (${fechaTexto})`;
+}
+
 function IconAlerta(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -330,6 +343,9 @@ export default function AdminPage({ session }) {
                     <p className="text-xs text-[#8a8471]">
                       {c.sucursales}/{c.sucursalesContratadas} sucursales · {c.empleados} empleados · alta{' '}
                       {new Date(c.created_at).toLocaleDateString('es-AR')}
+                    </p>
+                    <p className="text-xs text-[#8a8471] mt-1">
+                      Última conexión: {formatUltimaConexion(c.ultimaConexion)}
                     </p>
                   </div>
                 ))}

@@ -1,8 +1,18 @@
 // Inductoria · Edge Function: mercadopago-webhook
 // ------------------------------------------------
-// Recibe las notificaciones de MercadoPago cuando cambia el estado de
-// una suscripción (preapproval), y actualiza cuentas.plan acorde.
+// Recibe las notificaciones de MercadoPago y actualiza cuentas.plan.
 // Verifica la firma x-signature, mismo mecanismo que en Repunte.
+//
+// MercadoPago manda al menos dos familias de eventos relevantes:
+// - "preapproval" / "subscription_preapproval": la suscripcion en si
+//   cambia de estado (autorizada, pausada, cancelada). Se dispara una
+//   vez por cada cambio de estado, no en cada pago.
+// - "payment" / "subscription_authorized_payment": un pago puntual
+//   DENTRO de una suscripcion ya autorizada (el cobro mensual). Se
+//   dispara cada vez que se cobra, y es el unico evento que llega en
+//   los pagos recurrentes despues del primero.
+// Hay que procesar los dos, si no, la cuenta solo se activa la
+// primera vez y nunca mas se entera de los cobros siguientes.
 //
 // Esta función NO debe pedir JWT de usuario (la llama MercadoPago, no
 // alguien logueado), así que "Verify JWT" tiene que estar DESACTIVADO
@@ -50,13 +60,15 @@ async function verificarFirma(req: Request, dataId: string): Promise<boolean> {
   return firmaHex === hash;
 }
 
-// Mapeo del estado de MercadoPago al plan de la cuenta.
-function mapearEstado(mpStatus: string): string {
+function mapearEstadoPreapproval(mpStatus: string): string {
   if (mpStatus === 'authorized') return 'active';
   if (mpStatus === 'paused') return 'past_due';
   if (mpStatus === 'cancelled') return 'cancelled';
   return 'inactive';
 }
+
+const TIPOS_PREAPPROVAL = new Set(['preapproval', 'subscription_preapproval']);
+const TIPOS_PAGO = new Set(['payment', 'subscription_authorized_payment']);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -68,8 +80,15 @@ Deno.serve(async (req) => {
     const dataId = url.searchParams.get('data.id') || url.searchParams.get('id');
     const tipo = url.searchParams.get('type') || url.searchParams.get('topic');
 
-    if (!dataId || tipo !== 'preapproval') {
-      // Otras notificaciones (pagos sueltos, etc.) las ignoramos por ahora.
+    if (!dataId || !tipo) {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    const esPreapproval = TIPOS_PREAPPROVAL.has(tipo);
+    const esPago = TIPOS_PAGO.has(tipo);
+
+    if (!esPreapproval && !esPago) {
+      // Cualquier otro tipo de evento lo ignoramos por ahora.
       return new Response('ok', { headers: corsHeaders });
     }
 
@@ -83,28 +102,54 @@ Deno.serve(async (req) => {
     }
 
     const mpToken = Deno.env.get('MP_ACCESS_TOKEN')!;
-    const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${dataId}`, {
-      headers: { Authorization: `Bearer ${mpToken}` },
-    });
-
-    if (!mpRes.ok) {
-      console.error('No se pudo consultar el preapproval en MercadoPago');
-      return new Response('ok', { headers: corsHeaders });
-    }
-
-    const preapproval = await mpRes.json();
-    const cuentaId = preapproval.external_reference;
-    const nuevoPlan = mapearEstado(preapproval.status);
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    await supabase
-      .from('cuentas')
-      .update({ plan: nuevoPlan, mp_preapproval_id: dataId })
-      .eq('id', cuentaId);
+    if (esPreapproval) {
+      // Cambio de estado de la suscripcion en si.
+      const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${dataId}`, {
+        headers: { Authorization: `Bearer ${mpToken}` },
+      });
+      if (!mpRes.ok) {
+        console.error('No se pudo consultar el preapproval en MercadoPago');
+        return new Response('ok', { headers: corsHeaders });
+      }
+      const preapproval = await mpRes.json();
+      const cuentaId = preapproval.external_reference;
+      const nuevoPlan = mapearEstadoPreapproval(preapproval.status);
+
+      await supabase
+        .from('cuentas')
+        .update({ plan: nuevoPlan, mp_preapproval_id: dataId })
+        .eq('id', cuentaId);
+    } else if (esPago) {
+      // Un pago puntual dentro de la suscripcion (el cobro mensual).
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+        headers: { Authorization: `Bearer ${mpToken}` },
+      });
+      if (!mpRes.ok) {
+        console.error('No se pudo consultar el pago en MercadoPago');
+        return new Response('ok', { headers: corsHeaders });
+      }
+      const pago = await mpRes.json();
+      const cuentaId = pago.external_reference;
+
+      if (!cuentaId) {
+        console.warn('Pago sin external_reference, no se puede asociar a una cuenta', dataId);
+        return new Response('ok', { headers: corsHeaders });
+      }
+
+      if (pago.status === 'approved') {
+        await supabase
+          .from('cuentas')
+          .update({ plan: 'active' })
+          .eq('id', cuentaId);
+      }
+      // Si el pago rechaza, no tocamos el plan aca: el evento de
+      // preapproval (paused/cancelled) es el que maneja esos casos.
+    }
 
     return new Response('ok', { headers: corsHeaders });
   } catch (err) {

@@ -62,6 +62,16 @@ Deno.serve(async (req) => {
       .from('microcursos')
       .select('*', { count: 'exact', head: true });
 
+    // -----------------------------
+    // Última conexión por cuenta (vía Supabase Auth)
+    // Asume que cuentas.id === auth.users.id (mismo patrón que Repunte)
+    // -----------------------------
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const ultimaConexionPorId: Record<string, string | null> = {};
+    (usersData?.users || []).forEach((u) => {
+      ultimaConexionPorId[u.id] = u.last_sign_in_at ?? null;
+    });
+
     const negociosPorCuenta: Record<string, string[]> = {};
     (negocios || []).forEach((n) => {
       if (!negociosPorCuenta[n.cuenta_id]) negociosPorCuenta[n.cuenta_id] = [];
@@ -106,6 +116,7 @@ Deno.serve(async (req) => {
       sucursalesContratadas: c.sucursales_contratadas,
       empleados: empleadosPorCuenta[c.id] || 0,
       created_at: c.created_at,
+      ultimaConexion: ultimaConexionPorId[c.id] || null,
     }));
 
     // -----------------------------
