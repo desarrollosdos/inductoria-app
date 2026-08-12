@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     // -----------------------------
     const { data: cuentas } = await supabase
       .from('cuentas')
-      .select('id, nombre, plan, sucursales_contratadas, created_at')
+      .select('id, owner_id, nombre, plan, sucursales_contratadas, created_at')
       .order('created_at', { ascending: false });
 
     const { data: negocios } = await supabase.from('negocios').select('id, cuenta_id');
@@ -63,8 +63,7 @@ Deno.serve(async (req) => {
       .select('*', { count: 'exact', head: true });
 
     // -----------------------------
-    // Última conexión por cuenta (vía Supabase Auth)
-    // Asume que cuentas.id === auth.users.id (mismo patrón que Repunte)
+    // Última conexión por cuenta (vía Supabase Auth), cruzando por owner_id
     // -----------------------------
     const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const ultimaConexionPorId: Record<string, string | null> = {};
@@ -116,7 +115,7 @@ Deno.serve(async (req) => {
       sucursalesContratadas: c.sucursales_contratadas,
       empleados: empleadosPorCuenta[c.id] || 0,
       created_at: c.created_at,
-      ultimaConexion: ultimaConexionPorId[c.id] || null,
+      ultimaConexion: ultimaConexionPorId[c.owner_id] || null,
     }));
 
     // -----------------------------
