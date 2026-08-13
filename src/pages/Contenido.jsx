@@ -804,7 +804,7 @@ export default function Contenido({ session }) {
                               guardandoEdit ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C2790C] bg-[#FCE38A] border border-[#F0C24D] rounded-full px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C2790C] bg-[#FCE38A] border border-[#F0C24D] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7] disabled:cursor-not-allowed"
                           >
                             {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                           </button>
@@ -820,7 +820,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#0055A4] bg-[#DCEAF7] border border-[#B5D4F4] rounded-full px-4 py-2 disabled:opacity-60"
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#0055A4] bg-[#DCEAF7] border border-[#B5D4F4] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
                             >
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
                             </button>
@@ -926,7 +926,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion || puestosNuevoCurso.length === 0}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#1D9E75] bg-[#D7F2E6] border border-[#9FE1CB] rounded-full px-4 py-2 disabled:opacity-50"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#1D9E75] bg-[#D7F2E6] border border-[#9FE1CB] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
@@ -934,7 +934,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleDescartarCurso}
                                 disabled={procesandoAccion}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FBE0D6] border border-[#F0997B] rounded-full px-4 py-2 disabled:opacity-60"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FBE0D6] border border-[#F0997B] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
                               >
                                 Descartar
                               </button>
