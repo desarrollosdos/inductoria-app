@@ -96,7 +96,7 @@ export default function Progreso({ session }) {
 
     const { data: empleadosData } = await supabase
       .from('empleados')
-      .select('id, nombre, negocio_id, fecha_alta, foto_url, token_acceso, pin')
+      .select('id, nombre, puesto, negocio_id, fecha_alta, foto_url, token_acceso, pin')
       .in('negocio_id', negocioIds)
       .is('fecha_baja', null)
       .order('fecha_alta', { ascending: false });
@@ -105,11 +105,22 @@ export default function Progreso({ session }) {
 
     const { data: cursosData } = await supabase
       .from('microcursos')
-      .select('id, titulo')
+      .select('id, titulo, puestos_aplicables')
       .eq('cuenta_id', cuentaData.id)
       .eq('estado', 'aprobado');
     const tituloPorCurso = {};
     (cursosData || []).forEach((c) => (tituloPorCurso[c.id] = c.titulo));
+
+    // Total de cursos que le corresponden a CADA empleado según su puesto,
+    // no el total global de la cuenta (un curso sin puestos_aplicables
+    // aplica a todos; si tiene puestos definidos, solo cuenta para esos).
+    function totalCursosParaPuesto(puesto) {
+      return (cursosData || []).filter((c) => {
+        const puestos = c.puestos_aplicables;
+        if (!puestos || puestos.length === 0) return true;
+        return puesto && puestos.includes(puesto);
+      }).length;
+    }
 
     let progresoPorEmpleado = {};
     const conteoPorCurso = {};
@@ -161,6 +172,7 @@ export default function Progreso({ session }) {
       ...e,
       negocioNombre: negociosPorId[e.negocio_id] || '—',
       completados: progresoPorEmpleado[e.id]?.completados || 0,
+      totalCursos: totalCursosParaPuesto(e.puesto),
       ultimaActividad: progresoPorEmpleado[e.id]?.ultimaActividad || null,
       badges: progresoPorEmpleado[e.id]?.badges || [],
     }));
@@ -188,8 +200,12 @@ export default function Progreso({ session }) {
   }
 
   const promedioGeneral =
-    totalCursos > 0 && filas.length > 0
-      ? Math.round((filas.reduce((acc, f) => acc + f.completados / totalCursos, 0) / filas.length) * 100)
+    filas.length > 0
+      ? Math.round(
+          (filas.reduce((acc, f) => acc + (f.totalCursos > 0 ? f.completados / f.totalCursos : 0), 0) /
+            filas.length) *
+            100
+        )
       : 0;
 
   // Métricas inspiradas en lo que muestran plataformas de capacitación
@@ -336,7 +352,7 @@ export default function Progreso({ session }) {
           ) : (
             <div className="space-y-3">
               {filas.map((f) => {
-                const porcentaje = totalCursos > 0 ? Math.round((f.completados / totalCursos) * 100) : 0;
+                const porcentaje = f.totalCursos > 0 ? Math.round((f.completados / f.totalCursos) * 100) : 0;
                 const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
                 return (
                   <div key={f.id} className="border-b border-[#EDE0C8] pb-3 last:border-0">
@@ -346,7 +362,7 @@ export default function Progreso({ session }) {
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {totalCursos > 0 && f.completados < totalCursos && (
+                            {f.totalCursos > 0 && f.completados < f.totalCursos && (
                               <>
                                 <button
                                   onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
@@ -378,7 +394,7 @@ export default function Progreso({ session }) {
                               </>
                             )}
                             <p className="text-xs font-medium text-[#3d382c] whitespace-nowrap">
-                              {f.completados}/{totalCursos} cursos · {f.negocioNombre}
+                              {f.completados}/{f.totalCursos} cursos · {f.negocioNombre}
                             </p>
                           </div>
                         </div>
