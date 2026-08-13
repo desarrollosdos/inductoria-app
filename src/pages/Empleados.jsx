@@ -46,6 +46,32 @@ function IconCamara(props) {
   );
 }
 
+function IconGaleria(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </svg>
+  );
+}
+
+// Mensajes de validación de campos obligatorios en castellano (el
+// navegador muestra "Please fill out this field" en inglés por default).
+function validarCampo(e) {
+  const el = e.target;
+  if (el.validity.valueMissing) {
+    el.setCustomValidity('Completá este campo.');
+  } else if (el.validity.typeMismatch) {
+    el.setCustomValidity('Ingresá un mail válido.');
+  } else {
+    el.setCustomValidity('');
+  }
+}
+function limpiarValidacion(e) {
+  e.target.setCustomValidity('');
+}
+
 // Recorta la foto a un cuadrado (centrado), listo para mostrar en círculo.
 function recortarACuadrado(file) {
   return new Promise((resolve, reject) => {
@@ -492,27 +518,31 @@ export default function Empleados({ session }) {
                       type="button"
                       onClick={() => fileInputCamaraRef.current.click()}
                       disabled={procesandoFoto}
-                      className="text-xs font-semibold text-[#C1502E] border border-[#C1502E] rounded-full px-3 py-1"
+                      title="Tomar foto"
+                      className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center disabled:opacity-60"
                     >
-                      Tomar foto
+                      <IconCamara />
                     </button>
                     <button
                       type="button"
                       onClick={() => fileInputGaleriaRef.current.click()}
                       disabled={procesandoFoto}
-                      className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-3 py-1"
+                      title="Elegir de galería"
+                      className="w-9 h-9 rounded-full bg-[#EDE0C8] text-[#8a8471] flex items-center justify-center disabled:opacity-60"
                     >
-                      Elegir de galería
+                      <IconGaleria />
                     </button>
                   </div>
                   <span className="text-xs text-[#8a8471]">
-                    {procesandoFoto ? 'Procesando...' : fotoPreview ? 'Foto lista' : 'Opcional'}
+                    {procesandoFoto ? 'Procesando...' : fotoPreview ? 'Foto lista' : 'Foto opcional'}
                   </span>
                 </div>
               </div>
               <select
                 value={negocioSeleccionado}
                 onChange={(e) => setNegocioSeleccionado(e.target.value)}
+                onInvalid={validarCampo}
+                onInput={limpiarValidacion}
                 required
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               >
@@ -528,6 +558,8 @@ export default function Empleados({ session }) {
                 required
                 value={nombreEmpleado}
                 onChange={(e) => setNombreEmpleado(e.target.value)}
+                onInvalid={validarCampo}
+                onInput={limpiarValidacion}
                 placeholder="Nombre del empleado"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
@@ -535,6 +567,8 @@ export default function Empleados({ session }) {
                 required
                 value={puesto}
                 onChange={(e) => setPuesto(e.target.value)}
+                onInvalid={validarCampo}
+                onInput={limpiarValidacion}
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               >
                 <option value="">Elegí el puesto</option>
@@ -550,6 +584,8 @@ export default function Empleados({ session }) {
                   required
                   value={puestoCustom}
                   onChange={(e) => setPuestoCustom(e.target.value)}
+                  onInvalid={validarCampo}
+                  onInput={limpiarValidacion}
                   placeholder="Especificá el puesto"
                   className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
                 />
@@ -565,6 +601,8 @@ export default function Empleados({ session }) {
                 type="email"
                 value={mailEmpleado}
                 onChange={(e) => setMailEmpleado(e.target.value)}
+                onInvalid={validarCampo}
+                onInput={limpiarValidacion}
                 placeholder="Mail"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
