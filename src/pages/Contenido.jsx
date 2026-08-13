@@ -48,6 +48,7 @@ export default function Contenido({ session }) {
   const [subiendo, setSubiendo] = useState(false);
   const [arrastrando, setArrastrando] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState(null);
+  const [extrayendoArchivo, setExtrayendoArchivo] = useState(false);
 
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
@@ -201,23 +202,58 @@ export default function Contenido({ session }) {
     if (!file) return;
     setErrorArchivo(null);
 
-    const esTexto = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
-    if (!esTexto) {
-      setErrorArchivo(
-        'Por ahora solo se puede subir archivo .txt. PDF y audio todavía no están armados, es el próximo paso.'
-      );
+    const nombreLower = file.name.toLowerCase();
+    const esTxt = file.type === 'text/plain' || nombreLower.endsWith('.txt');
+    const esPdf = file.type === 'application/pdf' || nombreLower.endsWith('.pdf');
+    const esDocx =
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      nombreLower.endsWith('.docx');
+
+    if (!esTxt && !esPdf && !esDocx) {
+      setErrorArchivo('Solo se aceptan archivos .txt, .pdf o .docx. Audio todavía no está armado.');
       return;
     }
 
-    const lector = new FileReader();
-    lector.onload = (e) => {
-      setTexto(e.target.result);
+    if (esTxt) {
+      const lector = new FileReader();
+      lector.onload = (e) => {
+        setTexto(e.target.result);
+        if (!titulo.trim()) {
+          setTitulo(file.name.replace(/\.txt$/i, ''));
+        }
+      };
+      lector.onerror = () => setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
+      lector.readAsText(file);
+      return;
+    }
+
+    // PDF y .docx pasan por el servidor para extraer el texto.
+    setExtrayendoArchivo(true);
+    const lectorBinario = new FileReader();
+    lectorBinario.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1]; // saca el prefijo data:...;base64,
+      const { data, error } = await supabase.functions.invoke('extraer-texto-archivo', {
+        method: 'POST',
+        body: { archivo_base64: base64, nombre_archivo: file.name, tipo: file.type },
+      });
+
+      setExtrayendoArchivo(false);
+
+      if (error || data?.error) {
+        setErrorArchivo(data?.error || 'No se pudo extraer el texto del archivo.');
+        return;
+      }
+
+      setTexto(data.texto);
       if (!titulo.trim()) {
-        setTitulo(file.name.replace(/\.txt$/i, ''));
+        setTitulo(file.name.replace(/\.(pdf|docx)$/i, ''));
       }
     };
-    lector.onerror = () => setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
-    lector.readAsText(file);
+    lectorBinario.onerror = () => {
+      setExtrayendoArchivo(false);
+      setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
+    };
+    lectorBinario.readAsDataURL(file);
   }
 
   function handleDrop(e) {
@@ -486,8 +522,8 @@ export default function Contenido({ session }) {
             <h2 className="font-semibold text-[#2C2C2A]">Subir contenido nuevo</h2>
           </div>
           <p className="text-xs text-[#8a8471] mb-3">
-            Pegá el texto acá abajo, o arrastrá un archivo .txt. PDF y audio directo todavía no están
-            armados, es el próximo paso.
+            Pegá el texto acá abajo, o arrastrá un archivo .txt, .pdf o .docx. Audio directo
+            todavía no está armado, es el próximo paso.
           </p>
           <form onSubmit={handleSubir} className="space-y-2">
             <input
@@ -515,11 +551,14 @@ export default function Contenido({ session }) {
                 <path d="M7 8l5-5 5 5" />
                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
-              Arrastrá un archivo .txt acá, o hacé clic para elegirlo
+              {extrayendoArchivo
+                ? 'Extrayendo texto del archivo...'
+                : 'Arrastrá un archivo .txt, .pdf o .docx acá, o hacé clic para elegirlo'}
               <input
                 type="file"
-                accept=".txt,text/plain"
+                accept=".txt,text/plain,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(e) => handleArchivo(e.target.files?.[0])}
+                disabled={extrayendoArchivo}
                 className="hidden"
               />
             </label>
