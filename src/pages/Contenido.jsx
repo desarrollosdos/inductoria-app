@@ -820,9 +820,8 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-[#0055A4] bg-[#DCEAF7] rounded-full px-4 py-2 disabled:opacity-60"
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#0055A4] bg-[#DCEAF7] rounded-full px-4 py-2 disabled:opacity-60"
                             >
-                              <IconVarita />
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
                             </button>
                           )}
