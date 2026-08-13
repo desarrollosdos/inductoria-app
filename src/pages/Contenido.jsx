@@ -72,6 +72,8 @@ export default function Contenido({ session }) {
   const [puestosBiblioteca, setPuestosBiblioteca] = useState([]);
 
   const [cursosPublicados, setCursosPublicados] = useState([]);
+  const [gapsPorCurso, setGapsPorCurso] = useState({});
+  const [gapAbiertoId, setGapAbiertoId] = useState(null);
 
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
@@ -134,6 +136,13 @@ export default function Contenido({ session }) {
       // lista editable: ya están en "Cursos disponibles para tus empleados",
       // de solo lectura.
       setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
+
+      supabase.functions.invoke('gaps-conocimiento', { method: 'GET' }).then(({ data, error }) => {
+        if (error || !data?.gaps) return;
+        const mapa = {};
+        data.gaps.forEach((g) => (mapa[g.microcurso_id] = g));
+        setGapsPorCurso(mapa);
+      });
     }
 
     const { data: baseData } = await supabase
@@ -1006,17 +1015,42 @@ export default function Contenido({ session }) {
                           {editando ? 'Cancelar' : 'Cambiar versión'}
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => abrirEdicionPuestos(m)}
-                        className={`mt-2 text-xs font-semibold rounded-lg px-3 py-1.5 border ${
-                          sinDefinir
-                            ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                            : 'text-[#6b6455] border-[#EDE0C8]'
-                        }`}
-                      >
-                        {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap mt-2">
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicionPuestos(m)}
+                          className={`text-xs font-semibold rounded-lg px-3 py-1.5 border ${
+                            sinDefinir
+                              ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
+                              : 'text-[#6b6455] border-[#EDE0C8]'
+                          }`}
+                        >
+                          {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
+                        </button>
+                        {gapsPorCurso[m.id]?.total > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setGapAbiertoId(gapAbiertoId === m.id ? null : m.id)}
+                            className="text-xs font-semibold text-[#D69A2D] border border-[#D69A2D] bg-[#FCF3DD] rounded-lg px-3 py-1.5"
+                          >
+                            {gapsPorCurso[m.id].total} pregunta{gapsPorCurso[m.id].total === 1 ? '' : 's'} frecuente
+                            {gapsPorCurso[m.id].total === 1 ? '' : 's'}
+                          </button>
+                        )}
+                      </div>
+                      {gapAbiertoId === m.id && gapsPorCurso[m.id] && (
+                        <div className="mt-2 bg-[#FCF3DD] rounded-lg p-3 space-y-1">
+                          <p className="text-[10px] font-semibold text-[#8a6d1f] mb-1">
+                            Preguntas que hicieron tus empleados sobre este curso — puede ser señal
+                            de que algún paso no quedó claro:
+                          </p>
+                          {gapsPorCurso[m.id].ejemplos.map((ej, i) => (
+                            <p key={i} className="text-xs text-[#6b6455] italic">
+                              "{ej}"
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {editandoPuestos && (
