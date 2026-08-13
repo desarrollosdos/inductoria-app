@@ -67,12 +67,21 @@ Deno.serve(async (req) => {
 
     const { data: microcursos, error: microcursosError } = await supabase
       .from('microcursos')
-      .select('id, titulo, duracion_min, fecha_limite, actualizado_at')
+      .select('id, titulo, duracion_min, fecha_limite, actualizado_at, puestos_aplicables')
       .eq('cuenta_id', negocio.cuenta_id)
       .eq('estado', 'aprobado')
       .order('created_at', { ascending: true });
 
     if (microcursosError) throw microcursosError;
+
+    // Un curso sin puestos_aplicables (null o vacío) aplica a todos.
+    // Si tiene puestos definidos, solo se le asigna al empleado si su
+    // puesto está en esa lista.
+    const microcursosParaEmpleado = (microcursos || []).filter((m) => {
+      const puestos = m.puestos_aplicables;
+      if (!puestos || puestos.length === 0) return true;
+      return empleado.puesto && puestos.includes(empleado.puesto);
+    });
 
     const { data: progreso, error: progresoError } = await supabase
       .from('progreso_empleado')
@@ -86,7 +95,7 @@ Deno.serve(async (req) => {
       progresoPorCurso[p.microcurso_id] = p;
     });
 
-    const microcursosConProgreso = (microcursos || []).map((m) => {
+    const microcursosConProgreso = microcursosParaEmpleado.map((m) => {
       const p = progresoPorCurso[m.id];
       const completado = p?.completado || false;
       const fechaCompletado = p?.fecha_completado ?? null;

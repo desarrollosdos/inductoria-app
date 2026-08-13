@@ -14,6 +14,22 @@ const CUENTAS_EXENTAS = [
 ];
 import { TituloCursoInline } from '../components/Badges';
 
+// Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
+// duplica acá porque son archivos separados sin un módulo compartido
+// de constantes todavía. Si agregás un puesto nuevo al catálogo de
+// Empleados.jsx, replicalo acá para que la asignación por puesto lo vea.
+const PUESTOS_CATALOGO_BASE = [
+  'Vendedor/a',
+  'Cajero/a',
+  'Encargado/a',
+  'Estilista / Peluquero/a',
+  'Manicura / Cosmetóloga',
+  'Recepcionista',
+  'Repositor/a',
+  'Kiosquero/a',
+  'Panadero/a',
+];
+
 function IconContenidoMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -75,6 +91,11 @@ export default function Contenido({ session }) {
   const [actualizandoId, setActualizandoId] = useState(null);
   const [errorActualizar, setErrorActualizar] = useState(null);
 
+  // Asignación por puesto de un curso ya publicado.
+  const [editandoPuestosId, setEditandoPuestosId] = useState(null);
+  const [puestosSeleccionados, setPuestosSeleccionados] = useState([]);
+  const [guardandoPuestos, setGuardandoPuestos] = useState(false);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +113,7 @@ export default function Contenido({ session }) {
     if (cuentaData) {
       const { data: publicadosData } = await supabase
         .from('microcursos')
-        .select('id, titulo, created_at')
+        .select('id, titulo, created_at, puestos_aplicables')
         .eq('cuenta_id', cuentaData.id)
         .eq('estado', 'aprobado')
         .order('created_at', { ascending: false });
@@ -410,6 +431,43 @@ export default function Contenido({ session }) {
     setEditandoPublicadoId(microcursoId);
     setTextoNuevoPublicado('');
     setErrorActualizar(null);
+  }
+
+  function abrirEdicionPuestos(microcurso) {
+    if (editandoPuestosId === microcurso.id) {
+      setEditandoPuestosId(null);
+      return;
+    }
+    setEditandoPuestosId(microcurso.id);
+    setPuestosSeleccionados(microcurso.puestos_aplicables || []);
+  }
+
+  function togglePuesto(puesto) {
+    setPuestosSeleccionados((prev) =>
+      prev.includes(puesto) ? prev.filter((p) => p !== puesto) : [...prev, puesto]
+    );
+  }
+
+  async function handleGuardarPuestos(microcursoId) {
+    setGuardandoPuestos(true);
+    // Array vacío = aplica a todos los puestos, guardamos null para que
+    // quede explícito en la base (en vez de un array vacío).
+    const valor = puestosSeleccionados.length > 0 ? puestosSeleccionados : null;
+
+    const { error } = await supabase
+      .from('microcursos')
+      .update({ puestos_aplicables: valor })
+      .eq('id', microcursoId);
+
+    setGuardandoPuestos(false);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setCursosPublicados(
+      cursosPublicados.map((m) => (m.id === microcursoId ? { ...m, puestos_aplicables: valor } : m))
+    );
+    setEditandoPuestosId(null);
   }
 
   async function handleActualizarPublicado(microcursoId) {
@@ -762,14 +820,30 @@ export default function Contenido({ session }) {
             <div className="space-y-2">
               {cursosPublicados.map((m) => {
                 const editando = editandoPublicadoId === m.id;
+                const editandoPuestos = editandoPuestosId === m.id;
+                const puestosActuales = m.puestos_aplicables || [];
                 return (
                   <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between gap-3 px-4 py-3">
-                      <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div>
+                        <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
+                        <p className="text-[10px] text-[#8a8471] mt-0.5">
+                          {puestosActuales.length > 0
+                            ? `Solo para: ${puestosActuales.join(', ')}`
+                            : 'Para todos los puestos'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                         <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white">
                           Agregado
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicionPuestos(m)}
+                          className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-3 py-1"
+                        >
+                          {editandoPuestos ? 'Cancelar' : 'Puestos'}
+                        </button>
                         <button
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
@@ -779,6 +853,43 @@ export default function Contenido({ session }) {
                         </button>
                       </div>
                     </div>
+
+                    {editandoPuestos && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
+                        <p className="text-xs text-[#8a8471]">
+                          Sin nada tildado, el curso aplica a todos los puestos. Tildá solo los
+                          puestos a los que querés asignarlo.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {PUESTOS_CATALOGO_BASE.map((p) => (
+                            <label
+                              key={p}
+                              className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
+                                puestosSeleccionados.includes(p)
+                                  ? 'bg-[#C1502E] text-white border-[#C1502E]'
+                                  : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={puestosSeleccionados.includes(p)}
+                                onChange={() => togglePuesto(p)}
+                                className="hidden"
+                              />
+                              {p}
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleGuardarPuestos(m.id)}
+                          disabled={guardandoPuestos}
+                          className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
+                        >
+                          {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
+                        </button>
+                      </div>
+                    )}
 
                     {editando && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
