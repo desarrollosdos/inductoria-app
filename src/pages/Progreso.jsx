@@ -13,6 +13,17 @@ function IconProgresoMini(props) {
   );
 }
 
+function IconQR(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" />
+    </svg>
+  );
+}
+
 function Avatar({ e, size = 32 }) {
   const estilo = { width: size, height: size, border: '2px solid #C1502E' };
   if (e.foto_url) {
@@ -42,6 +53,7 @@ export default function Progreso({ session }) {
   const [totalCursos, setTotalCursos] = useState(0);
   const [cursosRanking, setCursosRanking] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [qrAbierto, setQrAbierto] = useState(null);
 
   useEffect(() => {
     cargarTodo();
@@ -325,6 +337,7 @@ export default function Progreso({ session }) {
             <div className="space-y-3">
               {filas.map((f) => {
                 const porcentaje = totalCursos > 0 ? Math.round((f.completados / totalCursos) * 100) : 0;
+                const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
                 return (
                   <div key={f.id} className="border-b border-[#EDE0C8] pb-3 last:border-0">
                     <div className="flex items-center gap-3 mb-1">
@@ -344,8 +357,7 @@ export default function Progreso({ session }) {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    const link = `${window.location.origin}/empleado?token=${f.token_acceso}`;
-                                    navigator.clipboard.writeText(link);
+                                    navigator.clipboard.writeText(linkAcceso);
                                     alert('Link copiado');
                                   }}
                                   title="Copiar link de acceso"
@@ -355,6 +367,13 @@ export default function Progreso({ session }) {
                                     <rect x="9" y="9" width="13" height="13" rx="2" />
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                                   </svg>
+                                </button>
+                                <button
+                                  onClick={() => setQrAbierto(qrAbierto === f.id ? null : f.id)}
+                                  title="Ver código QR"
+                                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
+                                >
+                                  <IconQR />
                                 </button>
                               </>
                             )}
@@ -370,6 +389,33 @@ export default function Progreso({ session }) {
                         )}
                       </div>
                     </div>
+
+                    {qrAbierto === f.id && (
+                      <div className="mt-2 mb-1 bg-[#EDE0C8] rounded-lg p-3 flex items-center gap-3">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(linkAcceso)}`}
+                          alt={`Código QR de acceso para ${f.nombre}`}
+                          width={110}
+                          height={110}
+                          className="rounded-lg bg-white p-1 flex-shrink-0"
+                        />
+                        <div>
+                          <p className="text-xs font-semibold text-[#2C2C2A]">
+                            Escaneá desde el celular del empleado
+                          </p>
+                          <p className="text-xs text-[#8a8471] mt-1">
+                            PIN: <span className="font-bold text-[#C1502E]">{f.pin}</span>
+                          </p>
+                          <button
+                            onClick={() => setQrAbierto(null)}
+                            className="text-[10px] font-semibold text-[#8a8471] underline mt-2"
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="w-full h-2 bg-[#EDE0C8] rounded-full overflow-hidden">
                       <div className="h-full bg-[#3F7D5C] rounded-full" style={{ width: `${porcentaje}%` }} />
                     </div>
