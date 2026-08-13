@@ -264,15 +264,15 @@ export default function AdminPage({ session }) {
           Las métricas de acá reflejan los datos cargados, no una conciliación con MercadoPago.
         </p>
 
-        {/* Subsecciones, mismo patrón que el nav principal, en verde */}
-        <div className="flex justify-between sm:justify-start sm:gap-4">
+        {/* Subsecciones: fila de íconos en desktop, select desplegable en mobile */}
+        <div className="hidden sm:flex sm:gap-4">
           {SUB_TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex-1 sm:flex-none flex flex-col items-center gap-1.5 text-center"
+                className="flex flex-col items-center gap-1.5 text-center"
               >
                 <span
                   className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
@@ -281,7 +281,7 @@ export default function AdminPage({ session }) {
                   <t.Icon />
                 </span>
                 <span
-                  className={`text-[9.5px] sm:text-xs font-semibold whitespace-nowrap ${
+                  className={`text-xs font-semibold whitespace-nowrap ${
                     active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
                   }`}
                 >
@@ -290,6 +290,29 @@ export default function AdminPage({ session }) {
               </button>
             );
           })}
+        </div>
+
+        <div className="sm:hidden relative">
+          <select
+            value={tab}
+            onChange={(e) => setTab(e.target.value)}
+            className="w-full appearance-none rounded-xl border-2 px-4 py-3 text-sm font-semibold pr-10"
+            style={{ borderColor: VERDE, color: '#2C2C2A', background: '#EDE0C8' }}
+          >
+            {SUB_TABS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <span
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center"
+            style={{ background: VERDE, color: '#fff' }}
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
         </div>
 
         {tab === 'resumen' && (

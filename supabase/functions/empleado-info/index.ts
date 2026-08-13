@@ -74,12 +74,14 @@ Deno.serve(async (req) => {
 
     if (microcursosError) throw microcursosError;
 
-    // Un curso sin puestos_aplicables (null o vacío) aplica a todos.
-    // Si tiene puestos definidos, solo se le asigna al empleado si su
-    // puesto está en esa lista.
+    // Un curso sin puestos_aplicables (null o vacío) todavía no fue
+    // publicado para nadie — el dueño no eligió a quién asignarlo. Con
+    // 'TODOS' explícito se le asigna a cualquier puesto; con puestos
+    // puntuales, solo a esos.
     const microcursosParaEmpleado = (microcursos || []).filter((m) => {
       const puestos = m.puestos_aplicables;
-      if (!puestos || puestos.length === 0) return true;
+      if (!puestos || puestos.length === 0) return false;
+      if (puestos.includes('TODOS')) return true;
       return empleado.puesto && puestos.includes(empleado.puesto);
     });
 

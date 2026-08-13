@@ -229,9 +229,13 @@ export default function Contenido({ session }) {
     const esDocx =
       file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       nombreLower.endsWith('.docx');
+    const esImagen =
+      ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type) ||
+      /\.(png|jpe?g|webp)$/.test(nombreLower);
+    const esAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|webm|opus)$/.test(nombreLower);
 
-    if (!esTxt && !esPdf && !esDocx) {
-      setErrorArchivo('Solo se aceptan archivos .txt, .pdf o .docx. Audio todavía no está armado.');
+    if (!esTxt && !esPdf && !esDocx && !esImagen && !esAudio) {
+      setErrorArchivo('Solo se aceptan archivos .txt, .pdf, .docx, imágenes o audio. Video no está soportado.');
       return;
     }
 
@@ -442,16 +446,21 @@ export default function Contenido({ session }) {
     setPuestosSeleccionados(microcurso.puestos_aplicables || []);
   }
 
+  function toggleTodos() {
+    setPuestosSeleccionados((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
+  }
+
   function togglePuesto(puesto) {
-    setPuestosSeleccionados((prev) =>
-      prev.includes(puesto) ? prev.filter((p) => p !== puesto) : [...prev, puesto]
-    );
+    setPuestosSeleccionados((prev) => {
+      const sinTodos = prev.filter((p) => p !== 'TODOS');
+      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
+    });
   }
 
   async function handleGuardarPuestos(microcursoId) {
     setGuardandoPuestos(true);
-    // Array vacío = aplica a todos los puestos, guardamos null para que
-    // quede explícito en la base (en vez de un array vacío).
+    // Sin nada tildado, queda "sin definir" (invisible para empleados)
+    // hasta que el dueño elija explícitamente Todos o puestos puntuales.
     const valor = puestosSeleccionados.length > 0 ? puestosSeleccionados : null;
 
     const { error } = await supabase
@@ -552,14 +561,14 @@ export default function Contenido({ session }) {
                 return (
                   <div
                     key={curso.id}
-                    className="flex items-center justify-between gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
                   >
-                    <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium" />
+                    <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium break-words" />
                     <button
                       type="button"
                       onClick={() => handleAgregarBase(curso)}
                       disabled={yaAgregado || agregandoBaseId === curso.id}
-                      className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                      className="w-full sm:w-auto text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
                     >
                       {yaAgregado ? 'Ya agregado' : agregandoBaseId === curso.id ? 'Agregando...' : 'Agregar a los cursos'}
                     </button>
@@ -580,8 +589,9 @@ export default function Contenido({ session }) {
             <h2 className="font-semibold text-[#2C2C2A]">Subir contenido nuevo</h2>
           </div>
           <p className="text-xs text-[#8a8471] mb-3">
-            Pegá el texto acá abajo, o arrastrá un archivo .txt, .pdf o .docx. Audio directo
-            todavía no está armado, es el próximo paso.
+            Pegá el texto acá abajo, o arrastrá un archivo .txt, .pdf, .docx, una imagen (captura
+            de pantalla o foto) o un audio (nota de voz explicando el tema). Video no está
+            soportado.
           </p>
           <form onSubmit={handleSubir} className="space-y-2">
             <input
@@ -610,11 +620,11 @@ export default function Contenido({ session }) {
                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
               {extrayendoArchivo
-                ? 'Extrayendo texto del archivo...'
-                : 'Arrastrá un archivo .txt, .pdf o .docx acá, o hacé clic para elegirlo'}
+                ? 'Leyendo el archivo...'
+                : 'Arrastrá un .txt, .pdf, .docx, imagen o audio acá, o hacé clic para elegirlo'}
               <input
                 type="file"
-                accept=".txt,text/plain,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".txt,text/plain,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,.mp3,.wav,.m4a,.ogg,audio/*"
                 onChange={(e) => handleArchivo(e.target.files?.[0])}
                 disabled={extrayendoArchivo}
                 className="hidden"
@@ -822,27 +832,37 @@ export default function Contenido({ session }) {
                 const editando = editandoPublicadoId === m.id;
                 const editandoPuestos = editandoPuestosId === m.id;
                 const puestosActuales = m.puestos_aplicables || [];
+                const sinDefinir = puestosActuales.length === 0;
+                const paraTodos = puestosActuales.includes('TODOS');
                 return (
                   <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div>
-                        <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
-                        <p className="text-[10px] text-[#8a8471] mt-0.5">
-                          {puestosActuales.length > 0
-                            ? `Solo para: ${puestosActuales.join(', ')}`
-                            : 'Para todos los puestos'}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3">
+                      <div className="min-w-0">
+                        <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
+                        <p className={`text-[10px] mt-0.5 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
+                          {sinDefinir
+                            ? '⚠ Sin puestos asignados, no visible para nadie todavía'
+                            : paraTodos
+                            ? 'Para todos los puestos'
+                            : `Solo para: ${puestosActuales.join(', ')}`}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white">
-                          Agregado
-                        </span>
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                        {!sinDefinir && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white">
+                            Agregado
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => abrirEdicionPuestos(m)}
-                          className="text-xs font-semibold text-[#8a8471] border border-[#EDE0C8] rounded-full px-3 py-1"
+                          className={`text-xs font-semibold rounded-full px-3 py-1 border ${
+                            sinDefinir
+                              ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
+                              : 'text-[#8a8471] border-[#EDE0C8]'
+                          }`}
                         >
-                          {editandoPuestos ? 'Cancelar' : 'Puestos'}
+                          {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Puestos'}
                         </button>
                         <button
                           type="button"
@@ -857,10 +877,25 @@ export default function Contenido({ session }) {
                     {editandoPuestos && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
-                          Sin nada tildado, el curso aplica a todos los puestos. Tildá solo los
-                          puestos a los que querés asignarlo.
+                          Elegí "Todos los puestos" para que lo vean todos, o tildá puestos
+                          puntuales. Sin nada elegido, el curso no es visible para nadie.
                         </p>
                         <div className="flex flex-wrap gap-2">
+                          <label
+                            className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
+                              puestosSeleccionados.includes('TODOS')
+                                ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
+                                : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={puestosSeleccionados.includes('TODOS')}
+                              onChange={toggleTodos}
+                              className="hidden"
+                            />
+                            Todos los puestos
+                          </label>
                           {PUESTOS_CATALOGO_BASE.map((p) => (
                             <label
                               key={p}
@@ -884,7 +919,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleGuardarPuestos(m.id)}
                           disabled={guardandoPuestos}
-                          className="text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>
