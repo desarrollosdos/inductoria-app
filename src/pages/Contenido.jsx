@@ -68,6 +68,8 @@ export default function Contenido({ session }) {
 
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
+  const [seleccionandoBaseId, setSeleccionandoBaseId] = useState(null);
+  const [puestosBiblioteca, setPuestosBiblioteca] = useState([]);
 
   const [cursosPublicados, setCursosPublicados] = useState([]);
 
@@ -82,6 +84,7 @@ export default function Contenido({ session }) {
   const [borrador, setBorrador] = useState(null); // { microcurso, pasos }
   const [cargandoBorrador, setCargandoBorrador] = useState(false);
   const [procesandoAccion, setProcesandoAccion] = useState(false);
+  const [puestosNuevoCurso, setPuestosNuevoCurso] = useState([]);
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
 
@@ -142,11 +145,32 @@ export default function Contenido({ session }) {
     setLoading(false);
   }
 
+  function abrirSeleccionBase(cursoId) {
+    if (seleccionandoBaseId === cursoId) {
+      setSeleccionandoBaseId(null);
+      return;
+    }
+    setSeleccionandoBaseId(cursoId);
+    setPuestosBiblioteca([]);
+  }
+
+  function toggleTodosBiblioteca() {
+    setPuestosBiblioteca((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
+  }
+
+  function togglePuestoBiblioteca(puesto) {
+    setPuestosBiblioteca((prev) => {
+      const sinTodos = prev.filter((p) => p !== 'TODOS');
+      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
+    });
+  }
+
   async function handleAgregarBase(curso) {
     if (!hasAccess) {
       setMostrarSuscripcion(true);
       return;
     }
+    if (puestosBiblioteca.length === 0) return;
 
     setAgregandoBaseId(curso.id);
 
@@ -161,6 +185,7 @@ export default function Contenido({ session }) {
         duracion_min: curso.duracion_min || 14,
         estado: 'aprobado',
         preguntas: curso.preguntas || [],
+        puestos_aplicables: puestosBiblioteca,
       })
       .select()
       .single();
@@ -183,6 +208,8 @@ export default function Contenido({ session }) {
     }
 
     setAgregandoBaseId(null);
+    setSeleccionandoBaseId(null);
+    setPuestosBiblioteca([]);
     setCursosPublicados([microcurso, ...cursosPublicados]);
   }
 
@@ -291,6 +318,7 @@ export default function Contenido({ session }) {
     if (abiertoId === c.id) {
       setAbiertoId(null);
       setBorrador(null);
+      setPuestosNuevoCurso([]);
       return;
     }
     setAbiertoId(c.id);
@@ -298,6 +326,7 @@ export default function Contenido({ session }) {
     setTextoEdit(c.texto_procesado || '');
     setErrorGenerar(null);
     setBorrador(null);
+    setPuestosNuevoCurso([]);
 
     if (c.estado === 'procesado' && c.microcurso_id) {
       setCargandoBorrador(true);
@@ -394,6 +423,7 @@ export default function Contenido({ session }) {
 
   async function handleAprobarCurso() {
     if (!borrador) return;
+    if (puestosNuevoCurso.length === 0) return;
 
     if (!hasAccess) {
       setMostrarSuscripcion(true);
@@ -401,10 +431,14 @@ export default function Contenido({ session }) {
     }
 
     setProcesandoAccion(true);
-    await supabase.from('microcursos').update({ estado: 'aprobado' }).eq('id', borrador.microcurso.id);
+    await supabase
+      .from('microcursos')
+      .update({ estado: 'aprobado', puestos_aplicables: puestosNuevoCurso })
+      .eq('id', borrador.microcurso.id);
     setProcesandoAccion(false);
     setAbiertoId(null);
     setBorrador(null);
+    setPuestosNuevoCurso([]);
     cargarTodo();
   }
 
@@ -448,6 +482,17 @@ export default function Contenido({ session }) {
     }
     setEditandoPuestosId(microcurso.id);
     setPuestosSeleccionados(microcurso.puestos_aplicables || []);
+  }
+
+  function toggleTodosNuevo() {
+    setPuestosNuevoCurso((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
+  }
+
+  function togglePuestoNuevo(puesto) {
+    setPuestosNuevoCurso((prev) => {
+      const sinTodos = prev.filter((p) => p !== 'TODOS');
+      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
+    });
   }
 
   function toggleTodos() {
@@ -562,20 +607,71 @@ export default function Contenido({ session }) {
             <div className="space-y-2">
               {cursosBase.map((curso) => {
                 const yaAgregado = cursosPublicados.some((m) => m.titulo === curso.titulo);
+                const seleccionando = seleccionandoBaseId === curso.id;
                 return (
-                  <div
-                    key={curso.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
-                  >
-                    <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium break-words" />
-                    <button
-                      type="button"
-                      onClick={() => handleAgregarBase(curso)}
-                      disabled={yaAgregado || agregandoBaseId === curso.id}
-                      className="w-full sm:w-auto text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
-                    >
-                      {yaAgregado ? 'Ya agregado' : agregandoBaseId === curso.id ? 'Agregando...' : 'Agregar a los cursos'}
-                    </button>
+                  <div key={curso.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-4 py-3">
+                      <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium break-words" />
+                      <button
+                        type="button"
+                        onClick={() => abrirSeleccionBase(curso.id)}
+                        disabled={yaAgregado}
+                        className="w-full sm:w-auto text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                      >
+                        {yaAgregado ? 'Ya agregado' : seleccionando ? 'Cancelar' : 'Agregar a los cursos'}
+                      </button>
+                    </div>
+                    {seleccionando && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
+                        <p className="text-xs text-[#8a8471]">
+                          ¿A qué puestos aplica? Elegí "Todos los puestos" o puestos puntuales
+                          antes de agregarlo.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <label
+                            className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
+                              puestosBiblioteca.includes('TODOS')
+                                ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
+                                : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={puestosBiblioteca.includes('TODOS')}
+                              onChange={toggleTodosBiblioteca}
+                              className="hidden"
+                            />
+                            Todos los puestos
+                          </label>
+                          {PUESTOS_CATALOGO_BASE.map((p) => (
+                            <label
+                              key={p}
+                              className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
+                                puestosBiblioteca.includes(p)
+                                  ? 'bg-[#C1502E] text-white border-[#C1502E]'
+                                  : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={puestosBiblioteca.includes(p)}
+                                onChange={() => togglePuestoBiblioteca(p)}
+                                className="hidden"
+                              />
+                              {p}
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAgregarBase(curso)}
+                          disabled={puestosBiblioteca.length === 0 || agregandoBaseId === curso.id}
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
+                        >
+                          {agregandoBaseId === curso.id ? 'Agregando...' : 'Confirmar y agregar'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -781,11 +877,56 @@ export default function Contenido({ session }) {
                                 </ul>
                               </div>
                             ))}
+                            <div className="bg-[#FBF7EA] border border-[#EDE0C8] rounded-lg p-3 space-y-2">
+                              <p className="text-xs font-semibold text-[#2C2C2A]">
+                                ¿A qué puestos aplica este curso?
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                <label
+                                  className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
+                                    puestosNuevoCurso.includes('TODOS')
+                                      ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
+                                      : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={puestosNuevoCurso.includes('TODOS')}
+                                    onChange={toggleTodosNuevo}
+                                    className="hidden"
+                                  />
+                                  Todos los puestos
+                                </label>
+                                {PUESTOS_CATALOGO_BASE.map((p) => (
+                                  <label
+                                    key={p}
+                                    className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
+                                      puestosNuevoCurso.includes(p)
+                                        ? 'bg-[#C1502E] text-white border-[#C1502E]'
+                                        : 'bg-white text-[#6b6455] border-[#EDE0C8]'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={puestosNuevoCurso.includes(p)}
+                                      onChange={() => togglePuestoNuevo(p)}
+                                      className="hidden"
+                                    />
+                                    {p}
+                                  </label>
+                                ))}
+                              </div>
+                              {puestosNuevoCurso.length === 0 && (
+                                <p className="text-[10px] text-[#C1502E]">
+                                  Elegí al menos una opción para poder publicar.
+                                </p>
+                              )}
+                            </div>
                             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                               <button
                                 type="button"
                                 onClick={handleAprobarCurso}
-                                disabled={procesandoAccion}
+                                disabled={procesandoAccion || puestosNuevoCurso.length === 0}
                                 className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
@@ -828,9 +969,8 @@ export default function Contenido({ session }) {
               </span>
             </div>
             <p className="text-xs text-[#8a8471] mb-3">
-              Los cursos marcados <strong>Nuevo</strong> todavía no son visibles para nadie: hay
-              que asignarles un puesto (o "Todos") para que se publiquen. Para cambiar el
-              contenido usá "Actualizar contenido", no se editan a mano.
+              El puesto de cada curso se define al publicarlo. Para cambiarle el puesto o el
+              contenido más adelante, usá los botones de cada curso.
             </p>
             <div className="space-y-2">
               {cursosPublicados.map((m) => {
@@ -842,41 +982,37 @@ export default function Contenido({ session }) {
                 return (
                   <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="px-4 py-3">
-                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                        {sinDefinir && (
-                          <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#D69A2D] text-white flex-shrink-0">
-                            Nuevo
-                          </span>
-                        )}
-                      </div>
-                      <p className={`text-[10px] mb-2 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
-                        {sinDefinir
-                          ? '⚠ Sin publicar, todavía no visible para nadie'
-                          : paraTodos
-                          ? 'Para todos los puestos'
-                          : `Solo para: ${puestosActuales.join(', ')}`}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => abrirEdicionPuestos(m)}
-                          className={`text-xs font-semibold rounded-lg px-3 py-1.5 border ${
-                            sinDefinir
-                              ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-[#6b6455] border-[#EDE0C8]'
-                          }`}
-                        >
-                          {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Puestos'}
-                        </button>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
+                          <p className={`text-[10px] mt-0.5 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
+                            {sinDefinir
+                              ? '⚠ Sin puesto asignado, no visible para nadie'
+                              : paraTodos
+                              ? 'Para todos los puestos'
+                              : `Solo para: ${puestosActuales.join(', ')}`}
+                          </p>
+                        </div>
                         <button
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
-                          className="text-xs font-semibold text-[#0055A4] border border-[#0055A4] rounded-lg px-3 py-1.5"
+                          title="Regenerar el contenido de este curso con IA"
+                          className="flex-shrink-0 text-[10px] font-semibold text-[#0055A4] border border-[#0055A4] rounded-full px-2.5 py-1 whitespace-nowrap"
                         >
-                          {editando ? 'Cancelar' : 'Actualizar contenido'}
+                          {editando ? 'Cancelar' : 'Cambiar versión'}
                         </button>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => abrirEdicionPuestos(m)}
+                        className={`mt-2 text-xs font-semibold rounded-lg px-3 py-1.5 border ${
+                          sinDefinir
+                            ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
+                            : 'text-[#6b6455] border-[#EDE0C8]'
+                        }`}
+                      >
+                        {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
+                      </button>
                     </div>
 
                     {editandoPuestos && (
