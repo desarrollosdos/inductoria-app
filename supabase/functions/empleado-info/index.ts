@@ -3,7 +3,8 @@
 // El empleado no tiene login de Supabase, entra con un link que trae un
 // token (?token=xxxx). Esta función valida ese token a mano y devuelve
 // todo lo necesario para "Mi perfil": sus datos, y la lista de cursos
-// (pendientes/completados) con fecha límite si tiene.
+// (pendientes/completados) con fecha límite si tiene, y si el curso fue
+// actualizado después de que el empleado ya lo había completado.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
 
     const { data: microcursos, error: microcursosError } = await supabase
       .from('microcursos')
-      .select('id, titulo, duracion_min, fecha_limite')
+      .select('id, titulo, duracion_min, fecha_limite, actualizado_at')
       .eq('cuenta_id', negocio.cuenta_id)
       .eq('estado', 'aprobado')
       .order('created_at', { ascending: true });
@@ -85,15 +86,30 @@ Deno.serve(async (req) => {
       progresoPorCurso[p.microcurso_id] = p;
     });
 
-    const microcursosConProgreso = (microcursos || []).map((m) => ({
-      id: m.id,
-      titulo: m.titulo,
-      duracion_min: m.duracion_min,
-      fecha_limite: m.fecha_limite,
-      completado: progresoPorCurso[m.id]?.completado || false,
-      puntaje: progresoPorCurso[m.id]?.puntaje ?? null,
-      fecha_completado: progresoPorCurso[m.id]?.fecha_completado ?? null,
-    }));
+    const microcursosConProgreso = (microcursos || []).map((m) => {
+      const p = progresoPorCurso[m.id];
+      const completado = p?.completado || false;
+      const fechaCompletado = p?.fecha_completado ?? null;
+
+      // Si el curso se actualizó (regeneró con IA) después de que el
+      // empleado ya lo había completado, se lo marcamos para que vuelva
+      // a revisarlo.
+      const actualizadoDespues =
+        completado && fechaCompletado && m.actualizado_at
+          ? new Date(m.actualizado_at).getTime() > new Date(fechaCompletado).getTime()
+          : false;
+
+      return {
+        id: m.id,
+        titulo: m.titulo,
+        duracion_min: m.duracion_min,
+        fecha_limite: m.fecha_limite,
+        completado,
+        puntaje: p?.puntaje ?? null,
+        fecha_completado: fechaCompletado,
+        actualizado_despues_de_completar: actualizadoDespues,
+      };
+    });
 
     return new Response(
       JSON.stringify({

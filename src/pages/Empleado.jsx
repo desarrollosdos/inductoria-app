@@ -25,6 +25,16 @@ function IconBadge(props) {
   );
 }
 
+function IconAviso(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
 function EmpleadoInterno({ onDatosCargados }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -158,34 +168,51 @@ function EmpleadoInterno({ onDatosCargados }) {
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[#8a8471] mb-2">Completados</h2>
           <div className="space-y-2">
-            {completados.map((m) => (
-              <div key={m.id} className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-full bg-[#eef9f4] text-[#1D9E75] flex items-center justify-center flex-shrink-0">
-                    <IconBadge />
-                  </span>
-                  <div>
-                    <p>
-                      {m.titulo.includes(':') ? (
-                        <>
-                          <span className="font-bold text-[#C1502E]">{m.titulo.split(':')[0]}:</span>
-                          <span className="text-[#2C2C2A]">{m.titulo.split(':').slice(1).join(':')}</span>
-                        </>
-                      ) : (
-                        <span className="font-bold text-[#C1502E]">{m.titulo}</span>
+            {completados.map((m) => {
+              const contenidoActualizado = m.actualizado_despues_de_completar;
+              const Wrapper = contenidoActualizado ? 'a' : 'div';
+              const wrapperProps = contenidoActualizado
+                ? { href: `/curso?token=${token}&curso=${m.id}` }
+                : {};
+              return (
+                <Wrapper
+                  key={m.id}
+                  {...wrapperProps}
+                  className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-full bg-[#eef9f4] text-[#1D9E75] flex items-center justify-center flex-shrink-0">
+                      <IconBadge />
+                    </span>
+                    <div>
+                      <p>
+                        {m.titulo.includes(':') ? (
+                          <>
+                            <span className="font-bold text-[#C1502E]">{m.titulo.split(':')[0]}:</span>
+                            <span className="text-[#2C2C2A]">{m.titulo.split(':').slice(1).join(':')}</span>
+                          </>
+                        ) : (
+                          <span className="font-bold text-[#C1502E]">{m.titulo}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-[#8a8471]">
+                        {m.fecha_completado
+                          ? `Completado el ${new Date(m.fecha_completado).toLocaleDateString('es-AR')}`
+                          : 'Completado'}
+                        {m.puntaje != null && ` · ${m.puntaje}%`}
+                      </p>
+                      {contenidoActualizado && (
+                        <p className="text-xs font-semibold text-[#D69A2D] flex items-center gap-1 mt-1">
+                          <IconAviso />
+                          Contenido actualizado, revisalo de nuevo
+                        </p>
                       )}
-                    </p>
-                    <p className="text-xs text-[#8a8471]">
-                      {m.fecha_completado
-                        ? `Completado el ${new Date(m.fecha_completado).toLocaleDateString('es-AR')}`
-                        : 'Completado'}
-                      {m.puntaje != null && ` · ${m.puntaje}%`}
-                    </p>
+                    </div>
                   </div>
-                </div>
-                <span className="text-xs font-semibold text-[#1D9E75]">✓</span>
-              </div>
-            ))}
+                  {!contenidoActualizado && <span className="text-xs font-semibold text-[#1D9E75]">✓</span>}
+                </Wrapper>
+              );
+            })}
           </div>
         </div>
       )}
