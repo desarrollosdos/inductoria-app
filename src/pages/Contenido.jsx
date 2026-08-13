@@ -68,6 +68,12 @@ export default function Contenido({ session }) {
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
 
+  // Actualizar contenido de un curso ya publicado, sin borrar el microcurso.
+  const [editandoPublicadoId, setEditandoPublicadoId] = useState(null);
+  const [textoNuevoPublicado, setTextoNuevoPublicado] = useState('');
+  const [actualizandoId, setActualizandoId] = useState(null);
+  const [errorActualizar, setErrorActualizar] = useState(null);
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -356,6 +362,45 @@ export default function Contenido({ session }) {
     setAbiertoId(null);
     setBorrador(null);
     cargarTodo();
+  }
+
+  function abrirEdicionPublicado(microcursoId) {
+    if (editandoPublicadoId === microcursoId) {
+      setEditandoPublicadoId(null);
+      setTextoNuevoPublicado('');
+      setErrorActualizar(null);
+      return;
+    }
+    setEditandoPublicadoId(microcursoId);
+    setTextoNuevoPublicado('');
+    setErrorActualizar(null);
+  }
+
+  async function handleActualizarPublicado(microcursoId) {
+    if (!hasAccess) {
+      setMostrarSuscripcion(true);
+      return;
+    }
+    if (!textoNuevoPublicado.trim()) return;
+
+    setActualizandoId(microcursoId);
+    setErrorActualizar(null);
+
+    const { data, error } = await supabase.functions.invoke('actualizar-curso-ia', {
+      method: 'POST',
+      body: { microcurso_id: microcursoId, texto_nuevo: textoNuevoPublicado.trim() },
+    });
+
+    setActualizandoId(null);
+
+    if (error || data?.error) {
+      setErrorActualizar(data?.error || 'No se pudo actualizar el curso. Probá de nuevo.');
+      return;
+    }
+
+    setEditandoPublicadoId(null);
+    setTextoNuevoPublicado('');
+    await cargarTodo();
   }
 
   if (loading) {
@@ -672,20 +717,59 @@ export default function Contenido({ session }) {
               </span>
             </div>
             <p className="text-xs text-[#8a8471] mb-3">
-              Ya están publicados y visibles para tu equipo. No se pueden editar desde acá.
+              Ya están publicados y visibles para tu equipo. Para cambiarles el contenido usá
+              "Actualizar contenido", no se editan a mano.
             </p>
             <div className="space-y-2">
-              {cursosPublicados.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between gap-3 border border-[#EDE0C8] rounded-xl px-4 py-3"
-                >
-                  <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 bg-[#1B2A3D] text-white">
-                    Agregado
-                  </span>
-                </div>
-              ))}
+              {cursosPublicados.map((m) => {
+                const editando = editandoPublicadoId === m.id;
+                return (
+                  <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 px-4 py-3">
+                      <TituloCursoInline titulo={m.titulo} className="text-sm font-medium" />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white">
+                          Agregado
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicionPublicado(m.id)}
+                          className="text-xs font-semibold text-[#0055A4] border border-[#0055A4] rounded-full px-3 py-1"
+                        >
+                          {editando ? 'Cancelar' : 'Actualizar contenido'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {editando && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
+                        <p className="text-xs text-[#8a8471]">
+                          Sumá el material nuevo acá abajo. La IA va a regenerar el curso completo
+                          combinando lo que ya tenía con esto, y se publica solo, sin pasar por
+                          aprobación de nuevo.
+                        </p>
+                        <textarea
+                          value={textoNuevoPublicado}
+                          onChange={(e) => setTextoNuevoPublicado(e.target.value)}
+                          rows={5}
+                          placeholder="Pegá acá el contenido nuevo a sumar..."
+                          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                        />
+                        {errorActualizar && <p className="text-xs text-[#C1502E]">{errorActualizar}</p>}
+                        <button
+                          type="button"
+                          onClick={() => handleActualizarPublicado(m.id)}
+                          disabled={actualizandoId === m.id || !textoNuevoPublicado.trim()}
+                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                        >
+                          <IconVarita />
+                          {actualizandoId === m.id ? 'Actualizando...' : 'Actualizar con IA'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
