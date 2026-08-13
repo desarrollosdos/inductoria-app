@@ -1010,7 +1010,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
                           title="Regenerar el contenido de este curso con IA"
-                          className="flex-shrink-0 text-[10px] font-semibold text-[#0055A4] border border-[#0055A4] rounded-full px-2.5 py-1 whitespace-nowrap"
+                          className="flex-shrink-0 text-[9px] font-semibold text-white bg-[#0055A4] rounded-full px-2 py-0.5 whitespace-nowrap"
                         >
                           {editando ? 'Cancelar' : 'Cambiar versión'}
                         </button>
