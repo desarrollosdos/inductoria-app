@@ -127,7 +127,49 @@ Deno.serve(async (req) => {
 
     const riesgos = { pagoEnRiesgo, sinEmpleados, cupoLleno };
 
-    return new Response(JSON.stringify({ resumen, clientes, riesgos }), {
+    // -----------------------------
+    // Gaps de conocimiento: cursos donde más se pregunta en el chat de
+    // dudas, con algunas preguntas de ejemplo. Un curso con muchas
+    // preguntas repetidas probablemente está mal explicado en algún paso.
+    // -----------------------------
+    const { data: todosMicrocursos } = await supabase
+      .from('microcursos')
+      .select('id, titulo, cuenta_id')
+      .eq('estado', 'aprobado');
+
+    const { data: preguntasIA } = await supabase
+      .from('preguntas_ia')
+      .select('microcurso_id, pregunta');
+
+    const nombrePorCuenta: Record<string, string> = {};
+    (cuentas || []).forEach((c) => (nombrePorCuenta[c.id] = c.nombre));
+
+    const infoPorCurso: Record<
+      string,
+      { titulo: string; cuenta: string; total: number; ejemplos: string[] }
+    > = {};
+    (todosMicrocursos || []).forEach((m) => {
+      infoPorCurso[m.id] = {
+        titulo: m.titulo,
+        cuenta: nombrePorCuenta[m.cuenta_id] || '—',
+        total: 0,
+        ejemplos: [],
+      };
+    });
+    (preguntasIA || []).forEach((p) => {
+      const info = infoPorCurso[p.microcurso_id];
+      if (!info) return;
+      info.total++;
+      if (info.ejemplos.length < 3) info.ejemplos.push(p.pregunta);
+    });
+
+    const gapsConocimiento = Object.entries(infoPorCurso)
+      .map(([microcurso_id, info]) => ({ microcurso_id, ...info }))
+      .filter((g) => g.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20);
+
+    return new Response(JSON.stringify({ resumen, clientes, riesgos, gapsConocimiento }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

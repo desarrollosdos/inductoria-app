@@ -94,11 +94,21 @@ function IconVisitas(props) {
   );
 }
 
+function IconGaps(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 18h6M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7c.5.4.8.9.8 1.5V17h6.4v-.8c0-.6.3-1.1.8-1.5A7 7 0 0 0 12 2Z" />
+    </svg>
+  );
+}
+
 const SUB_TABS = [
   { id: 'resumen', label: 'Resumen', Icon: IconResumen },
   { id: 'clientes', label: 'Clientes e historial', Icon: IconClientes },
   { id: 'riesgos', label: 'Riesgos y análisis', Icon: IconRiesgos },
   { id: 'visitas', label: 'Visitas', Icon: IconVisitas },
+  { id: 'gaps', label: 'Gaps de conocimiento', Icon: IconGaps },
   { id: 'costo', label: 'Costo de IA', Icon: IconCostoIA },
   { id: 'precio', label: 'Precio', Icon: IconPrecio },
 ];
@@ -481,6 +491,42 @@ export default function AdminPage({ session }) {
               </>
             ) : null}
           </>
+        )}
+
+        {tab === 'gaps' && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-1">Gaps de conocimiento</h2>
+            <p className="text-xs text-[#8a8471] mb-4">
+              Cursos donde más se pregunta en el chat de dudas. Muchas preguntas repetidas sobre
+              el mismo curso suelen ser señal de que algún paso no quedó claro.
+            </p>
+            {!datos.gapsConocimiento || datos.gapsConocimiento.length === 0 ? (
+              <p className="text-sm text-[#6b6455]">Todavía no hay preguntas registradas.</p>
+            ) : (
+              <div className="space-y-3">
+                {datos.gapsConocimiento.map((g) => (
+                  <div key={g.microcurso_id} className="border border-[#F5EFE3] rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-[#2C2C2A]">{g.titulo}</p>
+                      <span className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-2.5 py-0.5 flex-shrink-0">
+                        {g.total} pregunta{g.total === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#8a8471] mb-2">{g.cuenta}</p>
+                    {g.ejemplos.length > 0 && (
+                      <div className="space-y-1">
+                        {g.ejemplos.map((ej, i) => (
+                          <p key={i} className="text-xs text-[#6b6455] italic">
+                            "{ej}"
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {tab === 'costo' && (
