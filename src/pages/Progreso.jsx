@@ -112,12 +112,14 @@ export default function Progreso({ session }) {
     (cursosData || []).forEach((c) => (tituloPorCurso[c.id] = c.titulo));
 
     // Total de cursos que le corresponden a CADA empleado según su puesto,
-    // no el total global de la cuenta (un curso sin puestos_aplicables
-    // aplica a todos; si tiene puestos definidos, solo cuenta para esos).
+    // no el total global de la cuenta. Mismo criterio que empleado-info:
+    // sin puestos_aplicables = todavía no publicado (no cuenta); 'TODOS'
+    // explícito = aplica a cualquiera; puestos puntuales = solo esos.
     function totalCursosParaPuesto(puesto) {
       return (cursosData || []).filter((c) => {
         const puestos = c.puestos_aplicables;
-        if (!puestos || puestos.length === 0) return true;
+        if (!puestos || puestos.length === 0) return false;
+        if (puestos.includes('TODOS')) return true;
         return puesto && puestos.includes(puesto);
       }).length;
     }
