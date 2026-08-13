@@ -432,6 +432,10 @@ export default function Contenido({ session }) {
       setErrorActualizar(null);
       return;
     }
+    const confirmado = confirm(
+      'Esto regenera el curso completo con IA (sumando el contenido nuevo al que ya tenía). Los empleados que ya lo completaron van a ver un aviso para volver a hacerlo. ¿Querés continuar?'
+    );
+    if (!confirmado) return;
     setEditandoPublicadoId(microcursoId);
     setTextoNuevoPublicado('');
     setErrorActualizar(null);
@@ -824,8 +828,9 @@ export default function Contenido({ session }) {
               </span>
             </div>
             <p className="text-xs text-[#8a8471] mb-3">
-              Ya están publicados y visibles para tu equipo. Para cambiarles el contenido usá
-              "Actualizar contenido", no se editan a mano.
+              Los cursos marcados <strong>Nuevo</strong> todavía no son visibles para nadie: hay
+              que asignarles un puesto (o "Todos") para que se publiquen. Para cambiar el
+              contenido usá "Actualizar contenido", no se editan a mano.
             </p>
             <div className="space-y-2">
               {cursosPublicados.map((m) => {
@@ -836,30 +841,30 @@ export default function Contenido({ session }) {
                 const paraTodos = puestosActuales.includes('TODOS');
                 return (
                   <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3">
-                      <div className="min-w-0">
+                    <div className="px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                        <p className={`text-[10px] mt-0.5 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
-                          {sinDefinir
-                            ? '⚠ Sin puestos asignados, no visible para nadie todavía'
-                            : paraTodos
-                            ? 'Para todos los puestos'
-                            : `Solo para: ${puestosActuales.join(', ')}`}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                        {!sinDefinir && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white">
-                            Agregado
+                        {sinDefinir && (
+                          <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#D69A2D] text-white flex-shrink-0">
+                            Nuevo
                           </span>
                         )}
+                      </div>
+                      <p className={`text-[10px] mb-2 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
+                        {sinDefinir
+                          ? '⚠ Sin publicar, todavía no visible para nadie'
+                          : paraTodos
+                          ? 'Para todos los puestos'
+                          : `Solo para: ${puestosActuales.join(', ')}`}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
                         <button
                           type="button"
                           onClick={() => abrirEdicionPuestos(m)}
-                          className={`text-xs font-semibold rounded-full px-3 py-1 border ${
+                          className={`text-xs font-semibold rounded-lg px-3 py-1.5 border ${
                             sinDefinir
                               ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-[#8a8471] border-[#EDE0C8]'
+                              : 'text-[#6b6455] border-[#EDE0C8]'
                           }`}
                         >
                           {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Puestos'}
@@ -867,7 +872,7 @@ export default function Contenido({ session }) {
                         <button
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
-                          className="text-xs font-semibold text-[#0055A4] border border-[#0055A4] rounded-full px-3 py-1"
+                          className="text-xs font-semibold text-[#0055A4] border border-[#0055A4] rounded-lg px-3 py-1.5"
                         >
                           {editando ? 'Cancelar' : 'Actualizar contenido'}
                         </button>
