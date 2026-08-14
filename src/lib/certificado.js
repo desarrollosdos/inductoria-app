@@ -30,12 +30,17 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
   doc.setTextColor(...NAVY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('INDUCTORIA', centroX, 20, { align: 'center', charSpace: 1.5 });
+  const WORDMARK = 'INDUCTORIA';
+  const LETTER_SPACING = 1.5;
+  doc.text(WORDMARK, centroX, 20, { align: 'center', charSpace: LETTER_SPACING });
 
-  // Línea fina terracota debajo del wordmark
+  // Línea fina terracota debajo, con el mismo ancho que el texto de
+  // arriba (ancho real de la fuente + el espaciado entre letras que le
+  // agregamos, si no queda más corta que el wordmark).
+  const anchoWordmark = doc.getTextWidth(WORDMARK) + LETTER_SPACING * (WORDMARK.length - 1);
   doc.setDrawColor(...TERRACOTA);
   doc.setLineWidth(0.4);
-  doc.line(centroX - 16, 24, centroX + 16, 24);
+  doc.line(centroX - anchoWordmark / 2, 24, centroX + anchoWordmark / 2, 24);
 
   // Eyebrow
   doc.setTextColor(...MUTED);
