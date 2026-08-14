@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import jsPDF from 'jspdf';
+import { generarCertificadoPDF } from '../lib/certificado';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
@@ -46,60 +46,6 @@ function colorPorPorcentaje(pct) {
   const g = Math.round(amarillo[1] + (verde[1] - amarillo[1]) * t);
   const b = Math.round(amarillo[2] + (verde[2] - amarillo[2]) * t);
   return `rgb(${r}, ${g}, ${b})`;
-}
-
-function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCurso, puntaje, fechaCompletado }) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
-  const w = doc.internal.pageSize.getWidth();
-  const h = doc.internal.pageSize.getHeight();
-
-  doc.setFillColor(242, 240, 234);
-  doc.rect(0, 0, w, h, 'F');
-
-  doc.setDrawColor(193, 80, 46);
-  doc.setLineWidth(1.2);
-  doc.rect(6, 6, w - 12, h - 12);
-  doc.setLineWidth(0.3);
-  doc.rect(9, 9, w - 18, h - 18);
-
-  doc.setTextColor(138, 132, 113);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('CERTIFICADO DE FINALIZACIÓN', w / 2, 22, { align: 'center' });
-
-  doc.setTextColor(44, 44, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.text(nombreEmpleado, w / 2, 40, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(107, 100, 85);
-  doc.text('completó satisfactoriamente el curso', w / 2, 50, { align: 'center' });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(193, 80, 46);
-  doc.text(tituloCurso, w / 2, 63, { align: 'center', maxWidth: w - 40 });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(44, 44, 42);
-  doc.text(puntaje != null ? `Puntaje obtenido: ${puntaje}%` : ' ', w / 2, 76, { align: 'center' });
-
-  const fecha = fechaCompletado
-    ? new Date(fechaCompletado).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
-  doc.setFontSize(9);
-  doc.setTextColor(138, 132, 113);
-  doc.text(negocioNombre ? `${negocioNombre} · ${fecha}` : fecha, w / 2, h - 14, { align: 'center' });
-
-  doc.setFontSize(8);
-  doc.setTextColor(180, 170, 145);
-  doc.text('Generado con Inductoria', w / 2, h - 9, { align: 'center' });
-
-  const nombreArchivo = `Certificado - ${nombreEmpleado} - ${tituloCurso}.pdf`.replace(/[\\/:*?"<>|]/g, '');
-  doc.save(nombreArchivo);
 }
 
 export default function Progreso({ session }) {
@@ -505,9 +451,7 @@ export default function Progreso({ session }) {
                                 generarCertificadoPDF({
                                   nombreEmpleado: f.nombre,
                                   negocioNombre: f.negocioNombre,
-                                  tituloCurso: b.titulo.includes(':')
-                                    ? b.titulo.split(':').slice(1).join(':').trim()
-                                    : b.titulo,
+                                  tituloCurso: b.titulo,
                                   puntaje: b.puntaje,
                                   fechaCompletado: b.fecha_completado,
                                 })
