@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import jsPDF from 'jspdf';
 import { esCursoSeguridadEHigiene, BadgeCurso, BadgeEspecial } from '../components/Badges';
 import PinGate from '../components/PinGate';
 
@@ -72,6 +73,9 @@ function CursoDetalleInterno() {
   const [errorChat, setErrorChat] = useState(null);
   const [preguntasRestantes, setPreguntasRestantes] = useState(null);
 
+  const [datosEmpleado, setDatosEmpleado] = useState(null);
+  const [generandoCertificado, setGenerandoCertificado] = useState(false);
+
   useEffect(() => {
     if (!token || !microcursoId) {
       setError('Falta información en el link.');
@@ -100,6 +104,86 @@ function CursoDetalleInterno() {
       .catch(() => setError('No se pudo cargar el curso.'))
       .finally(() => setLoading(false));
   }, [token, microcursoId]);
+
+  useEffect(() => {
+    if (!resultado || !token) return;
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    fetch(`${base}/functions/v1/empleado-info?token=${encodeURIComponent(token)}`, {
+      headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
+    })
+      .then((res) => res.json())
+      .then((data) => setDatosEmpleado(data))
+      .catch(() => {});
+  }, [resultado, token]);
+
+  function handleDescargarCertificado() {
+    if (!resultado || !curso) return;
+    setGenerandoCertificado(true);
+
+    const nombreEmpleado = datosEmpleado?.empleado?.nombre || 'Empleado';
+    const negocioNombre = datosEmpleado?.negocio?.nombre || '';
+    const tituloCurso = curso.titulo.includes(':') ? curso.titulo.split(':').slice(1).join(':').trim() : curso.titulo;
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
+    const w = doc.internal.pageSize.getWidth();
+    const h = doc.internal.pageSize.getHeight();
+
+    // Fondo crema
+    doc.setFillColor(242, 240, 234);
+    doc.rect(0, 0, w, h, 'F');
+
+    // Doble borde terracota
+    doc.setDrawColor(193, 80, 46);
+    doc.setLineWidth(1.2);
+    doc.rect(6, 6, w - 12, h - 12);
+    doc.setLineWidth(0.3);
+    doc.rect(9, 9, w - 18, h - 18);
+
+    doc.setTextColor(138, 132, 113);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('CERTIFICADO DE FINALIZACIÓN', w / 2, 22, { align: 'center' });
+
+    doc.setTextColor(44, 44, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text(nombreEmpleado, w / 2, 40, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(107, 100, 85);
+    doc.text('completó satisfactoriamente el curso', w / 2, 50, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(193, 80, 46);
+    doc.text(tituloCurso, w / 2, 63, { align: 'center', maxWidth: w - 40 });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(44, 44, 42);
+    doc.text(`Puntaje obtenido: ${resultado.puntaje}%`, w / 2, 76, { align: 'center' });
+
+    const fecha = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+    doc.setFontSize(9);
+    doc.setTextColor(138, 132, 113);
+    doc.text(
+      negocioNombre ? `${negocioNombre} · ${fecha}` : fecha,
+      w / 2,
+      h - 14,
+      { align: 'center' }
+    );
+
+    doc.setFontSize(8);
+    doc.setTextColor(180, 170, 145);
+    doc.text('Generado con Inductoria', w / 2, h - 9, { align: 'center' });
+
+    const nombreArchivo = `Certificado - ${nombreEmpleado} - ${tituloCurso}.pdf`.replace(/[\\/:*?"<>|]/g, '');
+    doc.save(nombreArchivo);
+    setGenerandoCertificado(false);
+  }
 
   async function handleEnviarEvaluacion() {
     setEnviando(true);
@@ -274,10 +358,17 @@ function CursoDetalleInterno() {
             </div>
           )}
 
-          <div>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleDescargarCertificado}
+              disabled={generandoCertificado}
+              className="w-full py-2 rounded-lg font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] disabled:opacity-60"
+            >
+              {generandoCertificado ? 'Generando...' : 'Descargar certificado (PDF)'}
+            </button>
             <a
               href={`/empleado?token=${token}`}
-              className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
+              className="inline-block w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
             >
               Volver a Mi perfil
             </a>
