@@ -26,18 +26,24 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
 
   const centroX = w / 2;
 
+  // Texto con separación entre letras (charSpace) + align:'center' calcula
+  // MAL el punto de anclaje en jsPDF (queda corrido a la derecha, bug
+  // conocido). Para el wordmark y el eyebrow centramos a mano: medimos el
+  // ancho real (texto + espaciado agregado) y dibujamos desde la izquierda.
+  function textoCentradoConEspaciado(texto, y, charSpace) {
+    const anchoBase = doc.getTextWidth(texto);
+    const anchoTotal = anchoBase + charSpace * texto.length;
+    doc.text(texto, centroX - anchoTotal / 2, y, { charSpace });
+    return anchoTotal;
+  }
+
   // Marca "INDUCTORIA" arriba, como wordmark
   doc.setTextColor(...NAVY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  const WORDMARK = 'INDUCTORIA';
-  const LETTER_SPACING = 1.5;
-  doc.text(WORDMARK, centroX, 20, { align: 'center', charSpace: LETTER_SPACING });
+  const anchoWordmark = textoCentradoConEspaciado('INDUCTORIA', 20, 1.5);
 
-  // Línea fina terracota debajo, con el mismo ancho que el texto de
-  // arriba (ancho real de la fuente + el espaciado entre letras que le
-  // agregamos, si no queda más corta que el wordmark).
-  const anchoWordmark = doc.getTextWidth(WORDMARK) + LETTER_SPACING * (WORDMARK.length - 1);
+  // Línea fina terracota debajo, con el mismo ancho real que el wordmark
   doc.setDrawColor(...TERRACOTA);
   doc.setLineWidth(0.4);
   doc.line(centroX - anchoWordmark / 2, 24, centroX + anchoWordmark / 2, 24);
@@ -46,7 +52,7 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
   doc.setTextColor(...MUTED);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.text('CERTIFICADO DE FINALIZACIÓN', centroX, 34, { align: 'center', charSpace: 0.6 });
+  textoCentradoConEspaciado('CERTIFICADO DE FINALIZACIÓN', 34, 0.6);
 
   // Nombre del empleado
   doc.setTextColor(...TEXTO);
