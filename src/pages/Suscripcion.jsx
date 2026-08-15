@@ -107,6 +107,32 @@ export default function Suscripcion({ session }) {
     setLoading(false);
   }
 
+  // Cuando volvés de MercadoPago, el webhook que activa la cuenta puede
+  // tardar unos segundos en llegar. Si nos fuimos a pagar (bandera con
+  // reintentos restantes en sessionStorage, seteada en handleSuscribirme)
+  // y la cuenta sigue en "inactive", forzamos un reload de la página a los
+  // 3s en vez de dejarla así hasta que la persona refresque a mano. Tope de
+  // 5 reintentos (~15s) para no quedar recargando en loop si el pago
+  // realmente no se acredita.
+  useEffect(() => {
+    if (!cuenta) return;
+
+    const intentosRestantes = parseInt(sessionStorage.getItem('inductoria_pago_pendiente') || '0', 10);
+    if (intentosRestantes <= 0) return;
+
+    if (cuenta.plan !== 'inactive') {
+      sessionStorage.removeItem('inductoria_pago_pendiente');
+      return;
+    }
+
+    sessionStorage.setItem('inductoria_pago_pendiente', String(intentosRestantes - 1));
+    const timeoutId = setTimeout(() => {
+      window.location.reload();
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, [cuenta]);
+
   async function handleSuscribirme() {
     setIniciandoPago(true);
     const { data, error } = await supabase.functions.invoke('crear-suscripcion', {
@@ -119,6 +145,7 @@ export default function Suscripcion({ session }) {
       alert('No se pudo iniciar el pago. Probá de nuevo en un momento.');
       return;
     }
+    sessionStorage.setItem('inductoria_pago_pendiente', '5');
     window.location.href = data.init_point;
   }
 

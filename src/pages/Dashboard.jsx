@@ -379,7 +379,18 @@ export default function Dashboard({ session }) {
             ))}
           </div>
 
-          {cupoLleno ? (
+          {!hasAccess ? (
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] flex items-center justify-between gap-3">
+              <span>Necesitás una suscripción activa para cargar sucursales.</span>
+              <button
+                type="button"
+                onClick={() => setMostrarSuscripcion(true)}
+                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+              >
+                Suscribirme
+              </button>
+            </div>
+          ) : cupoLleno ? (
             <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A]">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
