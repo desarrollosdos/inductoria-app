@@ -148,8 +148,20 @@ export default function Empleados({ session }) {
   const [ultimoCreado, setUltimoCreado] = useState(null);
 
   const [editandoId, setEditandoId] = useState(null);
-  const [editForm, setEditForm] = useState({ nombre: '', puesto: '', puestoCustom: '', telefono: '', mail: '' });
+  const [editForm, setEditForm] = useState({
+    nombre: '',
+    puesto: '',
+    puestoCustom: '',
+    telefono: '',
+    mail: '',
+    foto_url: null,
+  });
   const [guardandoEdit, setGuardandoEdit] = useState(false);
+  const [editFotoBlob, setEditFotoBlob] = useState(null);
+  const [editFotoPreview, setEditFotoPreview] = useState(null);
+  const [editProcesandoFoto, setEditProcesandoFoto] = useState(false);
+  const editFileInputCamaraRef = useRef(null);
+  const editFileInputGaleriaRef = useRef(null);
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
 
@@ -283,6 +295,8 @@ export default function Empleados({ session }) {
   function abrirEdicion(e) {
     if (editandoId === e.id) {
       setEditandoId(null);
+      setEditFotoBlob(null);
+      setEditFotoPreview(null);
       return;
     }
     setEditandoId(e.id);
@@ -294,7 +308,24 @@ export default function Empleados({ session }) {
       puestoCustom: estaEnCatalogo ? '' : puestoActual,
       telefono: e.telefono || '',
       mail: e.mail || '',
+      foto_url: e.foto_url || null,
     });
+    setEditFotoBlob(null);
+    setEditFotoPreview(e.foto_url || null);
+  }
+
+  async function handleEditFotoChange(ev) {
+    const file = ev.target.files[0];
+    if (!file) return;
+    setEditProcesandoFoto(true);
+    try {
+      const blob = await recortarACuadrado(file);
+      setEditFotoBlob(blob);
+      setEditFotoPreview(URL.createObjectURL(blob));
+    } catch (err) {
+      console.error(err);
+    }
+    setEditProcesandoFoto(false);
   }
 
   async function handleGuardarEdicion(empleadoId) {
@@ -304,6 +335,24 @@ export default function Empleados({ session }) {
     }
 
     setGuardandoEdit(true);
+
+    // Si eligió una foto nueva, la subimos igual que en el alta. Si no
+    // tocó la foto, se mantiene la que ya tenía (editForm.foto_url).
+    let fotoUrl = editForm.foto_url;
+    if (editFotoBlob) {
+      const nombreArchivo = `${cuenta.id}/${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-empleados')
+        .upload(nombreArchivo, editFotoBlob, { contentType: 'image/jpeg' });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('fotos-empleados').getPublicUrl(nombreArchivo);
+        fotoUrl = urlData.publicUrl;
+      } else {
+        console.error('No se pudo subir la foto:', uploadError);
+      }
+    }
+
     const puestoFinal = editForm.puesto === 'Otro' ? editForm.puestoCustom.trim() : editForm.puesto.trim();
     const { data, error } = await supabase
       .from('empleados')
@@ -312,6 +361,7 @@ export default function Empleados({ session }) {
         puesto: puestoFinal || null,
         telefono: editForm.telefono.trim() || null,
         mail: editForm.mail.trim() || null,
+        foto_url: fotoUrl,
       })
       .eq('id', empleadoId)
       .select()
@@ -326,6 +376,8 @@ export default function Empleados({ session }) {
       empleados.map((e) => (e.id === empleadoId ? data : e)).sort((a, b) => a.nombre.localeCompare(b.nombre))
     );
     setEditandoId(null);
+    setEditFotoBlob(null);
+    setEditFotoPreview(null);
   }
 
   function nombreNegocio(negocioId) {
@@ -404,6 +456,55 @@ export default function Empleados({ session }) {
 
         {abierto && (
           <div className="mt-3 space-y-2 bg-[#EDE0C8] rounded-lg p-3">
+            <div className="flex items-center gap-3 mb-1">
+              <input
+                type="file"
+                accept="image/*"
+                capture="user"
+                ref={editFileInputCamaraRef}
+                onChange={handleEditFotoChange}
+                className="hidden"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={editFileInputGaleriaRef}
+                onChange={handleEditFotoChange}
+                className="hidden"
+              />
+              <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center overflow-hidden flex-shrink-0 border-2 border-dashed border-[#C1502E]">
+                {editFotoPreview ? (
+                  <img src={editFotoPreview} alt="Foto" className="w-full h-full object-cover" />
+                ) : (
+                  <IconCamara className="text-[#C1502E]" />
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => editFileInputCamaraRef.current.click()}
+                    disabled={editProcesandoFoto}
+                    title="Tomar foto"
+                    className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center disabled:opacity-60"
+                  >
+                    <IconCamara />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editFileInputGaleriaRef.current.click()}
+                    disabled={editProcesandoFoto}
+                    title="Elegir de galería"
+                    className="w-9 h-9 rounded-full bg-white text-[#8a8471] flex items-center justify-center disabled:opacity-60"
+                  >
+                    <IconGaleria />
+                  </button>
+                </div>
+                <span className="text-xs text-[#8a8471]">
+                  {editProcesandoFoto ? 'Procesando...' : editFotoPreview ? 'Foto lista' : 'Foto opcional'}
+                </span>
+              </div>
+            </div>
             <input
               type="text"
               value={editForm.nombre}
@@ -455,7 +556,11 @@ export default function Empleados({ session }) {
                 {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
               </button>
               <button
-                onClick={() => setEditandoId(null)}
+                onClick={() => {
+                  setEditandoId(null);
+                  setEditFotoBlob(null);
+                  setEditFotoPreview(null);
+                }}
                 className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5"
               >
                 Salir
