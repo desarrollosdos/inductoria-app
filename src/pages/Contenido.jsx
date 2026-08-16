@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
@@ -42,6 +42,23 @@ function IconVarita(props) {
   );
 }
 
+function IconMicrofono(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8" y1="22" x2="16" y2="22" />
+    </svg>
+  );
+}
+
+// Tope de duración de la grabación directa desde el navegador, para no
+// terminar con archivos gigantes (Groq acepta hasta 25MB, el server de
+// Inductoria corta en 10MB — 5 minutos de audio comprimido queda bien
+// por debajo de eso).
+const DURACION_MAX_GRABACION_SEG = 5 * 60;
+
 const ESTADO_INFO = {
   pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Pendiente' },
   aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
@@ -59,6 +76,18 @@ export default function Contenido({ session }) {
   const [arrastrando, setArrastrando] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState(null);
   const [extrayendoArchivo, setExtrayendoArchivo] = useState(false);
+
+  // Grabación de audio directo desde el navegador (alternativa a subir
+  // un archivo ya grabado). audioGrabado guarda { blob, url } una vez
+  // que se detiene la grabación, listo para escuchar antes de mandarlo.
+  const [grabando, setGrabando] = useState(false);
+  const [audioGrabado, setAudioGrabado] = useState(null);
+  const [segundosGrabados, setSegundosGrabados] = useState(0);
+  const [errorGrabacion, setErrorGrabacion] = useState(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksGrabacionRef = useRef([]);
+  const streamGrabacionRef = useRef(null);
+  const timerGrabacionRef = useRef(null);
 
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
@@ -99,6 +128,16 @@ export default function Contenido({ session }) {
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si el dueño se va de la pantalla mientras está grabando (cambia de
+  // pestaña, navega a otro lado), cortamos el micrófono y el timer en
+  // vez de dejarlos prendidos en segundo plano.
+  useEffect(() => {
+    return () => {
+      if (timerGrabacionRef.current) clearInterval(timerGrabacionRef.current);
+      if (streamGrabacionRef.current) streamGrabacionRef.current.getTracks().forEach((t) => t.stop());
+    };
   }, []);
 
   async function cargarTodo() {
@@ -322,6 +361,109 @@ export default function Contenido({ session }) {
       setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
     };
     lectorBinario.readAsDataURL(file);
+  }
+
+  // Graba audio directo desde el micrófono del navegador, como
+  // alternativa a subir un archivo ya grabado. Una vez detenida la
+  // grabación, se puede escuchar y, si sirve, se manda por el MISMO
+  // camino que un archivo de audio subido (handleArchivo), reusando
+  // toda la lógica que ya existe: el bloqueo de IA en trial, el envío
+  // a extraer-texto-archivo, etc.
+  function elegirMimeTypeGrabacion() {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const candidatos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+    return candidatos.find((m) => MediaRecorder.isTypeSupported?.(m)) || '';
+  }
+
+  async function iniciarGrabacion() {
+    setErrorGrabacion(null);
+
+    // Mismo bloqueo que subir un archivo de audio: no disponible en trial.
+    if (!puedeUsarIA(cuenta, session.user.email)) {
+      setVarianteSuscripcion('ia');
+      setMostrarSuscripcion(true);
+      return;
+    }
+
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setErrorGrabacion('Tu navegador no permite grabar audio acá. Probá subir un archivo de audio ya grabado.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamGrabacionRef.current = stream;
+
+      const mimeType = elegirMimeTypeGrabacion();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunksGrabacionRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksGrabacionRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksGrabacionRef.current, {
+          type: recorder.mimeType || mimeType || 'audio/webm',
+        });
+        setAudioGrabado({ blob, url: URL.createObjectURL(blob) });
+        stream.getTracks().forEach((t) => t.stop());
+        streamGrabacionRef.current = null;
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setGrabando(true);
+      setSegundosGrabados(0);
+
+      timerGrabacionRef.current = setInterval(() => {
+        setSegundosGrabados((s) => {
+          const siguiente = s + 1;
+          if (siguiente >= DURACION_MAX_GRABACION_SEG) {
+            detenerGrabacion();
+          }
+          return siguiente;
+        });
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      setErrorGrabacion('No se pudo acceder al micrófono. Revisá los permisos del navegador para este sitio.');
+    }
+  }
+
+  function detenerGrabacion() {
+    if (timerGrabacionRef.current) {
+      clearInterval(timerGrabacionRef.current);
+      timerGrabacionRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setGrabando(false);
+  }
+
+  function descartarGrabacion() {
+    if (audioGrabado?.url) URL.revokeObjectURL(audioGrabado.url);
+    setAudioGrabado(null);
+    setSegundosGrabados(0);
+  }
+
+  function usarGrabacion() {
+    if (!audioGrabado) return;
+    const extension = (audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+    const archivo = new File([audioGrabado.blob], `grabacion-${Date.now()}.${extension}`, {
+      type: audioGrabado.blob.type || 'audio/webm',
+    });
+    const url = audioGrabado.url;
+    setAudioGrabado(null);
+    setSegundosGrabados(0);
+    URL.revokeObjectURL(url);
+    handleArchivo(archivo);
+  }
+
+  function formatearDuracion(segundos) {
+    const m = Math.floor(segundos / 60).toString().padStart(2, '0');
+    const s = Math.floor(segundos % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   }
 
   function handleDrop(e) {
@@ -748,6 +890,66 @@ export default function Contenido({ session }) {
               />
             </label>
             {errorArchivo && <p className="text-xs text-[#C1502E]">{errorArchivo}</p>}
+
+            <div className="border border-[#EFDDCE] rounded-lg p-3">
+              <p className="text-xs text-[#8a8471] mb-2">
+                O grabá una nota de voz explicando el tema, directo desde acá.
+              </p>
+
+              {!grabando && !audioGrabado && (
+                <button
+                  type="button"
+                  onClick={iniciarGrabacion}
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#C1502E] bg-[#FBEAE3] border border-[#F0C9B9]"
+                >
+                  <IconMicrofono />
+                  Grabar audio
+                </button>
+              )}
+
+              {grabando && (
+                <div className="flex items-center justify-between gap-2 bg-[#FBEAE3] rounded-lg px-3 py-2">
+                  <span className="flex items-center gap-2 text-xs font-semibold text-[#C1502E]">
+                    <span className="w-2 h-2 rounded-full bg-[#C1502E] animate-pulse" />
+                    Grabando... {formatearDuracion(segundosGrabados)} / {formatearDuracion(DURACION_MAX_GRABACION_SEG)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={detenerGrabacion}
+                    className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1"
+                  >
+                    Detener
+                  </button>
+                </div>
+              )}
+
+              {audioGrabado && !grabando && (
+                <div className="space-y-2">
+                  <audio controls src={audioGrabado.url} className="w-full h-9" />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={descartarGrabacion}
+                      disabled={extrayendoArchivo}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
+                    >
+                      Descartar y grabar de nuevo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={usarGrabacion}
+                      disabled={extrayendoArchivo}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                    >
+                      {extrayendoArchivo ? 'Transcribiendo...' : 'Usar esta grabación'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {errorGrabacion && <p className="text-xs text-[#C1502E] mt-2">{errorGrabacion}</p>}
+            </div>
+
             <textarea
               required
               value={texto}
