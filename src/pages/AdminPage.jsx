@@ -8,6 +8,7 @@ const VERDE = '#3F7D5C';
 
 function etiquetaPlan(plan) {
   if (plan === 'active') return 'Activa';
+  if (plan === 'trial') return 'Prueba gratis';
   if (plan === 'inactive') return 'Inactiva';
   if (plan === 'past_due') return 'Pago pendiente';
   if (plan === 'suspended') return 'Suspendida';

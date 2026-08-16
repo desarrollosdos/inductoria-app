@@ -60,11 +60,20 @@ async function verificarFirma(req: Request, dataId: string): Promise<boolean> {
   return firmaHex === hash;
 }
 
-function mapearEstadoPreapproval(mpStatus: string): string {
+// Devuelve null para estados que no reconocemos explícitamente (por
+// ejemplo 'pending', el estado con el que crear-suscripcion arma el
+// preapproval ANTES de que el dueño termine de pagar en MercadoPago).
+// Antes esto devolvía 'inactive' por default, lo que pisaba mal el
+// plan real de la cuenta (trial vigente, o incluso active en una
+// renovación) apenas alguien apretaba "Suscribirme", mucho antes de
+// que el pago se acredite. Ahora, si no reconocemos el estado, no
+// tocamos nada — dejamos que el pago (evento "payment") o un cambio de
+// estado real (authorized/paused/cancelled) sean los que actualicen.
+function mapearEstadoPreapproval(mpStatus: string): string | null {
   if (mpStatus === 'authorized') return 'active';
   if (mpStatus === 'paused') return 'past_due';
   if (mpStatus === 'cancelled') return 'cancelled';
-  return 'inactive';
+  return null;
 }
 
 const TIPOS_PREAPPROVAL = new Set(['preapproval', 'subscription_preapproval']);
@@ -120,10 +129,16 @@ Deno.serve(async (req) => {
       const cuentaId = preapproval.external_reference;
       const nuevoPlan = mapearEstadoPreapproval(preapproval.status);
 
-      await supabase
-        .from('cuentas')
-        .update({ plan: nuevoPlan, mp_preapproval_id: dataId })
-        .eq('id', cuentaId);
+      if (nuevoPlan) {
+        await supabase
+          .from('cuentas')
+          .update({ plan: nuevoPlan, mp_preapproval_id: dataId })
+          .eq('id', cuentaId);
+      } else {
+        // Estado no reconocido (ej: 'pending'): igual guardamos el
+        // mp_preapproval_id para no perderlo, pero sin tocar el plan.
+        await supabase.from('cuentas').update({ mp_preapproval_id: dataId }).eq('id', cuentaId);
+      }
     } else if (esPago) {
       // Un pago puntual dentro de la suscripcion (el cobro mensual).
       const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {

@@ -17,6 +17,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.11.0';
 import mammoth from 'npm:mammoth@1.8.0';
+import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +94,30 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Solo se aceptan PDF, .docx, imágenes o audio. Video no está soportado.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // PDF/.docx se extraen con librerías comunes (unpdf/mammoth), sin
+    // costo de IA, así que quedan disponibles en trial. Imagen (Claude
+    // vision) y audio (Groq) sí usan un modelo de IA, igual que
+    // generar/actualizar cursos: no disponibles en trial.
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    if (esImagen || esAudio) {
+      const { data: cuentaDelUsuario } = await supabase
+        .from('cuentas')
+        .select('id, plan, trial_ends_at')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (!puedeUsarIA(cuentaDelUsuario, user.email)) {
+        return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     let textoExtraido = '';
@@ -192,10 +217,8 @@ Deno.serve(async (req) => {
       const outputTokens = usage.output_tokens || 0;
       const costoUsd = (inputTokens / 1_000_000) * 1.0 + (outputTokens / 1_000_000) * 5.0;
 
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
+      // Reusa el mismo cliente/consulta de más arriba (ya se validó el
+      // acceso a IA con esta misma cuenta), en vez de volver a pedirla.
       const { data: cuentaDelUsuario } = await supabase
         .from('cuentas')
         .select('id')

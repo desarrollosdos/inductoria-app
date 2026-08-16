@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import TrialBanner from '../components/TrialBanner';
 import { esCursoSeguridadEHigiene, CursoCompletadoFila, TituloCursoInline } from '../components/Badges';
 
 function IconProgresoMini(props) {
@@ -228,6 +229,7 @@ export default function Progreso({ session }) {
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <TrialBanner cuenta={cuenta} />
         <EstadoBar
           icon={IconProgresoMini}
           label="Progreso"

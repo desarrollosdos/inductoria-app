@@ -4,14 +4,8 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
-
-// Cuentas que siempre tienen acceso completo, sin importar el estado de
-// la suscripción (equipo interno / pruebas).
-const CUENTAS_EXENTAS = [
-  'desarrollosdos@gmail.com',
-  'lucasanzone@gmail.com',
-  'sofiasanzone@gmail.com',
-];
+import TrialBanner from '../components/TrialBanner';
+import { tieneAccesoBase, puedeUsarIA } from '../lib/acceso';
 import { TituloCursoInline } from '../components/Badges';
 
 // Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
@@ -89,6 +83,7 @@ export default function Contenido({ session }) {
   const [puestosNuevoCurso, setPuestosNuevoCurso] = useState([]);
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
+  const [varianteSuscripcion, setVarianteSuscripcion] = useState('general');
 
   // Actualizar contenido de un curso ya publicado, sin borrar el microcurso.
   const [editandoPublicadoId, setEditandoPublicadoId] = useState(null);
@@ -176,6 +171,7 @@ export default function Contenido({ session }) {
 
   async function handleAgregarBase(curso) {
     if (!hasAccess) {
+      setVarianteSuscripcion('general');
       setMostrarSuscripcion(true);
       return;
     }
@@ -227,6 +223,7 @@ export default function Contenido({ session }) {
     if (!texto.trim()) return;
 
     if (!hasAccess) {
+      setVarianteSuscripcion('general');
       setMostrarSuscripcion(true);
       return;
     }
@@ -272,6 +269,16 @@ export default function Contenido({ session }) {
 
     if (!esTxt && !esPdf && !esDocx && !esImagen && !esAudio) {
       setErrorArchivo('Solo se aceptan archivos .txt, .pdf, .docx, imágenes o audio. Video no está soportado.');
+      return;
+    }
+
+    // Leer imágenes (Claude vision) y transcribir audio (Groq) usa IA,
+    // igual que generar el curso — no disponible en trial. .txt/.pdf/.docx
+    // se extraen con librerías comunes (unpdf/mammoth), sin costo de IA,
+    // así que esos sí quedan disponibles durante el trial.
+    if ((esImagen || esAudio) && !puedeUsarIA(cuenta, session.user.email)) {
+      setVarianteSuscripcion('ia');
+      setMostrarSuscripcion(true);
       return;
     }
 
@@ -404,7 +411,8 @@ export default function Contenido({ session }) {
   }
 
   async function handleGenerarCurso(id) {
-    if (!hasAccess) {
+    if (!puedeUsarIA(cuenta, session.user.email)) {
+      setVarianteSuscripcion('ia');
       setMostrarSuscripcion(true);
       return;
     }
@@ -435,6 +443,7 @@ export default function Contenido({ session }) {
     if (puestosNuevoCurso.length === 0) return;
 
     if (!hasAccess) {
+      setVarianteSuscripcion('general');
       setMostrarSuscripcion(true);
       return;
     }
@@ -538,7 +547,8 @@ export default function Contenido({ session }) {
   }
 
   async function handleActualizarPublicado(microcursoId) {
-    if (!hasAccess) {
+    if (!puedeUsarIA(cuenta, session.user.email)) {
+      setVarianteSuscripcion('ia');
       setMostrarSuscripcion(true);
       return;
     }
@@ -582,15 +592,13 @@ export default function Contenido({ session }) {
     );
   }
 
-  const hasAccess =
-    CUENTAS_EXENTAS.includes(session.user.email) ||
-    cuenta.plan === 'active' ||
-    cuenta.plan === 'past_due';
+  const hasAccess = tieneAccesoBase(cuenta, session.user.email);
 
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <TrialBanner cuenta={cuenta} />
         <EstadoBar
           icon={IconContenidoMini}
           label="Contenido"
@@ -1140,7 +1148,10 @@ export default function Contenido({ session }) {
       </PageShell>
 
       {mostrarSuscripcion && (
-        <SuscripcionRequeridaModal onClose={() => setMostrarSuscripcion(false)} />
+        <SuscripcionRequeridaModal
+          variante={varianteSuscripcion}
+          onClose={() => setMostrarSuscripcion(false)}
+        />
       )}
     </div>
   );

@@ -10,6 +10,7 @@
 // para que esos empleados vean el aviso de "contenido actualizado".
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,13 +61,22 @@ Deno.serve(async (req) => {
     // Confirmamos que el curso sea de una cuenta del usuario que llama.
     const { data: microcurso, error: microcursoError } = await supabase
       .from('microcursos')
-      .select('*, cuentas!inner(owner_id)')
+      .select('*, cuentas!inner(owner_id, plan, trial_ends_at)')
       .eq('id', microcursoId)
       .single();
 
     if (microcursoError || !microcurso || microcurso.cuentas.owner_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Curso no encontrado' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Actualizar/regenerar con IA es la misma función (y el mismo costo)
+    // que generar un curso nuevo: tampoco disponible en trial.
+    if (!puedeUsarIA(microcurso.cuentas, user.email)) {
+      return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

@@ -10,6 +10,7 @@
 // la IA quede bajo control del dueño, no corriendo solo en segundo plano.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,13 +53,23 @@ Deno.serve(async (req) => {
     // Traemos el contenido, y confirmamos que sea de una cuenta del usuario que llama.
     const { data: contenido, error: contenidoError } = await supabase
       .from('contenidos')
-      .select('*, cuentas!inner(owner_id)')
+      .select('*, cuentas!inner(owner_id, plan, trial_ends_at)')
       .eq('id', contenidoId)
       .single();
 
     if (contenidoError || !contenido || contenido.cuentas.owner_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Contenido no encontrado' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Generar con IA no está disponible en trial, aunque el resto de la
+    // app sí. Se valida acá (no solo en el frontend) porque cualquiera
+    // podría llamar esta función directo con el token del usuario.
+    if (!puedeUsarIA(contenido.cuentas, user.email)) {
+      return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

@@ -4,14 +4,8 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
-
-// Cuentas que siempre tienen acceso completo, sin importar el estado de
-// la suscripción (equipo interno / pruebas).
-const CUENTAS_EXENTAS = [
-  'desarrollosdos@gmail.com',
-  'lucasanzone@gmail.com',
-  'sofiasanzone@gmail.com',
-];
+import TrialBanner from '../components/TrialBanner';
+import { TRIAL_DIAS, tieneAccesoBase } from '../lib/acceso';
 
 function IconSucursalesMini(props) {
   return (
@@ -144,9 +138,19 @@ export default function Dashboard({ session }) {
     if (!nombreCuenta.trim()) return;
     setCreandoCuenta(true);
 
+    // Cuenta nueva arranca en trial: TRIAL_DIAS días de acceso completo
+    // (sin tope de empleados ni sucursales), salvo generar/actualizar
+    // cursos con IA, que quedan bloqueados hasta que se suscriba.
+    const trialEndsAt = new Date(Date.now() + TRIAL_DIAS * 24 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabase
       .from('cuentas')
-      .insert({ owner_id: session.user.id, nombre: nombreCuenta.trim(), plan: 'inactive' })
+      .insert({
+        owner_id: session.user.id,
+        nombre: nombreCuenta.trim(),
+        plan: 'trial',
+        trial_ends_at: trialEndsAt,
+      })
       .select()
       .single();
 
@@ -290,16 +294,14 @@ export default function Dashboard({ session }) {
     );
   }
 
-  const hasAccess =
-    CUENTAS_EXENTAS.includes(session.user.email) ||
-    cuenta.plan === 'active' ||
-    cuenta.plan === 'past_due';
+  const hasAccess = tieneAccesoBase(cuenta, session.user.email);
   const cupoLleno = negocios.length >= cuenta.sucursales_contratadas;
 
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <TrialBanner cuenta={cuenta} />
         <EstadoBar
           icon={IconSucursalesMini}
           label="Sucursales"

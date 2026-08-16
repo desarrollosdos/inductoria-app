@@ -10,6 +10,7 @@
 // de Inductoria (procesar-contenido).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL_EMPLEADO } from '../_shared/acceso.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
     // 1. Validar token y obtener el empleado
     const { data: empleado, error: empleadoError } = await supabase
       .from('empleados')
-      .select('id')
+      .select('id, negocio_id')
       .eq('token_acceso', token)
       .is('fecha_baja', null)
       .maybeSingle();
@@ -51,6 +52,22 @@ Deno.serve(async (req) => {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // 1.b Chat de dudas con IA: no disponible mientras la cuenta del
+    // negocio está en trial (mismo criterio que generar/actualizar
+    // cursos), aunque el resto de la app del empleado sí funcione.
+    const { data: negocioEmpleado } = await supabase
+      .from('negocios')
+      .select('cuenta_id, cuentas!inner(plan, trial_ends_at)')
+      .eq('id', empleado.negocio_id)
+      .maybeSingle();
+
+    if (!puedeUsarIA(negocioEmpleado?.cuentas)) {
+      return new Response(
+        JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL_EMPLEADO, bloqueado_trial: true }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // 2. Chequear el cupo diario (5 preguntas/día, sin importar el curso)

@@ -4,14 +4,8 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
-
-// Cuentas que siempre tienen acceso completo, sin importar el estado de
-// la suscripción (equipo interno / pruebas).
-const CUENTAS_EXENTAS = [
-  'desarrollosdos@gmail.com',
-  'lucasanzone@gmail.com',
-  'sofiasanzone@gmail.com',
-];
+import TrialBanner from '../components/TrialBanner';
+import { tieneAccesoBase } from '../lib/acceso';
 
 const PUESTOS_CATALOGO = [
   'Vendedor/a',
@@ -402,10 +396,7 @@ export default function Empleados({ session }) {
     );
   }
 
-  const hasAccess =
-    CUENTAS_EXENTAS.includes(session.user.email) ||
-    cuenta.plan === 'active' ||
-    cuenta.plan === 'past_due';
+  const hasAccess = tieneAccesoBase(cuenta, session.user.email);
   const activos = empleados.filter((e) => !e.fecha_baja);
   const dadosDeBaja = empleados.filter((e) => e.fecha_baja);
 
@@ -576,6 +567,7 @@ export default function Empleados({ session }) {
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <TrialBanner cuenta={cuenta} />
         <EstadoBar
           icon={IconEmpleadosMini}
           label="Empleados"

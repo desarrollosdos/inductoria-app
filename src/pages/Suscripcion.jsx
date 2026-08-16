@@ -4,6 +4,7 @@ import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 import CancelarSuscripcionModal from '../components/CancelarSuscripcionModal';
 import { precioTotalMensual } from '../lib/precio';
+import { trialActivo, diasTrialRestantes } from '../lib/acceso';
 
 function IconCard(props) {
   return (
@@ -26,6 +27,16 @@ const ESTADOS = {
     solido: false,
     corto: 'Inactiva',
     largo: 'Todavía no te suscribiste',
+  },
+  // Prueba gratis: mismo criterio visual que "inactive" (fondo suave,
+  // no pastilla sólida como active/past_due/suspended/cancelled),
+  // porque tampoco es un problema de pago.
+  trial: {
+    pillBg: '#DCEEF7',
+    pillText: '#1B6E8C',
+    solido: false,
+    corto: 'Prueba gratis',
+    largo: 'Estás en tu prueba gratis',
   },
   active: { pillBg: '#1D9E75', pillText: '#fff', solido: true, corto: 'Activa', largo: 'Suscripción activa' },
   past_due: {
@@ -212,6 +223,11 @@ export default function Suscripcion({ session }) {
                   'Tu suscripción está cancelada. Podés volver a suscribirte cuando quieras.'}
                 {cuenta.plan === 'inactive' &&
                   `Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
+                {trialActivo(cuenta) &&
+                  `Te quedan ${diasTrialRestantes(cuenta)} día${diasTrialRestantes(cuenta) === 1 ? '' : 's'} de prueba gratis. Podés usar Inductoria sin límite de empleados ni sucursales, salvo generar o actualizar cursos con IA. Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
+                {cuenta.plan === 'trial' &&
+                  !trialActivo(cuenta) &&
+                  'Tu prueba gratis venció. Suscribite para seguir usando Inductoria.'}
               </p>
               <button
                 onClick={handleSuscribirme}
