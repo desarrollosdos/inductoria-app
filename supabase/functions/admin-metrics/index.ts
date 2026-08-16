@@ -13,6 +13,24 @@ const corsHeaders = {
 
 const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 
+// Duplicado de src/lib/acceso.js (las Edge Functions no pueden importar
+// directo desde src/lib, mismo criterio que crear-suscripcion). Modelo de
+// trial definido 2026-08-16: 7 días.
+const TRIAL_DIAS = 7;
+
+// Estados de cuentas.plan que implican que la cuenta llegó a pagar en
+// algún momento (aunque hoy tenga un problema de cobro o haya cancelado).
+// 'cancelled' cuenta acá porque cancelar-suscripcion solo deja cancelar
+// una suscripción que ya estaba 'active'.
+const ESTADOS_CONVERTIDO = ['active', 'past_due', 'cancelled', 'suspended'];
+
+function diasTrialRestantes(cuenta: { plan: string; trial_ends_at: string | null }): number {
+  if (cuenta.plan !== 'trial' || !cuenta.trial_ends_at) return 0;
+  const ms = new Date(cuenta.trial_ends_at).getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.min(TRIAL_DIAS, Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24))));
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -48,7 +66,7 @@ Deno.serve(async (req) => {
     // -----------------------------
     const { data: cuentas } = await supabase
       .from('cuentas')
-      .select('id, owner_id, nombre, plan, sucursales_contratadas, created_at')
+      .select('id, owner_id, nombre, plan, sucursales_contratadas, created_at, trial_ends_at, mp_preapproval_id')
       .order('created_at', { ascending: false });
 
     const { data: negocios } = await supabase.from('negocios').select('id, cuenta_id');
@@ -116,6 +134,8 @@ Deno.serve(async (req) => {
       empleados: empleadosPorCuenta[c.id] || 0,
       created_at: c.created_at,
       ultimaConexion: ultimaConexionPorId[c.owner_id] || null,
+      trialEndsAt: c.trial_ends_at,
+      diasTrialRestantes: diasTrialRestantes(c),
     }));
 
     // -----------------------------
@@ -126,6 +146,35 @@ Deno.serve(async (req) => {
     const cupoLleno = clientes.filter((c) => c.sucursales >= c.sucursalesContratadas && c.sucursales > 0);
 
     const riesgos = { pagoEnRiesgo, sinEmpleados, cupoLleno };
+
+    // -----------------------------
+    // Trials: detalle de cuentas en trial vigente + métricas de
+    // conversión de todas las cuentas que alguna vez tuvieron trial
+    // (trial_ends_at != null, se setea al crear la cuenta y nunca se
+    // borra después, así que sirve como marca permanente).
+    // -----------------------------
+    const cuentasConTrial = clientes.filter((c) => !!c.trialEndsAt);
+    const enTrial = cuentasConTrial
+      .filter((c) => c.plan === 'trial')
+      .sort((a, b) => a.diasTrialRestantes - b.diasTrialRestantes);
+    const convirtieron = cuentasConTrial.filter((c) => ESTADOS_CONVERTIDO.includes(c.plan));
+    const noConvirtieron = cuentasConTrial.filter((c) => c.plan === 'inactive');
+    const decididos = convirtieron.length + noConvirtieron.length;
+
+    const trials = {
+      totalConTrial: cuentasConTrial.length,
+      enCurso: enTrial.length,
+      convirtieron: convirtieron.length,
+      noConvirtieron: noConvirtieron.length,
+      tasaConversion: decididos > 0 ? Math.round((convirtieron.length / decididos) * 100) : null,
+      detalleEnTrial: enTrial.map((c) => ({
+        id: c.id,
+        nombre: c.nombre,
+        diasRestantes: c.diasTrialRestantes,
+        trialEndsAt: c.trialEndsAt,
+        created_at: c.created_at,
+      })),
+    };
 
     // -----------------------------
     // Gaps de conocimiento: cursos donde más se pregunta en el chat de
@@ -169,7 +218,7 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 20);
 
-    return new Response(JSON.stringify({ resumen, clientes, riesgos, gapsConocimiento }), {
+    return new Response(JSON.stringify({ resumen, clientes, riesgos, gapsConocimiento, trials }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
