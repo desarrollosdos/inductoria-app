@@ -45,7 +45,7 @@ function ChipEmailMobile({ email }) {
         onClick={() => setAbierto((v) => !v)}
         title="Ver cuenta"
         aria-label="Ver cuenta"
-        className="w-8 h-8 rounded-full bg-[#FBF3EC] text-[#2C2C2A] font-bold text-xs flex items-center justify-center"
+        className="w-8 h-8 rounded-full bg-[#7C8B6F] text-white font-bold text-xs flex items-center justify-center"
       >
         {inicial}
       </button>
