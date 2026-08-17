@@ -4,7 +4,7 @@ import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 import CancelarSuscripcionModal from '../components/CancelarSuscripcionModal';
 import { precioTotalMensual } from '../lib/precio';
-import { trialActivo, diasTrialRestantes } from '../lib/acceso';
+import { trialActivo, textoTrialRestante } from '../lib/acceso';
 
 function IconCard(props) {
   return (
@@ -224,7 +224,7 @@ export default function Suscripcion({ session }) {
                 {cuenta.plan === 'inactive' &&
                   `Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
                 {trialActivo(cuenta) &&
-                  `Te quedan ${diasTrialRestantes(cuenta)} día${diasTrialRestantes(cuenta) === 1 ? '' : 's'} de prueba gratis. Podés usar Inductoria sin límite de empleados ni sucursales, salvo generar o actualizar cursos con IA. Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
+                  `Te quedan ${textoTrialRestante(cuenta)} de prueba gratis. Podés usar Inductoria sin límite de empleados ni sucursales, salvo generar o actualizar cursos con IA. Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
                 {cuenta.plan === 'trial' &&
                   !trialActivo(cuenta) &&
                   'Tu prueba gratis venció. Suscribite para seguir usando Inductoria.'}
@@ -239,7 +239,18 @@ export default function Suscripcion({ session }) {
             </>
           )}
 
-          {cuenta.plan === 'active' && (
+          {cuenta.plan === 'active' && cuenta.cancelacion_pendiente && (
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455]">
+              Cancelaste tu suscripción — no se va a renovar. Mantenés acceso completo hasta el{' '}
+              <strong className="text-[#2C2C2A]">
+                {cuenta.acceso_hasta ? new Date(cuenta.acceso_hasta).toLocaleDateString('es-AR') : '—'}
+              </strong>
+              . Si te arrepentís, podés volver a suscribirte en cualquier momento después de esa
+              fecha.
+            </div>
+          )}
+
+          {cuenta.plan === 'active' && !cuenta.cancelacion_pendiente && (
             <div>
               <button
                 onClick={() => setMostrarCancelar(true)}

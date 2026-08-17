@@ -2,6 +2,12 @@
 // ---------------------------------------------
 // Devuelve el costo real de IA (tokens reales, no estimado) acumulado,
 // total y del mes en curso, y desglosado por cuenta. Solo el admin.
+//
+// También devuelve estadísticas de transcripción de audio (Groq): no es
+// costo real en USD (Groq es gratis dentro de su límite diario), pero
+// desde que se habilitó en trial (2026-08-17) sirve tener visibilidad
+// del volumen acá, por si algún día conviene revisar si sigue siendo
+// gratis a esa escala.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -82,8 +88,38 @@ Deno.serve(async (req) => {
 
     const porCuenta = Object.values(porCuentaMapa).sort((a, b) => b.usd - a.usd);
 
+    // Estadísticas de transcripción de audio (Groq), separado del costo
+    // real de arriba porque no tiene costo en USD.
+    const { data: audios, error: errorAudios } = await supabase
+      .from('audio_transcripciones_log')
+      .select('plan_al_momento, created_at');
+
+    if (errorAudios) throw errorAudios;
+
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
+
+    let audioTotal = 0;
+    let audioHoy = 0;
+    let audioMes = 0;
+    let audioTrial = 0;
+
+    (audios || []).forEach((a) => {
+      audioTotal += 1;
+      const fecha = new Date(a.created_at);
+      if (fecha >= inicioMes) audioMes += 1;
+      if (fecha >= inicioHoy) audioHoy += 1;
+      if (a.plan_al_momento === 'trial') audioTrial += 1;
+    });
+
     return new Response(
-      JSON.stringify({ totalUsd, totalUsdMes, generaciones, porCuenta }),
+      JSON.stringify({
+        totalUsd,
+        totalUsdMes,
+        generaciones,
+        porCuenta,
+        audio: { total: audioTotal, hoy: audioHoy, mes: audioMes, enTrial: audioTrial },
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

@@ -4,6 +4,18 @@
 // Requiere estar logueado (Verify JWT SI debe estar activo para esta
 // funcion, a diferencia del webhook). Solo cancela si la cuenta que
 // pide la baja es la dueña de la suscripcion.
+//
+// Igual que cualquier suscripción tipo SaaS (Netflix, Spotify, etc.):
+// cancelar corta la RENOVACIÓN automática, pero el acceso sigue activo
+// hasta el final del período ya pagado (esto es lo que ya prometía
+// CancelarSuscripcionModal.jsx en el frontend — "vas a perder acceso al
+// final de tu período ya pagado" — pero antes el código de acá abajo no
+// lo cumplía: cortaba el acceso al toque). Por eso NO tocamos
+// cuentas.plan acá: lo dejamos en 'active' y guardamos hasta cuándo
+// tiene acceso en acceso_hasta + marcamos cancelacion_pendiente. Un
+// cron diario (expirar-trials, que ya corre todos los días) es el que
+// después, cuando esa fecha ya pasó, recién ahí pasa el plan a
+// 'cancelled'.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -73,6 +85,34 @@ Deno.serve(async (req) => {
     }
 
     const mpToken = Deno.env.get('MP_ACCESS_TOKEN')!;
+
+    // Antes de cancelar, leemos next_payment_date: es la fecha en la
+    // que MercadoPago iba a cobrar el próximo período. Como el período
+    // actual ya está pagado, esa fecha es hasta cuándo le corresponde
+    // acceso al Cliente. La leemos ANTES del PUT porque una vez
+    // cancelada la suscripción, MercadoPago puede dejar de informarla.
+    const getRes = await fetch(`https://api.mercadopago.com/preapproval/${cuenta.mp_preapproval_id}`, {
+      headers: { Authorization: `Bearer ${mpToken}` },
+    });
+    let accesoHasta: string | null = null;
+    if (getRes.ok) {
+      const preapproval = await getRes.json();
+      if (preapproval.next_payment_date) {
+        accesoHasta = preapproval.next_payment_date;
+      }
+    }
+    // Si por algún motivo MercadoPago no informó next_payment_date
+    // (no debería pasar en una suscripción autorizada, pero por las
+    // dudas), usamos 30 días desde ahora como aproximación de un
+    // período mensual — preferimos ser generosos con el Cliente antes
+    // que cortarle el acceso de golpe por un dato faltante.
+    if (!accesoHasta) {
+      console.warn(
+        `cancelar-suscripcion: preapproval ${cuenta.mp_preapproval_id} sin next_payment_date, uso fallback de 30 días`
+      );
+      accesoHasta = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${cuenta.mp_preapproval_id}`, {
       method: 'PUT',
       headers: {
@@ -91,15 +131,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // No hace falta esperar al webhook para reflejarlo: lo marcamos
-    // nosotros mismos ya (el webhook lo va a confirmar igual después,
-    // sin pisar nada raro porque el estado destino es el mismo).
+    // OJO: plan queda como estaba ('active'). No lo tocamos acá — el
+    // Cliente sigue con acceso normal hasta acceso_hasta. El webhook
+    // de MercadoPago también va a recibir este cambio de estado, pero
+    // ya sabe (ver mercadopago-webhook) que un preapproval 'cancelled'
+    // tampoco debe tocar el plan directamente, por la misma razón.
     await supabase
       .from('cuentas')
-      .update({ plan: 'cancelled' })
+      .update({ cancelacion_pendiente: true, acceso_hasta: accesoHasta })
       .eq('id', cuenta.id);
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, acceso_hasta: accesoHasta }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

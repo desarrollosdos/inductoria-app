@@ -68,11 +68,15 @@ async function verificarFirma(req: Request, dataId: string): Promise<boolean> {
 // renovación) apenas alguien apretaba "Suscribirme", mucho antes de
 // que el pago se acredite. Ahora, si no reconocemos el estado, no
 // tocamos nada — dejamos que el pago (evento "payment") o un cambio de
-// estado real (authorized/paused/cancelled) sean los que actualicen.
+// estado real (authorized/paused) sean los que actualicen.
+//
+// 'cancelled' NO pasa por acá — se maneja aparte más abajo, porque a
+// diferencia de los demás no debe tocar el plan directamente (el
+// Cliente mantiene acceso hasta el final de su período ya pagado, ver
+// el comentario grande en cancelar-suscripcion/index.ts).
 function mapearEstadoPreapproval(mpStatus: string): string | null {
   if (mpStatus === 'authorized') return 'active';
   if (mpStatus === 'paused') return 'past_due';
-  if (mpStatus === 'cancelled') return 'cancelled';
   return null;
 }
 
@@ -127,17 +131,42 @@ Deno.serve(async (req) => {
       }
       const preapproval = await mpRes.json();
       const cuentaId = preapproval.external_reference;
-      const nuevoPlan = mapearEstadoPreapproval(preapproval.status);
 
-      if (nuevoPlan) {
+      if (preapproval.status === 'cancelled') {
+        // No cortamos el acceso al toque: el Cliente sigue con acceso
+        // hasta next_payment_date (el período que ya pagó). Cubre tanto
+        // cancelaciones hechas desde nuestro botón (cancelar-suscripcion
+        // ya seteó esto mismo, así que este update es idempotente) como
+        // cancelaciones hechas directo desde la cuenta de MercadoPago
+        // del Cliente, que no pasan por nuestra app.
+        const accesoHasta =
+          preapproval.next_payment_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         await supabase
           .from('cuentas')
-          .update({ plan: nuevoPlan, mp_preapproval_id: dataId })
+          .update({ cancelacion_pendiente: true, acceso_hasta: accesoHasta, mp_preapproval_id: dataId })
           .eq('id', cuentaId);
       } else {
-        // Estado no reconocido (ej: 'pending'): igual guardamos el
-        // mp_preapproval_id para no perderlo, pero sin tocar el plan.
-        await supabase.from('cuentas').update({ mp_preapproval_id: dataId }).eq('id', cuentaId);
+        const nuevoPlan = mapearEstadoPreapproval(preapproval.status);
+
+        if (nuevoPlan) {
+          // Si el estado vuelve a authorized/paused (por ejemplo, una
+          // nueva suscripción después de haber cancelado la anterior),
+          // limpiamos cualquier cancelación pendiente que hubiera
+          // quedado de antes.
+          await supabase
+            .from('cuentas')
+            .update({
+              plan: nuevoPlan,
+              mp_preapproval_id: dataId,
+              cancelacion_pendiente: false,
+              acceso_hasta: null,
+            })
+            .eq('id', cuentaId);
+        } else {
+          // Estado no reconocido (ej: 'pending'): igual guardamos el
+          // mp_preapproval_id para no perderlo, pero sin tocar el plan.
+          await supabase.from('cuentas').update({ mp_preapproval_id: dataId }).eq('id', cuentaId);
+        }
       }
     } else if (esPago) {
       // Un pago puntual dentro de la suscripcion (el cobro mensual).
@@ -159,7 +188,7 @@ Deno.serve(async (req) => {
       if (pago.status === 'approved') {
         await supabase
           .from('cuentas')
-          .update({ plan: 'active' })
+          .update({ plan: 'active', cancelacion_pendiente: false, acceso_hasta: null })
           .eq('id', cuentaId);
       }
       // Si el pago rechaza, no tocamos el plan aca: el evento de

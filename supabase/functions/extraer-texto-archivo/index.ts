@@ -4,14 +4,21 @@
 // devuelve el texto plano extraído, para que el dueño lo vea y edite en
 // el textarea antes de aprobarlo, igual que hoy hace con .txt.
 //
-// - PDF/.docx: se parsean acá mismo (unpdf / mammoth).
+// - PDF/.docx: se parsean acá mismo (unpdf / mammoth). Sin costo de IA.
 // - Imagen: se manda a Claude (vision) para "leerla". Cuesta centavos,
 //   se loguea en ai_usage_log como el resto de la IA de Inductoria.
+//   Bloqueado en trial (usa puedeUsarIA), igual que generar un curso.
 // - Audio: se manda a Groq (Whisper), NO a Claude — la API de Claude no
 //   acepta audio. Groq tiene nivel gratis (hasta 8hs de audio/día, sin
 //   tarjeta), así que esto no suma costo mientras no se pase de ese
 //   límite. Necesita el secret GROQ_API_KEY cargado en Supabase (cuenta
 //   gratuita en console.groq.com, separada de Anthropic).
+//   DISPONIBLE EN TRIAL (desde 2026-08-17): a diferencia de la imagen,
+//   esto no tiene costo real, así que no pasa por puedeUsarIA. Cada
+//   transcripción se loguea en audio_transcripciones_log (no en
+//   ai_usage_log, que es específicamente costo real en USD) para poder
+//   ver en el panel de admin cuánto volumen se genera — por si Groq
+//   algún día deja de ser gratis en ese volumen o cambia sus límites.
 // - Video: NO soportado, decisión explícita de no agregarlo.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -97,27 +104,31 @@ Deno.serve(async (req) => {
     }
 
     // PDF/.docx se extraen con librerías comunes (unpdf/mammoth), sin
-    // costo de IA, así que quedan disponibles en trial. Imagen (Claude
-    // vision) y audio (Groq) sí usan un modelo de IA, igual que
-    // generar/actualizar cursos: no disponibles en trial.
+    // costo de IA, así que quedan disponibles en trial. Imagen sí usa un
+    // modelo de IA con costo real (Claude vision), igual que
+    // generar/actualizar cursos: no disponible en trial. Audio (Groq)
+    // es gratis, así que SÍ está disponible en trial (ver cabecera del
+    // archivo) — solo se consulta la cuenta para loguear el volumen.
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    let cuentaDelUsuario: { id: string; plan: string; trial_ends_at?: string | null } | null = null;
     if (esImagen || esAudio) {
-      const { data: cuentaDelUsuario } = await supabase
+      const { data } = await supabase
         .from('cuentas')
         .select('id, plan, trial_ends_at')
         .eq('owner_id', user.id)
         .maybeSingle();
+      cuentaDelUsuario = data;
+    }
 
-      if (!puedeUsarIA(cuentaDelUsuario, user.email)) {
-        return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    if (esImagen && !puedeUsarIA(cuentaDelUsuario, user.email)) {
+      return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     let textoExtraido = '';
@@ -163,6 +174,18 @@ Deno.serve(async (req) => {
       }
 
       textoExtraido = await groqRes.text();
+
+      // Volumen de transcripciones de audio (gratis, no es un costo real
+      // en USD como ai_usage_log). Sirve para que el admin vea si el uso
+      // crece mucho — por ejemplo, muchas cuentas en trial grabando
+      // audio — y pueda anticiparse si Groq algún día deja de ser
+      // gratis en ese volumen. No corta el flujo si falla el insert.
+      const { error: logError } = await supabase.from('audio_transcripciones_log').insert({
+        cuenta_id: cuentaDelUsuario?.id ?? null,
+        plan_al_momento: cuentaDelUsuario?.plan ?? null,
+        bytes_archivo: bytes.length,
+      });
+      if (logError) console.error('No se pudo registrar el log de transcripción de audio:', logError);
     } else {
       // Imagen: se la mandamos a Claude (vision) para que "lea" el
       // contenido de capacitación que muestra la captura.
@@ -211,20 +234,15 @@ Deno.serve(async (req) => {
 
       // Registramos el costo contra la cuenta real del usuario, mismo
       // criterio que procesar-contenido (nunca cuenta_id null). El audio
-      // (Groq) no se loguea acá porque es gratis, no tiene costo real.
+      // (Groq) no se loguea acá porque es gratis, no tiene costo real —
+      // se loguea aparte en audio_transcripciones_log (ver rama esAudio).
       const usage = claudeData.usage || {};
       const inputTokens = usage.input_tokens || 0;
       const outputTokens = usage.output_tokens || 0;
       const costoUsd = (inputTokens / 1_000_000) * 1.0 + (outputTokens / 1_000_000) * 5.0;
 
-      // Reusa el mismo cliente/consulta de más arriba (ya se validó el
+      // Reusa la misma cuenta consultada más arriba (ya se validó el
       // acceso a IA con esta misma cuenta), en vez de volver a pedirla.
-      const { data: cuentaDelUsuario } = await supabase
-        .from('cuentas')
-        .select('id')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-
       if (cuentaDelUsuario) {
         const { error: usageError } = await supabase.from('ai_usage_log').insert({
           cuenta_id: cuentaDelUsuario.id,

@@ -1,15 +1,23 @@
 // Inductoria · Edge Function: expirar-trials
 // ------------------------------------------------
 // Corre todos los días vía pg_cron (ver supabase/sql/2026-08-16-trial.sql).
-// Busca cuentas en plan='trial' cuyo trial_ends_at ya pasó y las pasa a
-// 'inactive' — el mismo estado que ya usa toda la app para "sin acceso,
-// necesita suscribirse" (Suscripcion.jsx, Dashboard.jsx, Empleados.jsx,
-// Contenido.jsx), así que no hace falta ningún manejo especial nuevo en
-// el frontend para la cuenta vencida.
+// Hace dos cosas (el nombre quedó corto para lo segundo, pero se
+// mantiene así para no tener que rearmar el cron job ya configurado):
+//
+// 1. Busca cuentas en plan='trial' cuyo trial_ends_at ya pasó y las pasa
+//    a 'inactive' — el mismo estado que ya usa toda la app para "sin
+//    acceso, necesita suscribirse" (Suscripcion.jsx, Dashboard.jsx,
+//    Empleados.jsx, Contenido.jsx), así que no hace falta ningún manejo
+//    especial nuevo en el frontend para la cuenta vencida.
+//
+// 2. Busca cuentas con cancelacion_pendiente=true cuyo acceso_hasta ya
+//    pasó (canceladas por el Cliente o desde MercadoPago, pero que
+//    mantuvieron acceso hasta el final de su período ya pagado — ver
+//    cancelar-suscripcion/index.ts) y ahí sí las pasa a 'cancelled'.
 //
 // Protegida con un secret (x-cron-secret) para que no la pueda llamar
-// cualquiera desde afuera y tirar cuentas a 'inactive' a mano. Mismo
-// criterio que los cron jobs de Repunte.
+// cualquiera desde afuera y tirar cuentas a 'inactive'/'cancelled' a
+// mano. Mismo criterio que los cron jobs de Repunte.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -39,18 +47,34 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: vencidas, error } = await supabase
+    const ahora = new Date().toISOString();
+
+    const { data: trialsVencidos, error: errorTrials } = await supabase
       .from('cuentas')
       .update({ plan: 'inactive' })
       .eq('plan', 'trial')
-      .lt('trial_ends_at', new Date().toISOString())
+      .lt('trial_ends_at', ahora)
       .select('id');
 
-    if (error) throw error;
+    if (errorTrials) throw errorTrials;
 
-    return new Response(JSON.stringify({ ok: true, cuentas_vencidas: (vencidas || []).length }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const { data: cancelacionesAplicadas, error: errorCancelaciones } = await supabase
+      .from('cuentas')
+      .update({ plan: 'cancelled', cancelacion_pendiente: false })
+      .eq('cancelacion_pendiente', true)
+      .lt('acceso_hasta', ahora)
+      .select('id');
+
+    if (errorCancelaciones) throw errorCancelaciones;
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        cuentas_vencidas: (trialsVencidos || []).length,
+        cancelaciones_aplicadas: (cancelacionesAplicadas || []).length,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (err) {
     console.error(err);
     return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {

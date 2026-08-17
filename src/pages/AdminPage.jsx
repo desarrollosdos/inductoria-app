@@ -29,12 +29,6 @@ function formatUltimaConexion(fecha) {
   return `Hace ${dias} días (${fechaTexto})`;
 }
 
-function etiquetaDiasRestantes(dias) {
-  if (dias <= 0) return 'Vence hoy';
-  if (dias === 1) return '1 día';
-  return `${dias} días`;
-}
-
 function IconAlerta(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -101,15 +95,6 @@ function IconVisitas(props) {
   );
 }
 
-function IconTrial(props) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3.5 2" />
-    </svg>
-  );
-}
-
 function IconGaps(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -122,7 +107,6 @@ function IconGaps(props) {
 const SUB_TABS = [
   { id: 'resumen', label: 'Resumen', Icon: IconResumen },
   { id: 'clientes', label: 'Clientes e historial', Icon: IconClientes },
-  { id: 'trials', label: 'Trials', Icon: IconTrial },
   { id: 'riesgos', label: 'Riesgos y análisis', Icon: IconRiesgos },
   { id: 'visitas', label: 'Visitas', Icon: IconVisitas },
   { id: 'gaps', label: 'Gaps de conocimiento', Icon: IconGaps },
@@ -258,7 +242,7 @@ export default function AdminPage({ session }) {
     return <p className="text-center mt-24 text-[#6b6455]">No se pudieron cargar las métricas.</p>;
   }
 
-  const { resumen, clientes, riesgos, trials } = datos;
+  const { resumen, clientes, riesgos } = datos;
   const cuentasActivas = clientes.filter((c) => c.plan === 'active').length;
 
   return (
@@ -402,57 +386,6 @@ export default function AdminPage({ session }) {
               </div>
             )}
           </div>
-        )}
-
-        {tab === 'trials' && (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Tarjeta label="Pasaron por trial" valor={trials.totalConTrial} />
-              <Tarjeta label="Convirtieron" valor={trials.convirtieron} />
-              <Tarjeta label="No convirtieron" valor={trials.noConvirtieron} />
-              <Tarjeta
-                label="Tasa de conversión"
-                valor={trials.tasaConversion === null ? '—' : `${trials.tasaConversion}%`}
-              />
-            </div>
-            <p className="text-xs text-[#8a8471] -mt-2">
-              Tasa de conversión calculada sobre trials ya decididos (convirtieron o no), sin contar
-              los {trials.enCurso} que todavía están en curso.
-            </p>
-
-            <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-              <h2 className="font-semibold text-[#2C2C2A] mb-4">
-                Cuentas en trial ahora ({trials.detalleEnTrial.length})
-              </h2>
-              {trials.detalleEnTrial.length === 0 ? (
-                <p className="text-sm text-[#6b6455]">Ninguna cuenta está en trial en este momento.</p>
-              ) : (
-                <div className="space-y-2">
-                  {trials.detalleEnTrial.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
-                      <div>
-                        <p className="text-sm font-semibold text-[#2C2C2A]">{c.nombre}</p>
-                        <p className="text-xs text-[#8a8471]">
-                          Vence el{' '}
-                          {new Date(c.trialEndsAt).toLocaleDateString('es-AR', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </p>
-                      </div>
-                      <span
-                        className="text-xs font-semibold px-2.5 py-1 rounded-full text-white"
-                        style={{ background: c.diasRestantes <= 2 ? '#C1502E' : '#8a8471' }}
-                      >
-                        {etiquetaDiasRestantes(c.diasRestantes)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
         )}
 
         {tab === 'riesgos' && (
@@ -637,6 +570,24 @@ export default function AdminPage({ session }) {
                   {costoIA.generaciones === 1 ? '' : 's'} con IA en total, costo real según tokens
                   de Claude Haiku 4.5 (no estimado).
                 </p>
+
+                {costoIA.audio && (
+                  <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+                    <h2 className="font-semibold text-[#2C2C2A] mb-1">Transcripción de audio (Groq)</h2>
+                    <p className="text-xs text-[#8a8471] mb-4">
+                      No suma al costo de arriba: Groq es gratis mientras no se supere su límite
+                      diario (8hs de audio/día). Está habilitado también durante el trial, así que
+                      vale la pena mirar este número de tanto en tanto — si crece mucho, conviene
+                      revisar el uso real en console.groq.com por si conviniera ponerle un límite.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <Tarjeta label="Hoy" valor={costoIA.audio.hoy} />
+                      <Tarjeta label="Este mes" valor={costoIA.audio.mes} />
+                      <Tarjeta label="Total histórico" valor={costoIA.audio.total} />
+                      <Tarjeta label="En trial (total)" valor={costoIA.audio.enTrial} />
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
                   <h2 className="font-semibold text-[#2C2C2A] mb-4">Costo por cuenta</h2>

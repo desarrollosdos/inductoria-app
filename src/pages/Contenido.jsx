@@ -311,11 +311,14 @@ export default function Contenido({ session }) {
       return;
     }
 
-    // Leer imágenes (Claude vision) y transcribir audio (Groq) usa IA,
-    // igual que generar el curso — no disponible en trial. .txt/.pdf/.docx
-    // se extraen con librerías comunes (unpdf/mammoth), sin costo de IA,
-    // así que esos sí quedan disponibles durante el trial.
-    if ((esImagen || esAudio) && !puedeUsarIA(cuenta, session.user.email)) {
+    // Leer imágenes usa Claude vision (costo real) — no disponible en
+    // trial, igual que generar el curso. .txt/.pdf/.docx se extraen con
+    // librerías comunes (unpdf/mammoth), sin costo de IA. El audio se
+    // transcribe con Groq, que es gratis, así que desde 2026-08-17
+    // también está disponible en trial (deja ver el flujo completo
+    // "subir/grabar audio → texto" antes de suscribirse — lo único que
+    // sigue bloqueado es el paso siguiente, generar el curso con IA).
+    if (esImagen && !puedeUsarIA(cuenta, session.user.email)) {
       setVarianteSuscripcion('ia');
       setMostrarSuscripcion(true);
       return;
@@ -367,8 +370,10 @@ export default function Contenido({ session }) {
   // alternativa a subir un archivo ya grabado. Una vez detenida la
   // grabación, se puede escuchar y, si sirve, se manda por el MISMO
   // camino que un archivo de audio subido (handleArchivo), reusando
-  // toda la lógica que ya existe: el bloqueo de IA en trial, el envío
-  // a extraer-texto-archivo, etc.
+  // toda la lógica que ya existe: el envío a extraer-texto-archivo, etc.
+  // Sin bloqueo de trial acá — igual que subir un audio ya grabado,
+  // transcribir con Groq es gratis y está disponible en trial (ver
+  // handleArchivo más arriba).
   function elegirMimeTypeGrabacion() {
     if (typeof MediaRecorder === 'undefined') return '';
     const candidatos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -377,13 +382,6 @@ export default function Contenido({ session }) {
 
   async function iniciarGrabacion() {
     setErrorGrabacion(null);
-
-    // Mismo bloqueo que subir un archivo de audio: no disponible en trial.
-    if (!puedeUsarIA(cuenta, session.user.email)) {
-      setVarianteSuscripcion('ia');
-      setMostrarSuscripcion(true);
-      return;
-    }
 
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setErrorGrabacion('Tu navegador no permite grabar audio acá. Probá subir un archivo de audio ya grabado.');
@@ -751,9 +749,11 @@ export default function Contenido({ session }) {
           }
         />
         <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
-          Esta es tu <strong>biblioteca de contenido</strong>: subís el material (manuales, audios
-          transcriptos, apuntes), lo marcás como aprobado, y desde ahí la IA lo convierte en un curso
-          con pasos y evaluación, listo para que vos lo revises antes de publicarlo.
+          Esta es tu <strong>biblioteca de contenido</strong>: subís el material de capacitación
+          (manuales en PDF o Word, apuntes de texto, fotos o capturas de pantalla, notas de voz
+          grabadas acá mismo o archivos de audio ya grabados), lo marcás como aprobado, y desde
+          ahí la IA lo convierte en un curso con pasos y evaluación, listo para que vos lo revises
+          antes de publicarlo.
         </div>
 
         {cursosBase.length > 0 && (

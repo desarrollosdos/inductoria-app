@@ -22,9 +22,15 @@ export interface CuentaPlan {
   trial_ends_at?: string | null;
 }
 
-// Acceso a las funciones de IA: activa, con pago pendiente (todavía no
-// se suspendió), o cuenta exenta. NUNCA en trial, aunque el trial esté
-// vigente.
+// Acceso a las funciones de IA con costo real (Claude: generar/
+// actualizar curso, chat de dudas, lectura de imágenes): activa, con
+// pago pendiente (todavía no se suspendió), o cuenta exenta. NUNCA en
+// trial, aunque el trial esté vigente.
+//
+// La transcripción de audio (Groq Whisper, en extraer-texto-archivo) NO
+// usa esta función — Groq es gratis dentro de su límite diario, así que
+// desde 2026-08-17 queda disponible también en trial. Ver el comentario
+// correspondiente en extraer-texto-archivo/index.ts.
 export function puedeUsarIA(cuenta: CuentaPlan | null | undefined, email?: string | null): boolean {
   if (email && CUENTAS_EXENTAS.has(email)) return true;
   if (!cuenta) return false;
