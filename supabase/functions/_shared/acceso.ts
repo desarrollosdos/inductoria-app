@@ -40,6 +40,13 @@ export function puedeUsarIA(cuenta: CuentaPlan | null | undefined, email?: strin
 export const MENSAJE_IA_BLOQUEADA_TRIAL =
   'Para usar esta función necesitás suscribirte. Durante la prueba gratis podés cargar empleados, contenido y usar cursos de la biblioteca, pero generar o actualizar cursos con IA requiere una suscripción activa.';
 
+// Mismo bloqueo que MENSAJE_IA_BLOQUEADA_TRIAL, pero para
+// generar-procedimiento — el mensaje genérico habla específicamente de
+// "cursos", que sería confuso mostrarle a alguien que apretó "Generar
+// procedimiento con IA".
+export const MENSAJE_IA_BLOQUEADA_TRIAL_PROCEDIMIENTO =
+  'Para usar esta función necesitás suscribirte. Durante la prueba gratis podés cargar empleados y contenido, pero generar procedimientos con IA requiere una suscripción activa.';
+
 // Mensaje para el empleado (no ve ni maneja la suscripción, así que no
 // tiene sentido pedirle a él que se suscriba).
 export const MENSAJE_IA_BLOQUEADA_TRIAL_EMPLEADO =

@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Empleados from './pages/Empleados';
 import Contenido from './pages/Contenido';
+import Procedimientos from './pages/Procedimientos';
 import Progreso from './pages/Progreso';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
@@ -105,6 +106,15 @@ export default function App() {
         <>
           <Header session={session} />
           <Contenido session={session} />
+        </>
+      );
+    }
+
+    if (path === '/procedimientos') {
+      return (
+        <>
+          <Header session={session} />
+          <Procedimientos session={session} />
         </>
       );
     }

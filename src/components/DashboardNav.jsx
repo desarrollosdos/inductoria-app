@@ -47,6 +47,15 @@ function IconContenido(props) {
   );
 }
 
+function IconProcedimientos(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 3h6l1 2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3l1-2z" />
+      <path d="m9 13 2 2 4-4" />
+    </svg>
+  );
+}
+
 function IconAdmin(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -61,6 +70,7 @@ const TABS = [
   { id: 'sucursales', label: 'Sucursales', path: '/sucursales', Icon: IconSucursales },
   { id: 'empleados', label: 'Empleados', path: '/empleados', Icon: IconEmpleados },
   { id: 'contenido', label: 'Contenido', path: '/contenido', Icon: IconContenido },
+  { id: 'procedimientos', label: 'Procedimientos', path: '/procedimientos', Icon: IconProcedimientos },
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 

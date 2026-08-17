@@ -4,17 +4,17 @@
 // que el cartel de bloqueo de Repunte.
 //
 // variante='ia': caso especial de una cuenta EN TRIAL que apretó una
-// función de IA (generar/actualizar curso). Ahí el resto de la app sí
-// funciona, así que el mensaje aclara eso en vez de sonar a "no podés
-// usar nada".
+// función de IA (generar/actualizar curso, generar procedimiento, leer
+// una imagen). Ahí el resto de la app sí funciona, así que el mensaje
+// aclara eso en vez de sonar a "no podés usar nada".
 const COPY = {
   general: {
     titulo: 'Activá tu suscripción para seguir usando Inductoria',
     texto: 'Podés seguir mirando la app, pero para crear, generar o publicar contenido real necesitás una suscripción activa.',
   },
   ia: {
-    titulo: 'Suscribite para generar cursos con IA',
-    texto: 'Generar o actualizar cursos con inteligencia artificial es una función paga. Podés seguir usando el resto de Inductoria (empleados, biblioteca de cursos, progreso) durante tu prueba gratis.',
+    titulo: 'Suscribite para usar las funciones con IA',
+    texto: 'Generar o actualizar cursos, generar procedimientos, o leer imágenes con inteligencia artificial son funciones pagas. Podés seguir usando el resto de Inductoria (empleados, biblioteca de cursos, progreso) durante tu prueba gratis.',
   },
 };
 
