@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 function IconSalir(props) {
@@ -7,6 +8,53 @@ function IconSalir(props) {
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
+  );
+}
+
+// Chip redondo con la inicial del mail, solo visible en mobile (en
+// desktop el mail ya se ve entero al lado del botón de salir, así que
+// esto sobraría ahí). En mobile no entra el mail completo al lado del
+// botón, así que en vez de ocultarlo sin más, este chip lo deja a un
+// toque de distancia: lo tocás y aparece el mail completo abajo, en un
+// globito, hasta que lo volvés a tocar o tocás en cualquier otro lado.
+function ChipEmailMobile({ email }) {
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function handleClickAfuera(e) {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target)) {
+        setAbierto(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickAfuera);
+    document.addEventListener('touchstart', handleClickAfuera);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAfuera);
+      document.removeEventListener('touchstart', handleClickAfuera);
+    };
+  }, [abierto]);
+
+  const inicial = (email || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <div className="relative sm:hidden" ref={contenedorRef}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        title="Ver cuenta"
+        aria-label="Ver cuenta"
+        className="w-8 h-8 rounded-full bg-[#FBF3EC] text-[#2C2C2A] font-bold text-xs flex items-center justify-center"
+      >
+        {inicial}
+      </button>
+      {abierto && (
+        <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 whitespace-nowrap">
+          <p className="text-xs font-semibold text-[#2C2C2A]">{email}</p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -35,8 +83,9 @@ export default function Header({ session, empleadoNombre }) {
         </a>
 
         {session && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden sm:inline text-xs font-semibold text-[#FBF3EC]">{session.user.email}</span>
+            <ChipEmailMobile email={session.user.email} />
             <button
               onClick={handleLogout}
               title="Salir"
