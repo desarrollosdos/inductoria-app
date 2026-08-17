@@ -148,13 +148,22 @@ export default function App() {
   }
 
   return (
-    <>
+    // min-h-screen + flex-col acá, y flex-1 en el contenido de abajo: es
+    // el patrón estándar de "footer pegado abajo". Antes el Footer
+    // quedaba pegado al final del contenido nomás, así que en pantallas
+    // con poco contenido (por ejemplo, "Cargando..." o una lista vacía)
+    // aparecía a mitad de página en vez de al pie. Con esto, si el
+    // contenido es corto, el espacio vacío que sobra lo absorbe el div
+    // de en medio (flex-1) y el Footer siempre queda al fondo de la
+    // pantalla; si el contenido es largo, el Footer baja con él, después
+    // de todo lo demás, como corresponde.
+    <div className="min-h-screen flex flex-col">
       <VisitTracker />
-      {renderContenido()}
+      <div className="flex-1 flex flex-col">{renderContenido()}</div>
       <Footer />
       {/* Solo para el dueño logueado (no en /empleado ni /curso, que son
           públicas): ofrece instalar Inductoria como app de escritorio. */}
       {session && path !== '/empleado' && path !== '/curso' && <InstalarAppPrompt />}
-    </>
+    </div>
   );
 }
