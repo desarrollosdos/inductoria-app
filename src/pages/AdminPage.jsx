@@ -29,6 +29,17 @@ function formatUltimaConexion(fecha) {
   return `Hace ${dias} días (${fechaTexto})`;
 }
 
+// Formatea segundos como "2h 15min" (o "45min" si no llega a 1 hora, o
+// "0min" si es 0) para el contador de tiempo de audio en la pestaña
+// "Costo de IA".
+function formatearDuracionAudio(segundosTotales) {
+  const segundos = Math.round(segundosTotales || 0);
+  const horas = Math.floor(segundos / 3600);
+  const minutos = Math.round((segundos % 3600) / 60);
+  if (horas === 0) return `${minutos}min`;
+  return `${horas}h ${minutos}min`;
+}
+
 function IconAlerta(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -580,11 +591,62 @@ export default function AdminPage({ session }) {
                       vale la pena mirar este número de tanto en tanto — si crece mucho, conviene
                       revisar el uso real en console.groq.com por si conviniera ponerle un límite.
                     </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <Tarjeta label="Hoy" valor={costoIA.audio.hoy} />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                      <Tarjeta label="Transcripciones hoy" valor={costoIA.audio.hoy} />
                       <Tarjeta label="Este mes" valor={costoIA.audio.mes} />
                       <Tarjeta label="Total histórico" valor={costoIA.audio.total} />
                       <Tarjeta label="En trial (total)" valor={costoIA.audio.enTrial} />
+                    </div>
+
+                    {/* Tiempo real de audio usado, que es lo que en verdad
+                        cuenta contra el límite gratis de Groq (no la
+                        cantidad de transcripciones ni el tamaño en bytes). */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                      <Tarjeta label="Tiempo usado hoy" valor={formatearDuracionAudio(costoIA.audio.segundosHoy)} />
+                      <Tarjeta label="Tiempo este mes" valor={formatearDuracionAudio(costoIA.audio.segundosMes)} />
+                      <Tarjeta label="Tiempo total" valor={formatearDuracionAudio(costoIA.audio.segundosTotal)} />
+                      <Tarjeta label="Tiempo en trial" valor={formatearDuracionAudio(costoIA.audio.segundosTrial)} />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471]">
+                          Uso de hoy vs. límite gratis diario de Groq (8h)
+                        </p>
+                        <span
+                          className="text-xs font-bold"
+                          style={{
+                            color:
+                              costoIA.audio.porcentajeLimiteHoy >= 80
+                                ? '#C1502E'
+                                : costoIA.audio.porcentajeLimiteHoy >= 50
+                                  ? '#EF9F27'
+                                  : '#1D9E75',
+                          }}
+                        >
+                          {costoIA.audio.porcentajeLimiteHoy}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-[#F5EFE3] overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, costoIA.audio.porcentajeLimiteHoy)}%`,
+                            backgroundColor:
+                              costoIA.audio.porcentajeLimiteHoy >= 80
+                                ? '#C1502E'
+                                : costoIA.audio.porcentajeLimiteHoy >= 50
+                                  ? '#EF9F27'
+                                  : '#1D9E75',
+                          }}
+                        />
+                      </div>
+                      {costoIA.audio.porcentajeLimiteHoy >= 50 && (
+                        <p className="text-xs text-[#8a8471] mt-1.5">
+                          Ya se usó {costoIA.audio.porcentajeLimiteHoy}% del límite gratis de hoy —
+                          si sigue subiendo, vale la pena revisar console.groq.com.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

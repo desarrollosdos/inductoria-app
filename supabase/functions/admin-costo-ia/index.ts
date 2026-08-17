@@ -89,10 +89,12 @@ Deno.serve(async (req) => {
     const porCuenta = Object.values(porCuentaMapa).sort((a, b) => b.usd - a.usd);
 
     // Estadísticas de transcripción de audio (Groq), separado del costo
-    // real de arriba porque no tiene costo en USD.
+    // real de arriba porque no tiene costo en USD. Ahora también suma la
+    // duración real de cada audio (duracion_segundos), para poder
+    // comparar el uso diario contra el límite gratis real de Groq.
     const { data: audios, error: errorAudios } = await supabase
       .from('audio_transcripciones_log')
-      .select('plan_al_momento, created_at');
+      .select('plan_al_momento, duracion_segundos, created_at');
 
     if (errorAudios) throw errorAudios;
 
@@ -103,14 +105,42 @@ Deno.serve(async (req) => {
     let audioHoy = 0;
     let audioMes = 0;
     let audioTrial = 0;
+    let segundosTotal = 0;
+    let segundosHoy = 0;
+    let segundosMes = 0;
+    let segundosTrial = 0;
 
     (audios || []).forEach((a) => {
-      audioTotal += 1;
+      const duracion = Number(a.duracion_segundos) || 0;
+      const enTrial = a.plan_al_momento === 'trial';
       const fecha = new Date(a.created_at);
-      if (fecha >= inicioMes) audioMes += 1;
-      if (fecha >= inicioHoy) audioHoy += 1;
-      if (a.plan_al_momento === 'trial') audioTrial += 1;
+      const esHoy = fecha >= inicioHoy;
+      const esMes = fecha >= inicioMes;
+
+      audioTotal += 1;
+      segundosTotal += duracion;
+      if (esMes) {
+        audioMes += 1;
+        segundosMes += duracion;
+      }
+      if (esHoy) {
+        audioHoy += 1;
+        segundosHoy += duracion;
+      }
+      if (enTrial) {
+        audioTrial += 1;
+        segundosTrial += duracion;
+      }
     });
+
+    // Límite gratis real de Groq para whisper-large-v3-turbo: 8hs (28.800
+    // segundos) de audio por día. Mandamos el % ya calculado para no
+    // duplicar el número mágico en el frontend.
+    const LIMITE_SEGUNDOS_GROQ_DIA = 28800;
+    const porcentajeLimiteHoy = Math.min(
+      999,
+      Math.round((segundosHoy / LIMITE_SEGUNDOS_GROQ_DIA) * 1000) / 10
+    );
 
     return new Response(
       JSON.stringify({
@@ -118,7 +148,17 @@ Deno.serve(async (req) => {
         totalUsdMes,
         generaciones,
         porCuenta,
-        audio: { total: audioTotal, hoy: audioHoy, mes: audioMes, enTrial: audioTrial },
+        audio: {
+          total: audioTotal,
+          hoy: audioHoy,
+          mes: audioMes,
+          enTrial: audioTrial,
+          segundosTotal,
+          segundosHoy,
+          segundosMes,
+          segundosTrial,
+          porcentajeLimiteHoy,
+        },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

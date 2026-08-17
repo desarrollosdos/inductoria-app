@@ -156,7 +156,11 @@ Deno.serve(async (req) => {
       form.append('file', new Blob([bytes], { type: tipo || 'audio/mpeg' }), nombreArchivo || 'audio.mp3');
       form.append('model', 'whisper-large-v3-turbo');
       form.append('language', 'es');
-      form.append('response_format', 'text');
+      // verbose_json (en vez de text) para poder leer la duración real del
+      // audio y loguearla — así el panel de admin puede mostrar tiempo
+      // usado, no solo cantidad de transcripciones, y compararlo contra el
+      // límite gratis de Groq (8hs de audio/día).
+      form.append('response_format', 'verbose_json');
 
       const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -173,17 +177,32 @@ Deno.serve(async (req) => {
         });
       }
 
-      textoExtraido = await groqRes.text();
+      const groqData = await groqRes.json();
+      textoExtraido =
+        groqData.text ||
+        (Array.isArray(groqData.segments) ? groqData.segments.map((s: any) => s.text).join(' ') : '');
 
-      // Volumen de transcripciones de audio (gratis, no es un costo real
-      // en USD como ai_usage_log). Sirve para que el admin vea si el uso
-      // crece mucho — por ejemplo, muchas cuentas en trial grabando
-      // audio — y pueda anticiparse si Groq algún día deja de ser
-      // gratis en ese volumen. No corta el flujo si falla el insert.
+      // La duración total no siempre viene como campo propio ("duration")
+      // en todos los proveedores compatibles con el formato Whisper — por
+      // las dudas, si no está, la calculamos como el "end" del último
+      // segmento (verbose_json siempre trae segments con start/end).
+      const duracionSegundos: number | null =
+        typeof groqData.duration === 'number'
+          ? groqData.duration
+          : Array.isArray(groqData.segments) && groqData.segments.length > 0
+            ? groqData.segments[groqData.segments.length - 1].end
+            : null;
+
+      // Volumen y tiempo de transcripciones de audio (gratis, no es un
+      // costo real en USD como ai_usage_log). Sirve para que el admin vea
+      // si el uso crece mucho — por ejemplo, muchas cuentas en trial
+      // grabando audio — y pueda anticiparse si Groq algún día deja de ser
+      // gratis en ese volumen o límite. No corta el flujo si falla el insert.
       const { error: logError } = await supabase.from('audio_transcripciones_log').insert({
         cuenta_id: cuentaDelUsuario?.id ?? null,
         plan_al_momento: cuentaDelUsuario?.plan ?? null,
         bytes_archivo: bytes.length,
+        duracion_segundos: duracionSegundos,
       });
       if (logError) console.error('No se pudo registrar el log de transcripción de audio:', logError);
     } else {

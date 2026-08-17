@@ -900,7 +900,7 @@ export default function Contenido({ session }) {
                 <button
                   type="button"
                   onClick={iniciarGrabacion}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#C1502E] bg-[#FBEAE3] border border-[#F0C9B9]"
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#1D9E75] bg-[#E3F3EA] border border-[#BEE3D0]"
                 >
                   <IconMicrofono />
                   Grabar audio
