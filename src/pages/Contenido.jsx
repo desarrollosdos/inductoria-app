@@ -291,7 +291,7 @@ export default function Contenido({ session }) {
     setTexto('');
   }
 
-  function handleArchivo(file) {
+  function handleArchivo(file, duracionSegConocida) {
     if (!file) return;
     setErrorArchivo(null);
 
@@ -337,26 +337,56 @@ export default function Contenido({ session }) {
       return;
     }
 
-    // PDF y .docx pasan por el servidor para extraer el texto.
+    // PDF, .docx, imagen o audio pasan por el servidor para extraer el
+    // texto. Usamos fetch directo en vez de supabase.functions.invoke:
+    // el SDK de supabase-js devuelve data=null en cualquier respuesta que
+    // no sea 2xx, así que el mensaje de error real que manda la función
+    // (por ejemplo, por qué Groq no pudo transcribir un audio puntual) se
+    // perdía y siempre se veía el mismo mensaje genérico. Con fetch
+    // directo, siempre leemos el cuerpo real de la respuesta, haya salido
+    // bien o mal.
     setExtrayendoArchivo(true);
     const lectorBinario = new FileReader();
     lectorBinario.onload = async (e) => {
       const base64 = e.target.result.split(',')[1]; // saca el prefijo data:...;base64,
-      const { data, error } = await supabase.functions.invoke('extraer-texto-archivo', {
-        method: 'POST',
-        body: { archivo_base64: base64, nombre_archivo: file.name, tipo: file.type },
-      });
+      const base = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      setExtrayendoArchivo(false);
+      try {
+        const res = await fetch(`${base}/functions/v1/extraer-texto-archivo`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: anonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            archivo_base64: base64,
+            nombre_archivo: file.name,
+            tipo: file.type,
+            // Solo se manda cuando el audio se grabó acá mismo (ver
+            // usarGrabacion): es la duración real medida por el
+            // navegador mientras grababa, para el contador de tiempo
+            // del panel de admin.
+            ...(duracionSegConocida ? { duracion_seg: duracionSegConocida } : {}),
+          }),
+        });
+        const data = await res.json().catch(() => null);
 
-      if (error || data?.error) {
-        setErrorArchivo(data?.error || 'No se pudo extraer el texto del archivo.');
-        return;
-      }
+        if (!res.ok || data?.error) {
+          setErrorArchivo(data?.error || `No se pudo extraer el texto del archivo (error ${res.status}).`);
+          return;
+        }
 
-      setTexto(data.texto);
-      if (!titulo.trim()) {
-        setTitulo(file.name.replace(/\.(pdf|docx)$/i, ''));
+        setTexto(data.texto);
+        if (!titulo.trim()) {
+          setTitulo(file.name.replace(/\.(pdf|docx)$/i, ''));
+        }
+      } catch (err) {
+        console.error(err);
+        setErrorArchivo('No se pudo conectar con el servidor. Probá de nuevo.');
+      } finally {
+        setExtrayendoArchivo(false);
       }
     };
     lectorBinario.onerror = () => {
@@ -452,10 +482,11 @@ export default function Contenido({ session }) {
       type: audioGrabado.blob.type || 'audio/webm',
     });
     const url = audioGrabado.url;
+    const duracionSeg = segundosGrabados; // guardarlo antes de resetear el contador
     setAudioGrabado(null);
     setSegundosGrabados(0);
     URL.revokeObjectURL(url);
-    handleArchivo(archivo);
+    handleArchivo(archivo, duracionSeg);
   }
 
   function formatearDuracion(segundos) {

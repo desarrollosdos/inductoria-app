@@ -156,11 +156,14 @@ Deno.serve(async (req) => {
       form.append('file', new Blob([bytes], { type: tipo || 'audio/mpeg' }), nombreArchivo || 'audio.mp3');
       form.append('model', 'whisper-large-v3-turbo');
       form.append('language', 'es');
-      // verbose_json (en vez de text) para poder leer la duración real del
-      // audio y loguearla — así el panel de admin puede mostrar tiempo
-      // usado, no solo cantidad de transcripciones, y compararlo contra el
-      // límite gratis de Groq (8hs de audio/día).
-      form.append('response_format', 'verbose_json');
+      // Volvimos a "text" (más simple y probado) en vez de "verbose_json":
+      // el intento de leer duration/segments del JSON de Groq resultó
+      // poco confiable (respuestas inconsistentes según el audio), así
+      // que dejamos de arriesgar la transcripción en sí por eso. Para el
+      // contador de tiempo del panel de admin, ahora usamos la duración
+      // que ya mide el propio navegador mientras graba (ver duracionSeg
+      // más abajo) en vez de pedírsela a Groq.
+      form.append('response_format', 'text');
 
       const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -171,33 +174,30 @@ Deno.serve(async (req) => {
       if (!groqRes.ok) {
         const errText = await groqRes.text();
         console.error('Error de Groq (audio):', errText);
-        return new Response(JSON.stringify({ error: 'No se pudo transcribir el audio' }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: 'No se pudo transcribir el audio.', detalle: errText.slice(0, 500) }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      const groqData = await groqRes.json();
-      textoExtraido =
-        groqData.text ||
-        (Array.isArray(groqData.segments) ? groqData.segments.map((s: any) => s.text).join(' ') : '');
-
-      // La duración total no siempre viene como campo propio ("duration")
-      // en todos los proveedores compatibles con el formato Whisper — por
-      // las dudas, si no está, la calculamos como el "end" del último
-      // segmento (verbose_json siempre trae segments con start/end).
-      const duracionSegundos: number | null =
-        typeof groqData.duration === 'number'
-          ? groqData.duration
-          : Array.isArray(groqData.segments) && groqData.segments.length > 0
-            ? groqData.segments[groqData.segments.length - 1].end
-            : null;
+      textoExtraido = await groqRes.text();
 
       // Volumen y tiempo de transcripciones de audio (gratis, no es un
       // costo real en USD como ai_usage_log). Sirve para que el admin vea
       // si el uso crece mucho — por ejemplo, muchas cuentas en trial
       // grabando audio — y pueda anticiparse si Groq algún día deja de ser
       // gratis en ese volumen o límite. No corta el flujo si falla el insert.
+      //
+      // duracion_seg viene del navegador (mide el tiempo real de la
+      // grabación mientras ocurre) cuando el audio se generó grabando acá
+      // mismo — es exacto y no depende de parsear nada de Groq. Si el
+      // audio vino de un archivo ya grabado que el Cliente subió, no lo
+      // tenemos, así que queda null (se puede sumar más adelante si hace
+      // falta, decodificando el archivo, pero no es necesario para tener
+      // una señal útil del volumen usado).
+      const duracionSegCliente = Number(body.duracion_seg);
+      const duracionSegundos = Number.isFinite(duracionSegCliente) && duracionSegCliente > 0 ? duracionSegCliente : null;
+
       const { error: logError } = await supabase.from('audio_transcripciones_log').insert({
         cuenta_id: cuentaDelUsuario?.id ?? null,
         plan_al_momento: cuentaDelUsuario?.plan ?? null,
