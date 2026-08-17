@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import Header from './components/Header';
 import VisitTracker from './components/VisitTracker';
+import InstalarAppPrompt from './components/InstalarAppPrompt';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Empleados from './pages/Empleados';
@@ -149,6 +150,9 @@ export default function App() {
     <>
       <VisitTracker />
       {renderContenido()}
+      {/* Solo para el dueño logueado (no en /empleado ni /curso, que son
+          públicas): ofrece instalar Inductoria como app de escritorio. */}
+      {session && path !== '/empleado' && path !== '/curso' && <InstalarAppPrompt />}
     </>
   );
 }

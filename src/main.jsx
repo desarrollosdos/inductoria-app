@@ -1,3 +1,9 @@
+// Importado de entrada, antes de todo lo demás: engancha el listener
+// de "beforeinstallprompt" apenas arranca la página, para no arriesgarse
+// a perder el evento si el navegador lo dispara temprano (ver el
+// comentario dentro del archivo).
+import './lib/instalarApp';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
