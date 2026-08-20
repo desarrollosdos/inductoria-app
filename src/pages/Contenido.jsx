@@ -546,6 +546,28 @@ export default function Contenido({ session }) {
     setSegundosGrabados(0);
   }
 
+  // Temporal, para debug: manda la grabación tal cual la capturó el
+  // navegador (WhatsApp, mail, etc.) sin pasar por Descargas, que en
+  // algunos celulares no se encuentra fácil. Se puede sacar una vez que
+  // la transcripción en mobile ande bien y estable.
+  async function compartirGrabacionDebug() {
+    if (!audioGrabado) return;
+    const extension = (audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+    const archivo = new File([audioGrabado.blob], `grabacion-debug-${Date.now()}.${extension}`, {
+      type: audioGrabado.blob.type || 'audio/webm',
+    });
+    if (navigator.share && navigator.canShare?.({ files: [archivo] })) {
+      try {
+        await navigator.share({ files: [archivo] });
+      } catch (e) {
+        // El usuario canceló el share, o el navegador lo rechazó. No es un
+        // error real, no hace falta mostrar nada.
+      }
+    } else {
+      alert('Este navegador no soporta compartir archivos directo. Usá el link de descargar de abajo.');
+    }
+  }
+
   function usarGrabacion() {
     if (!audioGrabado) return;
     const extension = (audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm';
@@ -1033,6 +1055,13 @@ export default function Contenido({ session }) {
                       revisarlo directo en vez de seguir adivinando. Se puede
                       sacar una vez que la transcripción en mobile ande bien
                       y estable. */}
+                  <button
+                    type="button"
+                    onClick={compartirGrabacionDebug}
+                    className="block w-full text-center text-[10px] text-[#6b6455] underline"
+                  >
+                    Compartir esta grabación (para debug)
+                  </button>
                   <a
                     href={audioGrabado.url}
                     download={`grabacion-debug-${Date.now()}.${(audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm'}`}
