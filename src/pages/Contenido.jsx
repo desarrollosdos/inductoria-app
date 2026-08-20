@@ -450,7 +450,12 @@ export default function Contenido({ session }) {
   // handleArchivo más arriba).
   function elegirMimeTypeGrabacion() {
     if (typeof MediaRecorder === 'undefined') return '';
-    const candidatos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+    // audio/mp4 primero: el webm que arma Chrome en Android a veces trae
+    // la duración mal escrita en la cabecera, y eso rompe la transcripción
+    // del lado de Groq aunque el archivo se escuche bien en el navegador.
+    // mp4/AAC es más parejo entre navegadores para esto, así que se
+    // prefiere cuando está disponible.
+    const candidatos = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
     return candidatos.find((m) => MediaRecorder.isTypeSupported?.(m)) || '';
   }
 
@@ -1018,6 +1023,17 @@ export default function Contenido({ session }) {
               {audioGrabado && !grabando && (
                 <div className="space-y-2">
                   <audio controls src={audioGrabado.url} className="w-full h-9" />
+                  {/* Temporal, para poder mandar un archivo que falló y
+                      revisarlo directo en vez de seguir adivinando. Se puede
+                      sacar una vez que la transcripción en mobile ande bien
+                      y estable. */}
+                  <a
+                    href={audioGrabado.url}
+                    download={`grabacion-debug-${Date.now()}.${(audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm'}`}
+                    className="block text-center text-[10px] text-[#6b6455] underline"
+                  >
+                    Descargar esta grabación (para debug)
+                  </a>
                   <div className="flex gap-2">
                     <button
                       type="button"
