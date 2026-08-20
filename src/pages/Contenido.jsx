@@ -484,7 +484,13 @@ export default function Contenido({ session }) {
       }
 
       const mimeType = elegirMimeTypeGrabacion();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      // Bitrate bajo a propósito: esto es una nota de voz hablada, no
+      // música, y Whisper transcribe perfecto con mucho menos que el
+      // default del navegador (que suele rondar 64-128kbps). Con 24kbps
+      // el archivo pesa una fracción de lo que pesaba, así que en una
+      // conexión lenta se sube en una fracción del tiempo.
+      const opciones = { audioBitsPerSecond: 24000, ...(mimeType ? { mimeType } : {}) };
+      const recorder = new MediaRecorder(stream, opciones);
       chunksGrabacionRef.current = [];
 
       recorder.ondataavailable = (e) => {
