@@ -33,6 +33,56 @@ const corsHeaders = {
 
 const TAMANO_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (Groq acepta hasta 25MB, nos quedamos cortos por las dudas)
 
+// Groq a veces devuelve 500/503 (internal_server_error / service_unavailable)
+// por capacidad del lado de ellos, no porque el audio esté mal. Vimos esto
+// específicamente en celulares con conexión lenta: el error no es del
+// archivo, es transitorio del lado de Groq. Reintentamos un par de veces
+// con una pausa corta antes de darnos por vencidos.
+const GROQ_MAX_INTENTOS = 3;
+const GROQ_ESPERA_ENTRE_INTENTOS_MS = 1500;
+
+function esperar(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function transcribirConGroq(bytes: Uint8Array, tipo: string, nombreArchivo: string, groqKey: string) {
+  let ultimoError = '';
+
+  for (let intento = 1; intento <= GROQ_MAX_INTENTOS; intento++) {
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: tipo || 'audio/mpeg' }), nombreArchivo || 'audio.mp3');
+    form.append('model', 'whisper-large-v3-turbo');
+    form.append('language', 'es');
+    // "text" en vez de "verbose_json": el intento de leer duration/segments
+    // del JSON de Groq resultó poco confiable, así que dejamos de arriesgar
+    // la transcripción en sí por eso. Para el contador de tiempo del panel
+    // de admin usamos la duración que ya mide el navegador (duracionSeg).
+    form.append('response_format', 'text');
+
+    const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${groqKey}` },
+      body: form,
+    });
+
+    if (groqRes.ok) {
+      return { ok: true as const, texto: await groqRes.text() };
+    }
+
+    ultimoError = await groqRes.text();
+    console.error(`Error de Groq (audio), intento ${intento}/${GROQ_MAX_INTENTOS}:`, ultimoError);
+
+    // Solo reintentamos errores que pintan transitorios (5xx / rate limit).
+    // Un 400 (archivo inválido) no se arregla reintentando.
+    const esTransitorio = groqRes.status >= 500 || groqRes.status === 429;
+    if (!esTransitorio || intento === GROQ_MAX_INTENTOS) break;
+
+    await esperar(GROQ_ESPERA_ENTRE_INTENTOS_MS * intento);
+  }
+
+  return { ok: false as const, error: ultimoError };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -152,35 +202,19 @@ Deno.serve(async (req) => {
         );
       }
 
-      const form = new FormData();
-      form.append('file', new Blob([bytes], { type: tipo || 'audio/mpeg' }), nombreArchivo || 'audio.mp3');
-      form.append('model', 'whisper-large-v3-turbo');
-      form.append('language', 'es');
-      // Volvimos a "text" (más simple y probado) en vez de "verbose_json":
-      // el intento de leer duration/segments del JSON de Groq resultó
-      // poco confiable (respuestas inconsistentes según el audio), así
-      // que dejamos de arriesgar la transcripción en sí por eso. Para el
-      // contador de tiempo del panel de admin, ahora usamos la duración
-      // que ya mide el propio navegador mientras graba (ver duracionSeg
-      // más abajo) en vez de pedírsela a Groq.
-      form.append('response_format', 'text');
+      const resultadoGroq = await transcribirConGroq(bytes, tipo, nombreArchivo, groqKey);
 
-      const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${groqKey}` },
-        body: form,
-      });
-
-      if (!groqRes.ok) {
-        const errText = await groqRes.text();
-        console.error('Error de Groq (audio):', errText);
+      if (!resultadoGroq.ok) {
         return new Response(
-          JSON.stringify({ error: 'No se pudo transcribir el audio.', detalle: errText.slice(0, 500) }),
+          JSON.stringify({
+            error: 'No se pudo transcribir el audio (Groq no respondió después de varios intentos).',
+            detalle: resultadoGroq.error.slice(0, 500),
+          }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      textoExtraido = await groqRes.text();
+      textoExtraido = resultadoGroq.texto;
 
       // Volumen y tiempo de transcripciones de audio (gratis, no es un
       // costo real en USD como ai_usage_log). Sirve para que el admin vea
