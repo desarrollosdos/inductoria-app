@@ -35,10 +35,12 @@ const TAMANO_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (Groq acepta hasta 25MB, nos
 
 // Groq a veces devuelve 500/503 (internal_server_error / service_unavailable)
 // por capacidad del lado de ellos, no porque el audio esté mal. Vimos esto
-// específicamente en celulares con conexión lenta: el error no es del
-// archivo, es transitorio del lado de Groq. Reintentamos un par de veces
-// con una pausa corta antes de darnos por vencidos.
-const GROQ_MAX_INTENTOS = 3;
+// Sacamos los reintentos que había acá: confirmado que el error de Groq
+// en mobile NO es pasajero (pasa siempre, no a veces), así que reintentar
+// solo sumaba tiempo de sobra y garantizaba pisar el límite de 150
+// segundos que tiene Supabase por función, terminando siempre en un 504
+// en vez de dejar ver el error real de Groq a tiempo.
+const GROQ_MAX_INTENTOS = 1;
 const GROQ_ESPERA_ENTRE_INTENTOS_MS = 1500;
 
 function esperar(ms: number) {
