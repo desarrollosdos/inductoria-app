@@ -412,7 +412,11 @@ export default function Contenido({ session }) {
         const data = await res.json().catch(() => null);
 
         if (!res.ok || data?.error) {
-          setErrorArchivo(data?.error || `No se pudo extraer el texto del archivo (error ${res.status}).`);
+          const mensajeBase = data?.error || `No se pudo extraer el texto del archivo (error ${res.status}).`;
+          // data.detalle trae el error real de Groq (o del servidor), antes
+          // se perdía y solo quedaba registrado en los logs de Supabase. Lo
+          // mostramos acá para no tener que ir a buscar el log cada vez.
+          setErrorArchivo(data?.detalle ? `${mensajeBase} (${data.detalle})` : mensajeBase);
           return;
         }
 
