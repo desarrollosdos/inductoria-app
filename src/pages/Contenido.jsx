@@ -534,7 +534,15 @@ export default function Contenido({ session }) {
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      // El argumento (1000) hace que vaya entregando pedacitos de 1
+      // segundo en vez de armar un solo bloque gigante al final. Sin esto,
+      // confirmado con un archivo real: Chrome en Android arma bien el
+      // audio pero le pone una duración mentirosa en la cabecera del
+      // archivo (decía 3 minutos y pico en una grabación de 19 segundos
+      // reales), y esa cabecera rota es lo que confunde a Groq al
+      // transcribir. Grabando en pedacitos chicos, cada uno queda bien
+      // formado y no pasa esto.
+      recorder.start(1000);
       setGrabando(true);
       setSegundosGrabados(0);
       grabacionInicioRef.current = Date.now();
