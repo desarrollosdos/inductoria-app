@@ -102,6 +102,12 @@ export default function Contenido({ session }) {
   const chunksGrabacionRef = useRef([]);
   const streamGrabacionRef = useRef(null);
   const timerGrabacionRef = useRef(null);
+  // Mantiene la pantalla del celular prendida mientras se graba. Sin esto,
+  // en Android el navegador puede atenuar/cortar el micrófono si la
+  // pantalla se apaga o se bloquea a mitad de la grabación, y el audio
+  // resultante queda incompleto (solo un pedacito, aunque el timer haya
+  // seguido contando normal).
+  const wakeLockRef = useRef(null);
 
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
@@ -151,8 +157,25 @@ export default function Contenido({ session }) {
     return () => {
       if (timerGrabacionRef.current) clearInterval(timerGrabacionRef.current);
       if (streamGrabacionRef.current) streamGrabacionRef.current.getTracks().forEach((t) => t.stop());
+      if (wakeLockRef.current) wakeLockRef.current.release().catch(() => {});
     };
   }, []);
+
+  // El wake lock se libera solo cuando la pestaña pasa a segundo plano
+  // (el navegador no lo reactiva por su cuenta). Si el dueño vuelve a la
+  // pestaña mientras sigue grabando, lo volvemos a pedir.
+  useEffect(() => {
+    if (!grabando) return;
+    function reactivarWakeLock() {
+      if (document.visibilityState === 'visible' && grabando && 'wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then((wl) => {
+          wakeLockRef.current = wl;
+        }).catch(() => {});
+      }
+    }
+    document.addEventListener('visibilitychange', reactivarWakeLock);
+    return () => document.removeEventListener('visibilitychange', reactivarWakeLock);
+  }, [grabando]);
 
   async function cargarTodo() {
     setLoading(true);
@@ -439,6 +462,18 @@ export default function Contenido({ session }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamGrabacionRef.current = stream;
 
+      // Evita que Android apague la pantalla y corte el micrófono a mitad
+      // de la grabación. Si el navegador no lo soporta (Safari viejo,
+      // etc.) seguimos igual, sin esto la grabación funciona pero corre
+      // el riesgo de cortarse si la pantalla se apaga.
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {
+        console.warn('No se pudo activar el wake lock:', e);
+      }
+
       const mimeType = elegirMimeTypeGrabacion();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksGrabacionRef.current = [];
@@ -482,6 +517,10 @@ export default function Contenido({ session }) {
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    }
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release().catch(() => {});
+      wakeLockRef.current = null;
     }
     setGrabando(false);
   }
