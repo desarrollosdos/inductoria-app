@@ -108,6 +108,14 @@ export default function Contenido({ session }) {
   // resultante queda incompleto (solo un pedacito, aunque el timer haya
   // seguido contando normal).
   const wakeLockRef = useRef(null);
+  // Hora real (Date.now(), no un contador de setInterval) en que arrancó
+  // la grabación. En Android el navegador pausa los setInterval cuando la
+  // pestaña queda en segundo plano, pero el micrófono sigue grabando: si
+  // solo contáramos "ticks" del timer, el corte de seguridad de 5 minutos
+  // nunca dispara a tiempo y queda grabando de más en silencio. Con la
+  // hora real, el tiempo transcurrido siempre es el correcto apenas la
+  // pestaña vuelve a primer plano.
+  const grabacionInicioRef = useRef(null);
 
   const [cursosBase, setCursosBase] = useState([]);
   const [agregandoBaseId, setAgregandoBaseId] = useState(null);
@@ -175,6 +183,26 @@ export default function Contenido({ session }) {
     }
     document.addEventListener('visibilitychange', reactivarWakeLock);
     return () => document.removeEventListener('visibilitychange', reactivarWakeLock);
+  }, [grabando]);
+
+  // Si la pestaña pasa a segundo plano mientras se está grabando (el
+  // dueño cambia de app, atiende el teléfono, se le bloquea la pantalla
+  // pese al wake lock), cortamos la grabación ahí mismo en vez de dejarla
+  // seguir. Esto es lo que causaba archivos con minutos de silencio real
+  // y solo un pedacito de voz real: el micrófono no se pausa en segundo
+  // plano aunque el timer de la pantalla sí, así que sin este corte queda
+  // grabando de más sin que nadie se dé cuenta. Lo que ya se grabó hasta
+  // este punto queda disponible para escuchar y usar como siempre.
+  useEffect(() => {
+    if (!grabando) return;
+    function cortarSiSeVaAFondo() {
+      if (document.visibilityState === 'hidden') {
+        detenerGrabacion();
+      }
+    }
+    document.addEventListener('visibilitychange', cortarSiSeVaAFondo);
+    return () => document.removeEventListener('visibilitychange', cortarSiSeVaAFondo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grabando]);
 
   async function cargarTodo() {
@@ -450,12 +478,12 @@ export default function Contenido({ session }) {
   // handleArchivo más arriba).
   function elegirMimeTypeGrabacion() {
     if (typeof MediaRecorder === 'undefined') return '';
-    // audio/mp4 primero: el webm que arma Chrome en Android a veces trae
-    // la duración mal escrita en la cabecera, y eso rompe la transcripción
-    // del lado de Groq aunque el archivo se escuche bien en el navegador.
-    // mp4/AAC es más parejo entre navegadores para esto, así que se
-    // prefiere cuando está disponible.
-    const candidatos = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+    // Volvimos al orden original (webm primero): confirmamos con un
+    // archivo real que el problema NO es el contenedor (webm vs mp4),
+    // pasaba igual con los dos. La causa real era otra (ver
+    // iniciarGrabacion/visibilitychange más abajo), así que nos quedamos
+    // con el camino más probado en Chrome en vez de sumar mp4 sin motivo.
+    const candidatos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
     return candidatos.find((m) => MediaRecorder.isTypeSupported?.(m)) || '';
   }
 
@@ -509,15 +537,14 @@ export default function Contenido({ session }) {
       recorder.start();
       setGrabando(true);
       setSegundosGrabados(0);
+      grabacionInicioRef.current = Date.now();
 
       timerGrabacionRef.current = setInterval(() => {
-        setSegundosGrabados((s) => {
-          const siguiente = s + 1;
-          if (siguiente >= DURACION_MAX_GRABACION_SEG) {
-            detenerGrabacion();
-          }
-          return siguiente;
-        });
+        const transcurridos = Math.floor((Date.now() - grabacionInicioRef.current) / 1000);
+        setSegundosGrabados(transcurridos);
+        if (transcurridos >= DURACION_MAX_GRABACION_SEG) {
+          detenerGrabacion();
+        }
       }, 1000);
     } catch (err) {
       console.error(err);
