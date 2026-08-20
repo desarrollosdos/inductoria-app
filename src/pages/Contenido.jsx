@@ -53,6 +53,16 @@ function IconMicrofono(props) {
   );
 }
 
+// Spinner del cartel de "procesando" (subida/transcripción en curso).
+function IconSpinner(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" strokeWidth="3" strokeLinecap="round" {...props}>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" />
+    </svg>
+  );
+}
+
 // Tope de duración de la grabación directa desde el navegador, para no
 // terminar con archivos gigantes (Groq acepta hasta 25MB, el server de
 // Inductoria corta en 10MB — 5 minutos de audio comprimido queda bien
@@ -76,6 +86,10 @@ export default function Contenido({ session }) {
   const [arrastrando, setArrastrando] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState(null);
   const [extrayendoArchivo, setExtrayendoArchivo] = useState(false);
+  // Qué se está procesando ahora mismo, solo para elegir el texto del
+  // cartel de "procesando" ('audio' = transcripción, 'archivo' = PDF/
+  // docx/imagen). null cuando no hay nada en curso.
+  const [tipoProcesando, setTipoProcesando] = useState(null);
 
   // Grabación de audio directo desde el navegador (alternativa a subir
   // un archivo ya grabado). audioGrabado guarda { blob, url } una vez
@@ -345,6 +359,7 @@ export default function Contenido({ session }) {
     // perdía y siempre se veía el mismo mensaje genérico. Con fetch
     // directo, siempre leemos el cuerpo real de la respuesta, haya salido
     // bien o mal.
+    setTipoProcesando(esAudio ? 'audio' : 'archivo');
     setExtrayendoArchivo(true);
     const lectorBinario = new FileReader();
     lectorBinario.onload = async (e) => {
@@ -387,10 +402,12 @@ export default function Contenido({ session }) {
         setErrorArchivo('No se pudo conectar con el servidor. Probá de nuevo.');
       } finally {
         setExtrayendoArchivo(false);
+        setTipoProcesando(null);
       }
     };
     lectorBinario.onerror = () => {
       setExtrayendoArchivo(false);
+      setTipoProcesando(null);
       setErrorArchivo('No se pudo leer el archivo. Probá de nuevo.');
     };
     lectorBinario.readAsDataURL(file);
@@ -931,7 +948,8 @@ export default function Contenido({ session }) {
                 <button
                   type="button"
                   onClick={iniciarGrabacion}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#1D9E75] bg-[#E3F3EA] border border-[#BEE3D0]"
+                  disabled={extrayendoArchivo}
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#1D9E75] bg-[#E3F3EA] border border-[#BEE3D0] disabled:opacity-60"
                 >
                   <IconMicrofono />
                   Grabar audio
@@ -980,6 +998,21 @@ export default function Contenido({ session }) {
 
               {errorGrabacion && <p className="text-xs text-[#C1502E] mt-2">{errorGrabacion}</p>}
             </div>
+
+            {extrayendoArchivo && (
+              <div className="flex items-start gap-3 bg-[#F0EAFB] border border-[#D9C7F5] rounded-lg px-4 py-3">
+                <IconSpinner className="animate-spin text-[#7F5FD1] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-[#5B3FA6]">
+                    {tipoProcesando === 'audio' ? 'Transcribiendo tu nota de voz...' : 'Extrayendo el texto de tu archivo...'}
+                  </p>
+                  <p className="text-xs text-[#7F5FD1] mt-0.5">
+                    Puede tardar más si tu conexión es lenta{tipoProcesando === 'audio' ? ' o el audio es largo' : ''}.
+                    No cierres ni recargues esta pantalla, el texto va a aparecer acá abajo apenas termine.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <textarea
               required
