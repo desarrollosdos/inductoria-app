@@ -418,6 +418,17 @@ export default function Contenido({ session }) {
       const base = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+      // Antes, si el pedido quedaba colgado (por ejemplo la pantalla del
+      // celular se bloquea a mitad de la espera y el navegador pausa todo
+      // en segundo plano hasta que se vuelve a desbloquear), el cartel de
+      // "procesando" quedaba así varios minutos sin ninguna pista de qué
+      // estaba pasando. Cortamos acá mismo a los 130 segundos (un poco
+      // antes de que Supabase corte solo a los 150 y devuelva un 504 sin
+      // explicación) para que, si esto pasa, al menos se vea un mensaje
+      // claro de que se cortó por tardar de más, en vez de un 504 pelado.
+      const controlador = new AbortController();
+      const timeoutId = setTimeout(() => controlador.abort(), 130000);
+
       try {
         const res = await fetch(`${base}/functions/v1/extraer-texto-archivo`, {
           method: 'POST',
@@ -436,6 +447,7 @@ export default function Contenido({ session }) {
             // del panel de admin.
             ...(duracionSegConocida ? { duracion_seg: duracionSegConocida } : {}),
           }),
+          signal: controlador.signal,
         });
         const data = await res.json().catch(() => null);
 
@@ -454,8 +466,13 @@ export default function Contenido({ session }) {
         }
       } catch (err) {
         console.error(err);
-        setErrorArchivo('No se pudo conectar con el servidor. Probá de nuevo.');
+        if (err?.name === 'AbortError') {
+          setErrorArchivo('El servidor tardó demasiado en responder (más de 2 minutos). Probá de nuevo con mejor conexión, o con un audio más corto.');
+        } else {
+          setErrorArchivo('No se pudo conectar con el servidor. Probá de nuevo.');
+        }
       } finally {
+        clearTimeout(timeoutId);
         setExtrayendoArchivo(false);
         setTipoProcesando(null);
       }
@@ -487,6 +504,27 @@ export default function Contenido({ session }) {
     return candidatos.find((m) => MediaRecorder.isTypeSupported?.(m)) || '';
   }
 
+  // Encontrado revisando esto de nuevo: usarGrabacion y
+  // compartirGrabacionDebug solo sabían poner extensión ".mp4" o ".webm"
+  // (miraban si el mimeType incluía "mp4", y si no, asumían webm siempre).
+  // Firefox en Android puede grabar en "audio/ogg" en vez de webm, y ahí
+  // el archivo terminaba mandado como "grabacion-....webm" con contenido
+  // Ogg real adentro. El navegador manda el Content-Type correcto en el Blob,
+  // pero Groq (como la mayoría de las APIs tipo Whisper) elige el decoder
+  // por la EXTENSIÓN del nombre de archivo, no por el Content-Type del
+  // multipart. Un .webm que en realidad es Ogg se intenta decodificar como
+  // el contenedor equivocado: en el mejor caso sale una transcripción
+  // basura ("transcribe cualquier cosa"), en el peor un error del server.
+  // Esto explica por qué fallaba distinto en Chrome y Firefox aun siendo
+  // el mismo bug: cada uno termina grabando en un contenedor distinto.
+  function extensionParaMimeType(mimeType) {
+    const m = (mimeType || '').toLowerCase();
+    if (m.includes('mp4')) return 'mp4';
+    if (m.includes('ogg')) return 'ogg';
+    if (m.includes('webm')) return 'webm';
+    return 'webm';
+  }
+
   async function iniciarGrabacion() {
     setErrorGrabacion(null);
 
@@ -496,7 +534,41 @@ export default function Contenido({ session }) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Antes pedíamos { audio: true } a secas, que en el celular deja que
+      // el navegador/OS aplique sus valores por defecto de cancelación de
+      // eco, supresión de ruido y control automático de ganancia. En una
+      // notebook esos filtros son livianos porque están pensados para
+      // videollamadas de escritorio, pero en el micrófono de un celular
+      // son mucho más agresivos (están pensados para llamadas telefónicas
+      // con parlante, no para dictado de cerca): pueden recortar el
+      // arranque de las palabras, meter "gating" en las partes suaves de
+      // la voz o variar el volumen a mitad de frase. Whisper (que hace
+      // Groq del otro lado) no tiene ese problema con ruido de fondo
+      // normal, pero sí le cuesta mucho con audio ya procesado/recortado
+      // así, y ante audio raro no siempre devuelve error: a veces
+      // "alucina" texto que no tiene nada que ver, que es exactamente el
+      // síntoma de "transcribe cualquier cosa" que se vio en Firefox.
+      // Pedimos el audio lo más crudo posible y dejamos que Whisper se
+      // encargue del ruido, que es para lo que está entrenado.
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+            sampleRate: { ideal: 16000 },
+          },
+        });
+      } catch (errConstraints) {
+        // Algún celular/navegador raro podría rechazar estas constraints
+        // puntuales (no debería, son todas "ideal" o booleanas, nunca
+        // "exact", pero por las dudas no dejamos sin poder grabar por
+        // esto). Reintentamos con el pedido genérico de antes.
+        console.warn('getUserMedia con constraints específicas falló, reintentando genérico:', errConstraints);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       streamGrabacionRef.current = stream;
 
       // Evita que Android apague la pantalla y corte el micrófono a mitad
@@ -587,7 +659,7 @@ export default function Contenido({ session }) {
   // la transcripción en mobile ande bien y estable.
   async function compartirGrabacionDebug() {
     if (!audioGrabado) return;
-    const extension = (audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+    const extension = extensionParaMimeType(audioGrabado.blob.type);
     const archivo = new File([audioGrabado.blob], `grabacion-debug-${Date.now()}.${extension}`, {
       type: audioGrabado.blob.type || 'audio/webm',
     });
@@ -605,7 +677,7 @@ export default function Contenido({ session }) {
 
   function usarGrabacion() {
     if (!audioGrabado) return;
-    const extension = (audioGrabado.blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+    const extension = extensionParaMimeType(audioGrabado.blob.type);
     const archivo = new File([audioGrabado.blob], `grabacion-${Date.now()}.${extension}`, {
       type: audioGrabado.blob.type || 'audio/webm',
     });
