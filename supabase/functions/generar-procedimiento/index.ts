@@ -20,6 +20,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL_PROCEDIMIENTO } from '../_shared/acceso.ts';
+import { AVISO_MATERIAL_NO_CONFIABLE, envolverMaterialNoConfiable, validarProcedimientoGenerado } from '../_shared/prompt-seguridad.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,7 +93,9 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-    const prompt = `Convertí el siguiente material de capacitación de un comercio en un Procedimiento (SOP - procedimiento operativo estándar) claro y accionable, del tipo que un empleado pueda tener impreso al lado del mostrador y seguir paso a paso sin dudas.
+    const instrucciones = `${AVISO_MATERIAL_NO_CONFIABLE}
+
+Convertí el material de capacitación de un comercio que te van a pasar en un Procedimiento (SOP - procedimiento operativo estándar) claro y accionable, del tipo que un empleado pueda tener impreso al lado del mostrador y seguir paso a paso sin dudas.
 
 Reglas de contenido:
 - "objetivo": 1 a 2 oraciones cortas, qué se logra siguiendo este procedimiento y por qué importa.
@@ -104,11 +107,6 @@ Reglas de contenido:
 - "area": string corto, una categoría/área a la que pertenece este procedimiento (ej: "Caja", "Depósito", "Atención al cliente", "Seguridad"), la que mejor represente el tema del material.
 - Tono serio y profesional, en segunda persona ("vos"), tono argentino, directo y sin vueltas — es una guía de uso rápido, no una explicación conceptual.
 - No inventes información que no esté en el material original más allá de lo mínimo razonable indicado arriba para materiales/excepciones.
-
-Material original:
-"""
-${contenido.texto_procesado}
-"""
 
 Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta forma exacta:
 {
@@ -131,7 +129,8 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2500,
-        messages: [{ role: 'user', content: prompt }],
+        system: instrucciones,
+        messages: [{ role: 'user', content: envolverMaterialNoConfiable(contenido.texto_procesado) }],
       }),
     });
 
@@ -177,6 +176,18 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Misma validación de forma que procesar-contenido, y por el mismo
+    // motivo: última barrera contra una inyección metida en el material
+    // antes de que llegue a guardarse como procedimiento.
+    const errorValidacion = validarProcedimientoGenerado(procedimientoGenerado);
+    if (errorValidacion) {
+      console.error('Procedimiento generado con formato inválido:', errorValidacion, textoRespuesta);
+      return new Response(
+        JSON.stringify({ error: 'La IA devolvió un procedimiento con un formato inesperado. Probá de nuevo.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Se crea como BORRADOR (pendiente): el dueño lo revisa, completa el

@@ -11,6 +11,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
+import { AVISO_MATERIAL_NO_CONFIABLE, envolverMaterialNoConfiable, validarCursoGenerado } from '../_shared/prompt-seguridad.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +84,9 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-    const prompt = `Convertí el siguiente material de capacitación de un comercio en un curso completo y serio para un empleado nuevo, con el mismo nivel de profundidad y formato que usaría una plataforma de capacitación profesional (no un resumen ni un apunte rápido).
+    const instrucciones = `${AVISO_MATERIAL_NO_CONFIABLE}
+
+Convertí el material de capacitación de un comercio que te van a pasar en un curso completo y serio para un empleado nuevo, con el mismo nivel de profundidad y formato que usaría una plataforma de capacitación profesional (no un resumen ni un apunte rápido).
 
 Estructura obligatoria, siempre 5 pasos, en este orden:
 1. Marco y por qué importa: contexto de por qué este tema es relevante para el puesto (si el material menciona una norma, ley o estándar, citala acá con precisión; si no menciona ninguna, explicá el motivo práctico/de negocio).
@@ -94,14 +97,9 @@ Reglas de contenido:
 - Cada uno de los 5 pasos tiene que tener entre 200 y 280 palabras. No menos. Esto no es negociable: un paso de 3 líneas no sirve para capacitar a nadie.
 - Desarrollá el POR QUÉ de cada cosa, no solo el QUÉ. Sumá contexto y al menos un ejemplo concreto o situación típica del día a día del comercio en cada paso donde ayude a entender mejor.
 - Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (cosas que sí hacer, cosas que no hacer, checklist), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones. Podés combinar: un párrafo de contexto seguido de una lista con guiones dentro del mismo paso.
-- Tono serio y profesional, pero en segunda persona ("vos"), tono argentino, sin sonar acartonado ni como un trámite burocrático — como si un compañero con experiencia real le explicara el tema a alguien que recién arranca.
+- Tono serio y profesional, pero en segunda persona ("vos"), tono argentino, sin sonar acartonado ni como un trámite burocrático, como si un compañero con experiencia real le explicara el tema a alguien que recién arranca.
 - Exactamente 5 preguntas de opción múltiple (3 opciones cada una), una por cada paso, que evalúen el punto central de ESE paso puntual, no detalles menores ni trivia.
 - No inventes información que no esté en el material original. Si el material es corto, desarrollá y explicá mejor lo que SÍ está (con más contexto, ejemplos y aplicación práctica), pero no agregues datos, cifras o normas que no estén en el original.
-
-Material original:
-"""
-${contenido.texto_procesado}
-"""
 
 Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta forma exacta:
 {
@@ -121,7 +119,8 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }],
+        system: instrucciones,
+        messages: [{ role: 'user', content: envolverMaterialNoConfiable(contenido.texto_procesado) }],
       }),
     });
 
@@ -167,6 +166,22 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Validamos que el JSON tenga exactamente la forma que pedimos antes
+    // de guardar nada. Además de ser una buena práctica en general, esto
+    // es la última barrera contra una inyección de instrucciones metida
+    // en el material (ver AVISO_MATERIAL_NO_CONFIABLE más arriba): si algo
+    // logró desviar parcialmente al modelo, lo más probable es que el
+    // resultado no tenga esta forma exacta, y acá lo cortamos antes de
+    // que llegue a convertirse en un curso real.
+    const errorValidacion = validarCursoGenerado(cursoGenerado);
+    if (errorValidacion) {
+      console.error('Curso generado con formato inválido:', errorValidacion, textoRespuesta);
+      return new Response(
+        JSON.stringify({ error: 'La IA devolvió un curso con un formato inesperado. Probá de nuevo.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Creamos el microcurso como BORRADOR (pendiente), el dueño lo revisa
