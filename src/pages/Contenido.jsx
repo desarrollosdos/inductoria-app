@@ -324,7 +324,7 @@ export default function Contenido({ session }) {
 
   async function handleSubir(e) {
     e.preventDefault();
-    if (!texto.trim()) return;
+    if (!titulo.trim() || !texto.trim()) return;
 
     if (!hasAccess) {
       setVarianteSuscripcion('general');
@@ -339,7 +339,7 @@ export default function Contenido({ session }) {
       .insert({
         cuenta_id: cuenta.id,
         tipo: 'texto',
-        archivo_original: titulo.trim() || null,
+        archivo_original: titulo.trim(),
         texto_procesado: texto.trim(),
         estado: 'pendiente',
       })
@@ -720,10 +720,11 @@ export default function Contenido({ session }) {
   }
 
   async function handleGuardarEdit(id) {
+    if (!tituloEdit.trim() || !textoEdit.trim()) return;
     setGuardandoEdit(true);
     const { data, error } = await supabase
       .from('contenidos')
-      .update({ archivo_original: tituloEdit.trim() || null, texto_procesado: textoEdit.trim() })
+      .update({ archivo_original: tituloEdit.trim(), texto_procesado: textoEdit.trim() })
       .eq('id', id)
       .select()
       .single();
@@ -1070,6 +1071,7 @@ export default function Contenido({ session }) {
           <form onSubmit={handleSubir} className="space-y-2">
             <input
               type="text"
+              required
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Título (ej: Manual de caja)"
@@ -1191,7 +1193,7 @@ export default function Contenido({ session }) {
             />
             <button
               type="submit"
-              disabled={subiendo}
+              disabled={subiendo || !titulo.trim() || !texto.trim()}
               className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
             >
               {subiendo ? 'Guardando...' : 'Guardar contenido'}
@@ -1234,6 +1236,7 @@ export default function Contenido({ session }) {
                       <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
                         <input
                           type="text"
+                          required
                           value={tituloEdit}
                           onChange={(e) => setTituloEdit(e.target.value)}
                           placeholder="Título"
@@ -1252,6 +1255,8 @@ export default function Contenido({ session }) {
                             onClick={() => handleGuardarEdit(c.id)}
                             disabled={
                               guardandoEdit ||
+                              !tituloEdit.trim() ||
+                              !textoEdit.trim() ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
                             className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C2790C] bg-[#FCE38A] border border-[#F0C24D] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7] disabled:cursor-not-allowed"
