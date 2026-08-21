@@ -356,7 +356,13 @@ export default function Contenido({ session }) {
     setTexto('');
   }
 
-  function handleArchivo(file, duracionSegConocida) {
+  // esGrabacionPropia: true cuando el audio viene de grabar acá mismo
+  // (usarGrabacion). Esos archivos siempre se llaman "grabacion-<hora>.ext"
+  // porque el nombre lo inventamos nosotros, así que no sirve como título
+  // (era justamente lo que estaba apareciendo arriba del contenido). Un
+  // audio o archivo subido por el dueño sí puede traer un nombre real, ahí
+  // sigue teniendo sentido usarlo para completar el título.
+  function handleArchivo(file, duracionSegConocida, esGrabacionPropia) {
     if (!file) return;
     setErrorArchivo(null);
 
@@ -461,8 +467,8 @@ export default function Contenido({ session }) {
         }
 
         setTexto(data.texto);
-        if (!titulo.trim()) {
-          setTitulo(file.name.replace(/\.(pdf|docx)$/i, ''));
+        if (!titulo.trim() && !esGrabacionPropia) {
+          setTitulo(file.name.replace(/\.(pdf|docx|mp3|wav|m4a|ogg|webm|opus|mp4)$/i, ''));
         }
       } catch (err) {
         console.error(err);
@@ -664,7 +670,7 @@ export default function Contenido({ session }) {
     setAudioGrabado(null);
     setSegundosGrabados(0);
     URL.revokeObjectURL(url);
-    handleArchivo(archivo, duracionSeg);
+    handleArchivo(archivo, duracionSeg, true);
   }
 
   function formatearDuracion(segundos) {
