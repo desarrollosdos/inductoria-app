@@ -17,6 +17,23 @@ function IconSucursalesMini(props) {
   );
 }
 
+// Cuánto puede llegar a cargar de sucursales ahora mismo. Durante el
+// trial (salvo cuentas exentas) el tope es siempre 1, sin importar lo
+// que se haya declarado en sucursales_contratadas al crear la cuenta:
+// ese número solo determina el precio del día que se suscriba
+// (crear-suscripcion). Fuera del trial (activa, past_due, o cuenta
+// exenta) el tope es directamente lo contratado — nunca hay una
+// excepción automática que deje crear gratis más de lo declarado/
+// pagado; para una cuenta exenta de prueba, lo contratado se sube a
+// mano desde Supabase.
+function limiteSucursales(cuenta, email) {
+  const contratadas = cuenta.sucursales_contratadas || 1;
+  if (trialActivo(cuenta) && !CUENTAS_EXENTAS.includes(email)) {
+    return Math.min(1, contratadas);
+  }
+  return contratadas;
+}
+
 const FORM_VACIO = {
   nombre: '',
   direccion: '',
@@ -197,6 +214,7 @@ export default function Dashboard({ session }) {
   const [precioBase, setPrecioBase] = useState(12000);
   const [loading, setLoading] = useState(true);
   const [nombreCuenta, setNombreCuenta] = useState('');
+  const [sucursalesIniciales, setSucursalesIniciales] = useState('1');
   const [creandoCuenta, setCreandoCuenta] = useState(false);
 
   const [form, setForm] = useState(FORM_VACIO);
@@ -247,10 +265,17 @@ export default function Dashboard({ session }) {
     if (!nombreCuenta.trim()) return;
     setCreandoCuenta(true);
 
-    // Cuenta nueva arranca en trial: TRIAL_DIAS días de acceso completo
-    // (sin tope de empleados ni sucursales), salvo generar/actualizar
-    // cursos con IA, que quedan bloqueados hasta que se suscriba.
+    // Cuenta nueva arranca en trial: TRIAL_DIAS días de acceso completo,
+    // sin tope de empleados, pero SÍ con tope de 1 sucursal durante el
+    // trial (ver cupoLleno más abajo) aunque acá se declare un número
+    // mayor. Lo que se declara acá queda guardado en
+    // sucursales_contratadas y es lo que determina el precio cuando se
+    // suscriba (crear-suscripcion), así el cobro queda validado de
+    // antemano en vez de calcularse recién en base a lo que haya
+    // llegado a cargar gratis. Generar/actualizar cursos con IA queda
+    // bloqueado en trial sin importar esto, hasta que se suscriba.
     const trialEndsAt = new Date(Date.now() + TRIAL_DIAS * 24 * 60 * 60 * 1000).toISOString();
+    const sucursalesDeclaradas = Math.max(1, parseInt(sucursalesIniciales, 10) || 1);
 
     const { data, error } = await supabase
       .from('cuentas')
@@ -259,6 +284,7 @@ export default function Dashboard({ session }) {
         nombre: nombreCuenta.trim(),
         plan: 'trial',
         trial_ends_at: trialEndsAt,
+        sucursales_contratadas: sucursalesDeclaradas,
       })
       .select()
       .single();
@@ -280,12 +306,13 @@ export default function Dashboard({ session }) {
       return;
     }
 
-    const sinTopeSucursales = trialActivo(cuenta) || CUENTAS_EXENTAS.includes(session.user.email);
-    if (!sinTopeSucursales && negocios.length >= cuenta.sucursales_contratadas) {
+    if (negocios.length >= limiteSucursales(cuenta, session.user.email)) {
       setErrorCupo(
-        `Informaste en tu plan que tendrías ${cuenta.sucursales_contratadas} sucursal${
-          cuenta.sucursales_contratadas === 1 ? '' : 'es'
-        }. Comunicate con nosotros si necesitás agregar más.`
+        trialActivo(cuenta) && !CUENTAS_EXENTAS.includes(session.user.email)
+          ? 'Durante la prueba gratis podés cargar 1 sucursal. Suscribite para cargar el resto que declaraste.'
+          : `Informaste en tu plan que tendrías ${cuenta.sucursales_contratadas} sucursal${
+              cuenta.sucursales_contratadas === 1 ? '' : 'es'
+            }. Comunicate con nosotros si necesitás agregar más.`
       );
       return;
     }
@@ -391,6 +418,24 @@ export default function Dashboard({ session }) {
               placeholder="Nombre de tu negocio"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
+            <div>
+              <label className="block text-xs font-medium text-[#6b6455] mb-1">
+                ¿Cuántas sucursales tenés?
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                step="1"
+                value={sucursalesIniciales}
+                onChange={(e) => setSucursalesIniciales(e.target.value)}
+                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+              />
+              <p className="text-xs text-[#8a8471] mt-1">
+                Define el precio de tu plan. Durante la prueba gratis podés cargar 1 sucursal;
+                cuando te suscribas se cobra por esta cantidad.
+              </p>
+            </div>
             <button
               type="submit"
               disabled={creandoCuenta}
@@ -405,11 +450,9 @@ export default function Dashboard({ session }) {
   }
 
   const hasAccess = tieneAccesoBase(cuenta, session.user.email);
-  // Trial vigente y cuentas exentas (equipo interno) no tienen tope de
-  // sucursales — ver el comentario de tieneAccesoBase en lib/acceso.js.
-  const sinTopeSucursales = trialActivo(cuenta) || CUENTAS_EXENTAS.includes(session.user.email);
-  const cupoLleno = !sinTopeSucursales && negocios.length >= cuenta.sucursales_contratadas;
+  const cupoLleno = negocios.length >= limiteSucursales(cuenta, session.user.email);
   const puedeAgregarAlPlan = cuenta.plan === 'active' && !cuenta.cancelacion_pendiente;
+  const esTrialConTope = trialActivo(cuenta) && !CUENTAS_EXENTAS.includes(session.user.email);
 
   return (
     <div>
@@ -513,6 +556,22 @@ export default function Dashboard({ session }) {
               precioBase={precioBase}
               onAgregada={cargarTodo}
             />
+          ) : cupoLleno && esTrialConTope ? (
+            <div className="bg-[#DCEEF7] border border-[#B8DCEC] rounded-lg p-3 text-sm text-[#1B6E8C] flex items-center justify-between gap-3">
+              <span>
+                Durante la prueba gratis podés cargar 1 sucursal. Suscribite para cargar
+                {cuenta.sucursales_contratadas > 1
+                  ? ` las ${cuenta.sucursales_contratadas} sucursales que declaraste`
+                  : ' el resto'}
+                .
+              </span>
+              <a
+                href="/suscripcion"
+                className="text-xs font-semibold text-white bg-[#1B6E8C] rounded-full px-3 py-1 flex-shrink-0"
+              >
+                Suscribirme
+              </a>
+            </div>
           ) : cupoLleno ? (
             <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A]">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
