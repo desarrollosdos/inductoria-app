@@ -5,7 +5,8 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
-import { TRIAL_DIAS, tieneAccesoBase } from '../lib/acceso';
+import { TRIAL_DIAS, tieneAccesoBase, trialActivo, CUENTAS_EXENTAS } from '../lib/acceso';
+import { precioTotalMensual } from '../lib/precio';
 
 function IconSucursalesMini(props) {
   return (
@@ -90,9 +91,110 @@ function CamposDireccion({ form, setForm }) {
   );
 }
 
+// Self-service: sumar 1 sucursal más a un plan pago ya activo. Sube el
+// monto de la suscripción en MercadoPago (Edge Function
+// agregar-sucursal-plan) y recién con eso confirmado destraba el cupo.
+// Solo se muestra cuando cuenta.plan === 'active' y sin cancelación
+// pendiente (ver el punto de montaje más abajo); para cualquier otro
+// estado (past_due, suspended, cancelled) se sigue mostrando el cartel
+// de "comunicate con nosotros".
+function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const cantidadActual = Math.max(negocios.length, cuenta.sucursales_contratadas || 1);
+  const cantidadNueva = cantidadActual + 1;
+  const precioActual = precioTotalMensual(cantidadActual, precioBase);
+  const precioNuevo = precioTotalMensual(cantidadNueva, precioBase);
+
+  async function handleAgregar() {
+    setLoading(true);
+    setError('');
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agregar-sucursal-plan`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'No se pudo actualizar el plan. Intentá de nuevo.');
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      setConfirmando(false);
+      onAgregada?.();
+    } catch (err) {
+      console.error(err);
+      setError('Error de conexión. Intentá de nuevo.');
+      setLoading(false);
+    }
+  }
+
+  if (!confirmando) {
+    return (
+      <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3">
+        <span>
+          Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
+          {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Podés sumar una más ahora mismo.
+        </span>
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+        >
+          Agregar sucursal
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+      <p>
+        Vas a pasar de {cantidadActual} a {cantidadNueva} sucursal{cantidadNueva === 1 ? '' : 'es'}.
+        Tu plan pasa de ${precioActual.toLocaleString('es-AR')}/mes a{' '}
+        <strong className="text-[#2C2C2A]">${precioNuevo.toLocaleString('es-AR')}/mes</strong>, desde
+        tu próximo cobro.
+      </p>
+      {error && <p className="text-xs text-[#C1502E]">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setConfirmando(false)}
+          disabled={loading}
+          className="flex-1 py-2 rounded-lg font-semibold text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
+        >
+          Volver
+        </button>
+        <button
+          type="button"
+          onClick={handleAgregar}
+          disabled={loading}
+          className="flex-1 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+        >
+          {loading ? 'Actualizando...' : 'Confirmar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
+  const [precioBase, setPrecioBase] = useState(12000);
   const [loading, setLoading] = useState(true);
   const [nombreCuenta, setNombreCuenta] = useState('');
   const [creandoCuenta, setCreandoCuenta] = useState(false);
@@ -129,6 +231,13 @@ export default function Dashboard({ session }) {
         .order('created_at', { ascending: true });
       setNegocios(negociosData || []);
     }
+
+    const { data: configData } = await supabase
+      .from('configuracion_precio')
+      .select('precio_base')
+      .eq('id', 1)
+      .maybeSingle();
+    if (configData) setPrecioBase(configData.precio_base);
 
     setLoading(false);
   }
@@ -171,7 +280,8 @@ export default function Dashboard({ session }) {
       return;
     }
 
-    if (negocios.length >= cuenta.sucursales_contratadas) {
+    const sinTopeSucursales = trialActivo(cuenta) || CUENTAS_EXENTAS.includes(session.user.email);
+    if (!sinTopeSucursales && negocios.length >= cuenta.sucursales_contratadas) {
       setErrorCupo(
         `Informaste en tu plan que tendrías ${cuenta.sucursales_contratadas} sucursal${
           cuenta.sucursales_contratadas === 1 ? '' : 'es'
@@ -295,7 +405,11 @@ export default function Dashboard({ session }) {
   }
 
   const hasAccess = tieneAccesoBase(cuenta, session.user.email);
-  const cupoLleno = negocios.length >= cuenta.sucursales_contratadas;
+  // Trial vigente y cuentas exentas (equipo interno) no tienen tope de
+  // sucursales — ver el comentario de tieneAccesoBase en lib/acceso.js.
+  const sinTopeSucursales = trialActivo(cuenta) || CUENTAS_EXENTAS.includes(session.user.email);
+  const cupoLleno = !sinTopeSucursales && negocios.length >= cuenta.sucursales_contratadas;
+  const puedeAgregarAlPlan = cuenta.plan === 'active' && !cuenta.cancelacion_pendiente;
 
   return (
     <div>
@@ -392,6 +506,13 @@ export default function Dashboard({ session }) {
                 Suscribirme
               </button>
             </div>
+          ) : cupoLleno && puedeAgregarAlPlan ? (
+            <AgregarSucursalPlan
+              cuenta={cuenta}
+              negocios={negocios}
+              precioBase={precioBase}
+              onAgregada={cargarTodo}
+            />
           ) : cupoLleno ? (
             <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A]">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
