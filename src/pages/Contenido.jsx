@@ -5,7 +5,7 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
-import { tieneAccesoBase, puedeUsarIA } from '../lib/acceso';
+import { tieneAccesoBase, puedeUsarIA, trialActivo } from '../lib/acceso';
 import { TituloCursoInline } from '../components/Badges';
 
 // Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
@@ -981,8 +981,8 @@ export default function Contenido({ session }) {
         <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
           Esta es tu <strong>biblioteca de contenido</strong>: subís el material de capacitación
           (manuales en PDF o Word, apuntes de texto, fotos o capturas de pantalla, notas de voz
-          grabadas acá mismo o archivos de audio ya grabados), lo marcás como aprobado, y desde
-          ahí la IA lo convierte en un curso con pasos y evaluación, listo para que vos lo revises
+          grabadas acá mismo o archivos de audio ya grabados), lo marcás como aprobado y desde
+          ahí la IA lo convierte en un curso con pasos y evaluación, listo para que lo revises
           antes de publicarlo.
         </div>
 
@@ -1046,11 +1046,7 @@ export default function Contenido({ session }) {
             </svg>
             <h2 className="font-semibold text-[#2C2C2A]">Subir contenido nuevo</h2>
           </div>
-          <p className="text-xs text-[#8a8471] mb-3">
-            Pegá el texto acá abajo, o arrastrá un archivo .txt, .pdf, .docx, una imagen (captura
-            de pantalla o foto) o un audio (nota de voz explicando el tema). Video no está
-            soportado.
-          </p>
+          <p className="text-xs text-[#8a8471] mb-3">Video no está soportado.</p>
           <form onSubmit={handleSubir} className="space-y-2">
             <input
               type="text"
@@ -1278,6 +1274,12 @@ export default function Contenido({ session }) {
                             Salir
                           </button>
                         </div>
+                        {c.estado === 'aprobado' && trialActivo(cuenta) && (
+                          <p className="text-[10px] text-[#8a8471] mt-1">
+                            Durante la prueba gratis podés dejarlo aprobado y listo: generar el
+                            curso con IA se habilita al suscribirte.
+                          </p>
+                        )}
                       </div>
                     )}
 
