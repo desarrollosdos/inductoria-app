@@ -408,15 +408,13 @@ export default function Empleados({ session }) {
           <div className="flex items-center gap-3">
             <Avatar e={e} />
             <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
-                {e.puesto && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full">
-                    {e.puesto}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[#8a8471]">
+              <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
+              {e.puesto && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full inline-block mt-0.5">
+                  {e.puesto}
+                </span>
+              )}
+              <p className="text-xs text-[#8a8471] mt-0.5">
                 {nombreNegocio(e.negocio_id)} · alta {new Date(e.fecha_alta).toLocaleDateString('es-AR')}
               </p>
             </div>
@@ -735,7 +733,7 @@ export default function Empleados({ session }) {
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-[#2C2C2A]">Empleados activos ({activos.length})</h2>
+            <h2 className="font-semibold text-[#2C2C2A]">Activos {activos.length}</h2>
             <div className="flex gap-1 bg-[#EDE0C8] rounded-lg p-1">
               <button
                 onClick={() => setVista('alfabetico')}
