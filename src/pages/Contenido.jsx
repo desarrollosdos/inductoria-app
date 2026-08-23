@@ -1024,7 +1024,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleAgregarBase(curso)}
                           disabled={puestosBiblioteca.length === 0 || agregandoBaseId === curso.id}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#6B8F71] rounded-full px-4 py-2 disabled:opacity-60"
                         >
                           {agregandoBaseId === curso.id ? 'Agregando...' : 'Confirmar y agregar'}
                         </button>
@@ -1467,7 +1467,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleGuardarPuestos(m.id)}
                           disabled={guardandoPuestos}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#1D9E75] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#6B8F71] rounded-full px-4 py-2 disabled:opacity-60"
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>
