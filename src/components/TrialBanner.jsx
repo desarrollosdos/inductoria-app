@@ -12,7 +12,7 @@ export default function TrialBanner({ cuenta }) {
     <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-xl px-4 py-3 flex items-center justify-between gap-3 text-sm">
       <span className="text-[#6b6455]">
         Te quedan <strong className="text-[#2C2C2A]">{tiempoRestante}</strong> de prueba gratis.
-        Generar cursos con IA requiere suscripción.
+        Generar cursos y procedimientos con IA requiere suscripción.
       </span>
       <a
         href="/"
