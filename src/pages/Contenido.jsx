@@ -1024,7 +1024,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleAgregarBase(curso)}
                           disabled={puestosBiblioteca.length === 0 || agregandoBaseId === curso.id}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#6B8F71] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                         >
                           {agregandoBaseId === curso.id ? 'Agregando...' : 'Confirmar y agregar'}
                         </button>
@@ -1097,7 +1097,7 @@ export default function Contenido({ session }) {
                   type="button"
                   onClick={iniciarGrabacion}
                   disabled={extrayendoArchivo}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#1D9E75] bg-[#E3F3EA] border border-[#BEE3D0] disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] disabled:opacity-60"
                 >
                   <IconMicrofono />
                   Grabar audio
@@ -1245,7 +1245,7 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#1D9E75] bg-[#D7F2E6] border border-[#9FE1CB] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2"
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
@@ -1336,7 +1336,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion || puestosNuevoCurso.length === 0}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#1D9E75] bg-[#D7F2E6] border border-[#9FE1CB] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
@@ -1469,7 +1469,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleGuardarPuestos(m.id)}
                           disabled={guardandoPuestos}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#6B8F71] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>

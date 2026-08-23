@@ -84,7 +84,7 @@ export default function DashboardNav({ userEmail }) {
       <div className="flex justify-between sm:justify-start sm:gap-4">
         {tabs.map((tab) => {
           const active = path === tab.path;
-          const color = tab.id === 'admin' ? '#3F7D5C' : '#C1502E';
+          const color = tab.id === 'admin' ? '#7C8B6F' : '#C1502E';
           return (
             <a
               key={tab.id}

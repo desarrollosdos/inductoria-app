@@ -4,7 +4,7 @@ import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 import { TIERS_PRECIO, precioPorSucursal } from '../lib/precio';
 
-const VERDE = '#3F7D5C';
+const VERDE = '#7C8B6F';
 
 function etiquetaPlan(plan) {
   if (plan === 'active') return 'Activa';

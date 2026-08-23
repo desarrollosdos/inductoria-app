@@ -432,7 +432,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleCambiarEstado(p.id, p.estado)}
                             disabled={procesandoId === p.id}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#1D9E75] bg-[#D7F2E6] border border-[#9FE1CB] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {p.estado === 'aprobado' ? 'Marcar como borrador' : 'Aprobar procedimiento'}
                           </button>
