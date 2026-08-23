@@ -75,6 +75,53 @@ const ESTADO_INFO = {
   procesado: { bg: '#F0EAFB', color: '#7F5FD1', label: 'Curso generado' },
 };
 
+// Lista desplegable de selección múltiple para "¿a qué puestos aplica
+// este curso?", en reemplazo de la fila de botones/pills (con el
+// catálogo creciendo por los puestos "Otro" que van cargando los
+// dueños, la fila de pills se hacía ilegible). Primera opción siempre
+// "Todos los puestos".
+function SelectorPuestos({ seleccionados, onChange, disabled }) {
+  return (
+    <select
+      multiple
+      value={seleccionados}
+      onChange={onChange}
+      disabled={disabled}
+      size={Math.min(PUESTOS_CATALOGO_BASE.length + 1, 6)}
+      className="w-full border border-[#EFDDCE] rounded-lg text-sm outline-none px-1 py-1 disabled:opacity-60"
+    >
+      <option value="TODOS">Todos los puestos</option>
+      {PUESTOS_CATALOGO_BASE.map((p) => (
+        <option key={p} value={p}>
+          {p}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Maneja la selección múltiple nativa del <select>, manteniendo la
+// misma regla de negocio que tenían los botones: "Todos los puestos"
+// es excluyente con puestos puntuales. Si el dueño tilda "Todos"
+// mientras ya tenía puestos puntuales elegidos, gana "Todos" (pisa el
+// resto); si tenía "Todos" tildado y ahora además tilda un puesto
+// puntual, se entiende que quiere pasar a puntual y se destilda "Todos".
+function manejarSeleccionPuestos(setPuestos) {
+  return (e) => {
+    const nuevos = Array.from(e.target.selectedOptions, (o) => o.value);
+    setPuestos((prev) => {
+      const todosPrev = prev.includes('TODOS');
+      const todosNuevo = nuevos.includes('TODOS');
+      if (todosNuevo && !todosPrev) return ['TODOS'];
+      if (todosNuevo && todosPrev) {
+        const especificos = nuevos.filter((p) => p !== 'TODOS');
+        return especificos.length > 0 ? especificos : ['TODOS'];
+      }
+      return nuevos;
+    });
+  };
+}
+
 export default function Contenido({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [contenidos, setContenidos] = useState([]);
@@ -260,17 +307,6 @@ export default function Contenido({ session }) {
     }
     setSeleccionandoBaseId(cursoId);
     setPuestosBiblioteca([]);
-  }
-
-  function toggleTodosBiblioteca() {
-    setPuestosBiblioteca((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
-  }
-
-  function togglePuestoBiblioteca(puesto) {
-    setPuestosBiblioteca((prev) => {
-      const sinTodos = prev.filter((p) => p !== 'TODOS');
-      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
-    });
   }
 
   async function handleAgregarBase(curso) {
@@ -858,28 +894,6 @@ export default function Contenido({ session }) {
     setPuestosSeleccionados(microcurso.puestos_aplicables || []);
   }
 
-  function toggleTodosNuevo() {
-    setPuestosNuevoCurso((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
-  }
-
-  function togglePuestoNuevo(puesto) {
-    setPuestosNuevoCurso((prev) => {
-      const sinTodos = prev.filter((p) => p !== 'TODOS');
-      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
-    });
-  }
-
-  function toggleTodos() {
-    setPuestosSeleccionados((prev) => (prev.includes('TODOS') ? [] : ['TODOS']));
-  }
-
-  function togglePuesto(puesto) {
-    setPuestosSeleccionados((prev) => {
-      const sinTodos = prev.filter((p) => p !== 'TODOS');
-      return sinTodos.includes(puesto) ? sinTodos.filter((p) => p !== puesto) : [...sinTodos, puesto];
-    });
-  }
-
   async function handleGuardarPuestos(microcursoId) {
     setGuardandoPuestos(true);
     // Sin nada tildado, queda "sin definir" (invisible para empleados)
@@ -1000,43 +1014,12 @@ export default function Contenido({ session }) {
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
                           ¿A qué puestos aplica? Elegí "Todos los puestos" o puestos puntuales
-                          antes de agregarlo.
+                          antes de agregarlo (mantené Ctrl o Cmd apretado para elegir varios).
                         </p>
-                        <div className="flex flex-wrap gap-2">
-                          <label
-                            className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
-                              puestosBiblioteca.includes('TODOS')
-                                ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
-                                : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={puestosBiblioteca.includes('TODOS')}
-                              onChange={toggleTodosBiblioteca}
-                              className="hidden"
-                            />
-                            Todos los puestos
-                          </label>
-                          {PUESTOS_CATALOGO_BASE.map((p) => (
-                            <label
-                              key={p}
-                              className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
-                                puestosBiblioteca.includes(p)
-                                  ? 'bg-[#C1502E] text-white border-[#C1502E]'
-                                  : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={puestosBiblioteca.includes(p)}
-                                onChange={() => togglePuestoBiblioteca(p)}
-                                className="hidden"
-                              />
-                              {p}
-                            </label>
-                          ))}
-                        </div>
+                        <SelectorPuestos
+                          seleccionados={puestosBiblioteca}
+                          onChange={manejarSeleccionPuestos(setPuestosBiblioteca)}
+                        />
                         <button
                           type="button"
                           onClick={() => handleAgregarBase(curso)}
@@ -1333,43 +1316,13 @@ export default function Contenido({ session }) {
                             ))}
                             <div className="bg-[#FBF7EA] border border-[#EDE0C8] rounded-lg p-3 space-y-2">
                               <p className="text-xs font-semibold text-[#2C2C2A]">
-                                ¿A qué puestos aplica este curso?
+                                ¿A qué puestos aplica este curso? (mantené Ctrl o Cmd apretado
+                                para elegir varios)
                               </p>
-                              <div className="flex flex-wrap gap-2">
-                                <label
-                                  className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
-                                    puestosNuevoCurso.includes('TODOS')
-                                      ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
-                                      : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={puestosNuevoCurso.includes('TODOS')}
-                                    onChange={toggleTodosNuevo}
-                                    className="hidden"
-                                  />
-                                  Todos los puestos
-                                </label>
-                                {PUESTOS_CATALOGO_BASE.map((p) => (
-                                  <label
-                                    key={p}
-                                    className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
-                                      puestosNuevoCurso.includes(p)
-                                        ? 'bg-[#C1502E] text-white border-[#C1502E]'
-                                        : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={puestosNuevoCurso.includes(p)}
-                                      onChange={() => togglePuestoNuevo(p)}
-                                      className="hidden"
-                                    />
-                                    {p}
-                                  </label>
-                                ))}
-                              </div>
+                              <SelectorPuestos
+                                seleccionados={puestosNuevoCurso}
+                                onChange={manejarSeleccionPuestos(setPuestosNuevoCurso)}
+                              />
                               {puestosNuevoCurso.length === 0 && (
                                 <p className="text-[10px] text-[#C1502E]">
                                   Elegí al menos una opción para poder publicar.
@@ -1503,43 +1456,13 @@ export default function Contenido({ session }) {
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
                           Elegí "Todos los puestos" para que lo vean todos, o tildá puestos
-                          puntuales. Sin nada elegido, el curso no es visible para nadie.
+                          puntuales (mantené Ctrl o Cmd apretado para elegir varios). Sin nada
+                          elegido, el curso no es visible para nadie.
                         </p>
-                        <div className="flex flex-wrap gap-2">
-                          <label
-                            className={`text-xs font-semibold border rounded-full px-3 py-1.5 cursor-pointer ${
-                              puestosSeleccionados.includes('TODOS')
-                                ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
-                                : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={puestosSeleccionados.includes('TODOS')}
-                              onChange={toggleTodos}
-                              className="hidden"
-                            />
-                            Todos los puestos
-                          </label>
-                          {PUESTOS_CATALOGO_BASE.map((p) => (
-                            <label
-                              key={p}
-                              className={`text-xs font-medium border rounded-full px-3 py-1.5 cursor-pointer ${
-                                puestosSeleccionados.includes(p)
-                                  ? 'bg-[#C1502E] text-white border-[#C1502E]'
-                                  : 'bg-white text-[#6b6455] border-[#EDE0C8]'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={puestosSeleccionados.includes(p)}
-                                onChange={() => togglePuesto(p)}
-                                className="hidden"
-                              />
-                              {p}
-                            </label>
-                          ))}
-                        </div>
+                        <SelectorPuestos
+                          seleccionados={puestosSeleccionados}
+                          onChange={manejarSeleccionPuestos(setPuestosSeleccionados)}
+                        />
                         <button
                           type="button"
                           onClick={() => handleGuardarPuestos(m.id)}
