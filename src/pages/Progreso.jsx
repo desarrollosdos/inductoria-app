@@ -49,9 +49,9 @@ function Avatar({ e, size = 32 }) {
 }
 
 function colorPorPorcentaje(pct) {
-  // Amarillo (#EAB308) en 0% -> Verde (#1D9E75) en 100%, transición continua.
+  // Amarillo (#EAB308) en 0% -> Verde (#7C8B6F) en 100%, transición continua.
   const amarillo = [234, 179, 8];
-  const verde = [29, 158, 117];
+  const verde = [124, 139, 111];
   const t = Math.min(Math.max(pct / 100, 0), 1);
   const r = Math.round(amarillo[0] + (verde[0] - amarillo[0]) * t);
   const g = Math.round(amarillo[1] + (verde[1] - amarillo[1]) * t);
@@ -76,7 +76,7 @@ function BarraSegmentada({ completados, total }) {
           <div
             key={i}
             className={`flex-1 h-[13px] rounded flex items-center justify-center text-[8px] font-bold ${
-              hecho ? 'bg-[#6B8F71] text-white' : 'bg-[#EDE0C8] text-[#a89f8a]'
+              hecho ? 'bg-[#7C8B6F] text-white' : 'bg-[#EDE0C8] text-[#a89f8a]'
             }`}
           >
             {i + 1}
