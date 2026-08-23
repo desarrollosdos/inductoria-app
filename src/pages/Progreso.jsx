@@ -425,7 +425,10 @@ export default function Progreso({ session }) {
                 Ya arrancaron
               </p>
               <p className="text-2xl font-bold text-[#2C2C2A]">
-                {yaArrancaron}/{filas.length}
+                {Math.round((yaArrancaron / filas.length) * 100)}%
+              </p>
+              <p className="text-[11px] text-[#8a8471] mt-0.5">
+                {yaArrancaron} de {filas.length} empleado{filas.length === 1 ? '' : 's'}
               </p>
             </div>
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
@@ -433,9 +436,14 @@ export default function Progreso({ session }) {
                 Más activo
               </p>
               {masActivo ? (
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-start gap-2 mt-1">
                   <Avatar e={masActivo} size={28} />
-                  <p className="text-sm font-bold text-[#2C2C2A] truncate">{masActivo.nombre}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words">{masActivo.nombre}</p>
+                    <p className="text-[11px] text-[#8a8471]">
+                      {masActivo.completados} curso{masActivo.completados === 1 ? '' : 's'}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-[#8a8471] mt-1">Todavía nadie</p>
