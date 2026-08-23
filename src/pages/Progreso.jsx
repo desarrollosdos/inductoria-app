@@ -48,17 +48,6 @@ function Avatar({ e, size = 32 }) {
   );
 }
 
-function colorPorPorcentaje(pct) {
-  // Amarillo (#EAB308) en 0% -> Verde (#7C8B6F) en 100%, transición continua.
-  const amarillo = [234, 179, 8];
-  const verde = [124, 139, 111];
-  const t = Math.min(Math.max(pct / 100, 0), 1);
-  const r = Math.round(amarillo[0] + (verde[0] - amarillo[0]) * t);
-  const g = Math.round(amarillo[1] + (verde[1] - amarillo[1]) * t);
-  const b = Math.round(amarillo[2] + (verde[2] - amarillo[2]) * t);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 // Reemplaza la barra continua + "X/Y cursos": un casillero por curso que
 // le corresponde al empleado según su puesto, numerado, en verde salvia
 // los que ya completó. Se ve de un vistazo cuántos le faltan sin tener
@@ -87,6 +76,114 @@ function BarraSegmentada({ completados, total }) {
   );
 }
 
+// Una fila de empleado dentro de "Tu equipo": avatar, acciones (PIN, link,
+// QR), barra segmentada de progreso y certificados de lo completado. Se usa
+// tanto en la vista agrupada por sucursal como en la vista por empleado
+// (alfabética, sin agrupar) — misma fila, distinto criterio de orden afuera.
+function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
+  const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
+  return (
+    <div className="px-6 py-2.5 border-t border-[#F3EEE1]">
+      <div className="flex items-center gap-3 mb-1">
+        <Avatar e={f} />
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
+            {f.totalCursos > 0 && f.completados < f.totalCursos && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
+                  title="Ver PIN de acceso"
+                  className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                >
+                  PIN
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(linkAcceso);
+                    alert('Link copiado');
+                  }}
+                  title="Copiar link de acceso"
+                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
+                >
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setQrAbierto(qrAbierto === f.id ? null : f.id)}
+                  title="Ver código QR"
+                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
+                >
+                  <IconQR />
+                </button>
+              </div>
+            )}
+          </div>
+          {f.ultimaActividad && (
+            <p className="text-[10px] text-[#8a8471]">
+              Última actividad: {new Date(f.ultimaActividad).toLocaleDateString('es-AR')}
+            </p>
+          )}
+          <BarraSegmentada completados={f.completados} total={f.totalCursos} />
+        </div>
+      </div>
+
+      {qrAbierto === f.id && (
+        <div className="mt-2 mb-1 bg-[#EDE0C8] rounded-lg p-3 flex items-center gap-3">
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(linkAcceso)}`}
+            alt={`Código QR de acceso para ${f.nombre}`}
+            width={110}
+            height={110}
+            className="rounded-lg bg-white p-1 flex-shrink-0"
+          />
+          <div>
+            <p className="text-xs font-semibold text-[#2C2C2A]">
+              Escaneá desde el celular del empleado
+            </p>
+            <p className="text-xs text-[#8a8471] mt-1">
+              PIN: <span className="font-bold text-[#C1502E]">{f.pin}</span>
+            </p>
+            <button
+              onClick={() => setQrAbierto(null)}
+              className="text-[10px] font-semibold text-[#8a8471] underline mt-2"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {f.badges.length > 0 && (
+        <div className="flex flex-col gap-1.5 mt-2">
+          {f.badges.map((b) => (
+            <div key={b.microcurso_id} className="flex items-center justify-between gap-2">
+              <CursoCompletadoFila titulo={b.titulo} especial={b.especial} />
+              <button
+                type="button"
+                onClick={() =>
+                  generarCertificadoPDF({
+                    nombreEmpleado: f.nombre,
+                    negocioNombre: f.negocioNombre,
+                    tituloCurso: b.titulo,
+                    puntaje: b.puntaje,
+                    fechaCompletado: b.fecha_completado,
+                  })
+                }
+                className="text-[10px] font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] rounded-full px-2 py-0.5 flex-shrink-0"
+              >
+                Certificado
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Progreso({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [filas, setFilas] = useState([]);
@@ -94,6 +191,10 @@ export default function Progreso({ session }) {
   const [cursosRanking, setCursosRanking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qrAbierto, setQrAbierto] = useState(null);
+  // Vista de "Tu equipo": agrupada por sucursal, o alfabética por empleado
+  // sin agrupar (útil cuando un curso aplica a todas las sucursales y el
+  // dueño quiere ver a todo el equipo junto, no separado por local).
+  const [vistaEquipo, setVistaEquipo] = useState('sucursal');
 
   useEffect(() => {
     cargarTodo();
@@ -285,6 +386,10 @@ export default function Progreso({ session }) {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   })();
 
+  // Vista alternativa "por empleado": todos juntos, alfabético, sin
+  // separar por sucursal.
+  const filasPorEmpleado = [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
@@ -386,8 +491,8 @@ export default function Progreso({ session }) {
                     </div>
                     <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${porcentajeBarra}%`, backgroundColor: colorPorPorcentaje(porcentajeBarra) }}
+                        className="h-full rounded-full bg-[#7C8B6F] transition-all"
+                        style={{ width: `${porcentajeBarra}%` }}
                       />
                     </div>
                   </div>
@@ -424,119 +529,48 @@ export default function Progreso({ session }) {
             </div>
           </div>
 
+          {gruposPorSucursal.length > 1 && (
+            <div className="flex gap-1.5 px-6 pb-3">
+              <button
+                type="button"
+                onClick={() => setVistaEquipo('sucursal')}
+                className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
+                  vistaEquipo === 'sucursal' ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#8a8471]'
+                }`}
+              >
+                Por sucursal
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaEquipo('empleado')}
+                className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
+                  vistaEquipo === 'empleado' ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#8a8471]'
+                }`}
+              >
+                Por empleado
+              </button>
+            </div>
+          )}
+
           {filas.length === 0 ? (
             <p className="text-sm text-[#6b6455] px-6 pb-6">Todavía no tenés empleados activos dados de alta.</p>
-          ) : (
+          ) : vistaEquipo === 'sucursal' ? (
             <div className="pb-2">
               {gruposPorSucursal.map((grupo) => (
                 <div key={grupo.nombre}>
                   <p className="text-[11px] font-bold text-[#8a8471] uppercase tracking-wide px-6 pt-3 pb-1.5">
                     {grupo.nombre}
                   </p>
-                  {grupo.empleados.map((f) => {
-                    const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
-                    return (
-                      <div key={f.id} className="px-6 py-2.5 border-t border-[#F3EEE1]">
-                        <div className="flex items-center gap-3 mb-1">
-                          <Avatar e={f} />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
-                              {f.totalCursos > 0 && f.completados < f.totalCursos && (
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <button
-                                    onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
-                                    title="Ver PIN de acceso"
-                                    className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0"
-                                  >
-                                    PIN
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(linkAcceso);
-                                      alert('Link copiado');
-                                    }}
-                                    title="Copiar link de acceso"
-                                    className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
-                                  >
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <rect x="9" y="9" width="13" height="13" rx="2" />
-                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => setQrAbierto(qrAbierto === f.id ? null : f.id)}
-                                    title="Ver código QR"
-                                    className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
-                                  >
-                                    <IconQR />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            {f.ultimaActividad && (
-                              <p className="text-[10px] text-[#8a8471]">
-                                Última actividad: {new Date(f.ultimaActividad).toLocaleDateString('es-AR')}
-                              </p>
-                            )}
-                            <BarraSegmentada completados={f.completados} total={f.totalCursos} />
-                          </div>
-                        </div>
-
-                        {qrAbierto === f.id && (
-                          <div className="mt-2 mb-1 bg-[#EDE0C8] rounded-lg p-3 flex items-center gap-3">
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(linkAcceso)}`}
-                              alt={`Código QR de acceso para ${f.nombre}`}
-                              width={110}
-                              height={110}
-                              className="rounded-lg bg-white p-1 flex-shrink-0"
-                            />
-                            <div>
-                              <p className="text-xs font-semibold text-[#2C2C2A]">
-                                Escaneá desde el celular del empleado
-                              </p>
-                              <p className="text-xs text-[#8a8471] mt-1">
-                                PIN: <span className="font-bold text-[#C1502E]">{f.pin}</span>
-                              </p>
-                              <button
-                                onClick={() => setQrAbierto(null)}
-                                className="text-[10px] font-semibold text-[#8a8471] underline mt-2"
-                              >
-                                Cerrar
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {f.badges.length > 0 && (
-                          <div className="flex flex-col gap-1.5 mt-2">
-                            {f.badges.map((b) => (
-                              <div key={b.microcurso_id} className="flex items-center justify-between gap-2">
-                                <CursoCompletadoFila titulo={b.titulo} especial={b.especial} />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    generarCertificadoPDF({
-                                      nombreEmpleado: f.nombre,
-                                      negocioNombre: f.negocioNombre,
-                                      tituloCurso: b.titulo,
-                                      puntaje: b.puntaje,
-                                      fechaCompletado: b.fecha_completado,
-                                    })
-                                  }
-                                  className="text-[10px] font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] rounded-full px-2 py-0.5 flex-shrink-0"
-                                >
-                                  Certificado
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {grupo.empleados.map((f) => (
+                    <FilaEmpleadoEquipo key={f.id} f={f} qrAbierto={qrAbierto} setQrAbierto={setQrAbierto} />
+                  ))}
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="pb-2">
+              {filasPorEmpleado.map((f) => (
+                <FilaEmpleadoEquipo key={f.id} f={f} qrAbierto={qrAbierto} setQrAbierto={setQrAbierto} />
               ))}
             </div>
           )}

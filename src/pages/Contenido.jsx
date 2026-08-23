@@ -1097,7 +1097,7 @@ export default function Contenido({ session }) {
                   type="button"
                   onClick={iniciarGrabacion}
                   disabled={extrayendoArchivo}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-white bg-[#7C8B6F] disabled:opacity-60"
                 >
                   <IconMicrofono />
                   Grabar audio
