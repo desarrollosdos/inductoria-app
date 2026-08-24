@@ -1,17 +1,20 @@
 import { supabase } from '../supabaseClient';
 
-function IconSalir(props) {
+// Mismo verde salvia (#7C8B6F) que ya se usa en el resto de la app (tab
+// Admin de DashboardNav, podio de Progreso, etc.) — antes iba una inicial
+// del mail acá, ahora un ícono de persona.
+function IconPersona(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
     </svg>
   );
 }
 
 export default function Header({ session, empleadoNombre }) {
   async function handleLogout() {
+    if (!window.confirm('¿Seguro que querés salir?')) return;
     await supabase.auth.signOut();
     window.location.href = '/';
   }
@@ -37,12 +40,18 @@ export default function Header({ session, empleadoNombre }) {
         {session && (
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-xs font-semibold text-[#FBF3EC]">{session.user.email}</span>
+            <span
+              title={session.user.email}
+              className="w-9 h-9 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
+            >
+              <IconPersona />
+            </span>
             <button
               onClick={handleLogout}
               title="Salir"
-              className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+              className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-semibold flex items-center justify-center hover:opacity-90 transition-opacity"
             >
-              <IconSalir />
+              Salida
             </button>
           </div>
         )}

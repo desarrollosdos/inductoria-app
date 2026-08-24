@@ -7,10 +7,13 @@ import PageShell from '../components/PageShell';
 import TrialBanner from '../components/TrialBanner';
 import { esCursoSeguridadEHigiene, CursoCompletadoFila, TituloCursoInline } from '../components/Badges';
 
+// Mismo ícono que usa DashboardNav.jsx para el tab "Progreso" (antes este
+// era un ícono de gráfico de barras distinto al del menú).
 function IconProgresoMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      <circle cx="12" cy="9" r="6" />
+      <path d="M8.5 14.2 6.5 21l5.5-3 5.5 3-2-6.8" />
     </svg>
   );
 }
