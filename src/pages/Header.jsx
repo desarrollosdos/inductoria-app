@@ -51,7 +51,7 @@ export default function Header({ session, empleadoNombre }) {
               title="Salir"
               className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-semibold flex items-center justify-center hover:opacity-90 transition-opacity"
             >
-              Salida
+              Salir
             </button>
           </div>
         )}
