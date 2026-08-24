@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
-function IconSalir(props) {
+function IconPersona(props) {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
     </svg>
   );
 }
 
-// Chip redondo con la inicial del mail, solo visible en mobile (en
+// Chip redondo con ícono de persona (antes la inicial del mail), solo visible en mobile (en
 // desktop el mail ya se ve entero al lado del botón de salir, así que
 // esto sobraría ahí). En mobile no entra el mail completo al lado del
 // botón, así que en vez de ocultarlo sin más, este chip lo deja a un
@@ -36,8 +35,6 @@ function ChipEmailMobile({ email }) {
     };
   }, [abierto]);
 
-  const inicial = (email || '?').trim().charAt(0).toUpperCase();
-
   return (
     <div className="relative sm:hidden" ref={contenedorRef}>
       <button
@@ -45,9 +42,9 @@ function ChipEmailMobile({ email }) {
         onClick={() => setAbierto((v) => !v)}
         title="Ver cuenta"
         aria-label="Ver cuenta"
-        className="w-8 h-8 rounded-full bg-[#7C8B6F] text-white font-bold text-xs flex items-center justify-center"
+        className="w-8 h-8 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center"
       >
-        {inicial}
+        <IconPersona />
       </button>
       {abierto && (
         <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 whitespace-nowrap">
@@ -60,6 +57,7 @@ function ChipEmailMobile({ email }) {
 
 export default function Header({ session, empleadoNombre }) {
   async function handleLogout() {
+    if (!window.confirm('¿Seguro que querés salir?')) return;
     await supabase.auth.signOut();
     window.location.href = '/';
   }
@@ -89,9 +87,9 @@ export default function Header({ session, empleadoNombre }) {
             <button
               onClick={handleLogout}
               title="Salir"
-              className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+              className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-semibold flex items-center justify-center hover:opacity-90 transition-opacity"
             >
-              <IconSalir />
+              Salir
             </button>
           </div>
         )}
