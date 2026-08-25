@@ -6,7 +6,7 @@ import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase } from '../lib/acceso';
-import { capitalizarPrimeraLetra } from '../lib/texto';
+import { capitalizarPalabras } from '../lib/texto';
 
 const PUESTOS_CATALOGO = [
   'Vendedor/a',
@@ -242,7 +242,7 @@ export default function Empleados({ session }) {
       .from('empleados')
       .insert({
         negocio_id: negocioSeleccionado,
-        nombre: capitalizarPrimeraLetra(nombreEmpleado.trim()),
+        nombre: capitalizarPalabras(nombreEmpleado.trim()),
         puesto: (puesto === 'Otro' ? puestoCustom.trim() : puesto.trim()) || null,
         telefono: telefonoEmpleado.trim() || null,
         mail: mailEmpleado.trim() || null,
@@ -352,7 +352,7 @@ export default function Empleados({ session }) {
     const { data, error } = await supabase
       .from('empleados')
       .update({
-        nombre: capitalizarPrimeraLetra(editForm.nombre.trim()),
+        nombre: capitalizarPalabras(editForm.nombre.trim()),
         puesto: puestoFinal || null,
         telefono: editForm.telefono.trim() || null,
         mail: editForm.mail.trim() || null,
