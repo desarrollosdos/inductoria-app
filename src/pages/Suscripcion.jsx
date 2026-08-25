@@ -38,7 +38,10 @@ const ESTADOS = {
     corto: 'Prueba gratis',
     largo: 'Estás en tu prueba gratis',
   },
-  active: { pillBg: '#1D9E75', pillText: '#fff', solido: true, corto: 'Activa', largo: 'Suscripción activa' },
+  // Mismo verde salvia que ya usa el resto del sitio (el avatar del
+  // header, los acentos de Admin), antes era un verde distinto (#1D9E75)
+  // que no coincidía con la paleta de la marca.
+  active: { pillBg: '#7C8B6F', pillText: '#fff', solido: true, corto: 'Activa', largo: 'Suscripción activa' },
   past_due: {
     pillBg: '#EF9F27',
     pillText: '#fff',
