@@ -7,6 +7,7 @@ import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase, puedeUsarIA } from '../lib/acceso';
 import { generarProcedimientoPDF } from '../lib/procedimiento';
+import { capitalizarPrimeraLetra } from '../lib/texto';
 
 function IconProcedimientos(props) {
   return (
@@ -166,7 +167,7 @@ export default function Procedimientos({ session }) {
     const { data, error } = await supabase
       .from('procedimientos')
       .update({
-        titulo: form.titulo.trim() || 'Sin título',
+        titulo: form.titulo.trim() ? capitalizarPrimeraLetra(form.titulo.trim()) : 'Sin título',
         area: form.area.trim() || null,
         responsable: form.responsable.trim() || null,
         objetivo: form.objetivo.trim() || null,

@@ -7,6 +7,7 @@ import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { TRIAL_DIAS, tieneAccesoBase, trialActivo, CUENTAS_EXENTAS } from '../lib/acceso';
 import { precioTotalMensual } from '../lib/precio';
+import { capitalizarPrimeraLetra } from '../lib/texto';
 
 function IconSucursalesMini(props) {
   return (
@@ -332,7 +333,7 @@ export default function Dashboard({ session }) {
       .from('negocios')
       .insert({
         cuenta_id: cuenta.id,
-        nombre: form.nombre.trim(),
+        nombre: capitalizarPrimeraLetra(form.nombre.trim()),
         direccion: form.direccion.trim(),
         localidad: form.localidad.trim(),
         provincia: form.provincia.trim(),
@@ -379,7 +380,7 @@ export default function Dashboard({ session }) {
     const { data, error } = await supabase
       .from('negocios')
       .update({
-        nombre: formEdit.nombre.trim(),
+        nombre: capitalizarPrimeraLetra(formEdit.nombre.trim()),
         direccion: formEdit.direccion.trim(),
         localidad: formEdit.localidad.trim(),
         provincia: formEdit.provincia.trim(),
