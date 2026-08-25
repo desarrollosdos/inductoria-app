@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 import { TIERS_PRECIO, precioPorSucursal } from '../lib/precio';
 
@@ -38,6 +37,20 @@ function formatearDuracionAudio(segundosTotales) {
   const minutos = Math.round((segundos % 3600) / 60);
   if (horas === 0) return `${minutos}min`;
   return `${horas}h ${minutos}min`;
+}
+
+// Ícono de persona: se usa tanto en el encabezado "Administración de
+// Inductoria" de acá arriba como en la pestaña "Administradores" de más
+// abajo. Antes vivía en DashboardNav.jsx (la pestaña extra "Admin" del
+// menú general), pero esa pestaña ya no existe: ahora un administrador
+// no ve el menú de siempre, ve directamente esta página.
+function IconAdmin(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+    </svg>
+  );
 }
 
 function IconAlerta(props) {
@@ -115,6 +128,20 @@ function IconGaps(props) {
   );
 }
 
+// Mismo ícono de "persona" de arriba, pero con un segundo perfil atrás
+// para diferenciarlo de un cliente/empleado individual: representa a
+// "los administradores" como grupo, no a una sola persona.
+function IconAdministradores(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M2.5 20c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" />
+      <path d="M17 8.5a2.7 2.7 0 1 0 0-5.4" />
+      <path d="M15.5 14c2.6.4 4.5 2.7 4.5 6" />
+    </svg>
+  );
+}
+
 const SUB_TABS = [
   { id: 'resumen', label: 'Resumen', Icon: IconResumen },
   { id: 'clientes', label: 'Clientes e historial', Icon: IconClientes },
@@ -123,6 +150,7 @@ const SUB_TABS = [
   { id: 'gaps', label: 'Gaps de conocimiento', Icon: IconGaps },
   { id: 'costo', label: 'Costo de IA', Icon: IconCostoIA },
   { id: 'precio', label: 'Precio', Icon: IconPrecio },
+  { id: 'administradores', label: 'Administradores', Icon: IconAdministradores },
 ];
 
 function Tarjeta({ label, valor }) {
@@ -153,6 +181,15 @@ export default function AdminPage({ session }) {
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
   const [mensajePrecio, setMensajePrecio] = useState(null);
 
+  // Estado de la nueva pestaña "Administradores": lista de mails
+  // habilitados para ver esta sección (tabla `administradores` en
+  // Supabase), más el formulario para agregar uno nuevo.
+  const [administradores, setAdministradores] = useState([]);
+  const [cargandoAdministradores, setCargandoAdministradores] = useState(false);
+  const [errorAdmin, setErrorAdmin] = useState(null);
+  const [nuevoEmailAdmin, setNuevoEmailAdmin] = useState('');
+  const [agregandoAdmin, setAgregandoAdmin] = useState(false);
+
   useEffect(() => {
     cargarMetricas();
     cargarPrecio();
@@ -164,6 +201,9 @@ export default function AdminPage({ session }) {
     }
     if (tab === 'visitas' && !visitas) {
       cargarVisitas();
+    }
+    if (tab === 'administradores' && administradores.length === 0 && !cargandoAdministradores) {
+      cargarAdministradores();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
@@ -241,6 +281,66 @@ export default function AdminPage({ session }) {
     setDatos(data);
   }
 
+  // Trae la lista de administradores desde la tabla `administradores`.
+  // La RLS de esa tabla ya exige ser administrador para poder leerla
+  // (ver es_administrador() en el SQL), así que si esto se ejecuta es
+  // porque quien está mirando esta página ya pasó ese chequeo en
+  // App.jsx.
+  async function cargarAdministradores() {
+    setCargandoAdministradores(true);
+    setErrorAdmin(null);
+    const { data, error } = await supabase.from('administradores').select('*').order('creado_en', { ascending: true });
+    setCargandoAdministradores(false);
+
+    if (error) {
+      setErrorAdmin('No se pudieron cargar los administradores.');
+      return;
+    }
+    setAdministradores(data || []);
+  }
+
+  async function handleAgregarAdmin(e) {
+    e.preventDefault();
+    setErrorAdmin(null);
+    const email = nuevoEmailAdmin.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      setErrorAdmin('Ingresá un mail válido.');
+      return;
+    }
+
+    setAgregandoAdmin(true);
+    const { error } = await supabase.from('administradores').insert({ email });
+    setAgregandoAdmin(false);
+
+    if (error) {
+      // 23505 = violación de unique/primary key en Postgres: ese mail
+      // ya estaba en la tabla.
+      setErrorAdmin(error.code === '23505' ? 'Ese mail ya es administrador.' : 'No se pudo agregar el administrador.');
+      return;
+    }
+    setNuevoEmailAdmin('');
+    cargarAdministradores();
+  }
+
+  async function handleQuitarAdmin(email) {
+    // Nunca dejar la tabla vacía: si el último administrador se saca a
+    // sí mismo (o a otro), nadie más podría volver a entrar acá para
+    // deshacerlo.
+    if (administradores.length <= 1) {
+      setErrorAdmin('No podés quitar el último administrador.');
+      return;
+    }
+    if (!window.confirm(`¿Seguro que querés quitar a ${email} como administrador?`)) return;
+
+    setErrorAdmin(null);
+    const { error } = await supabase.from('administradores').delete().eq('email', email);
+    if (error) {
+      setErrorAdmin('No se pudo quitar el administrador.');
+      return;
+    }
+    cargarAdministradores();
+  }
+
   if (cargando) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
   }
@@ -258,7 +358,20 @@ export default function AdminPage({ session }) {
 
   return (
     <div>
-      <DashboardNav userEmail={session.user.email} />
+      {/* Antes acá iba <DashboardNav userEmail={...} />, el mismo menú de
+          6 pestañas que ve cualquier cuenta (Suscripción, Sucursales,
+          Empleados, etc.). Un administrador ya no ve ese menú: solo le
+          interesa esta sección, así que en su lugar va un encabezado
+          simple que deja claro dónde está parado. */}
+      <div className="bg-[#2C2C2A]">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+          <span className="w-9 h-9 rounded-full bg-[#C1502E] text-white flex items-center justify-center flex-shrink-0">
+            <IconAdmin width="18" height="18" />
+          </span>
+          <span className="text-lg font-semibold text-[#FBF3EC]">Administración de Inductoria</span>
+        </div>
+      </div>
+
       <PageShell>
         <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -726,6 +839,65 @@ export default function AdminPage({ session }) {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {tab === 'administradores' && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-1">Administradores</h2>
+            <p className="text-sm text-[#6b6455] mb-4">
+              Los mails de acá abajo pueden entrar a esta sección de administración. El resto de
+              los usuarios sigue viendo la app normal, sin esta pantalla.
+            </p>
+
+            <form onSubmit={handleAgregarAdmin} className="flex items-end gap-2 mb-5">
+              <div className="flex-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] block mb-1">
+                  Agregar administrador
+                </label>
+                <input
+                  type="email"
+                  value={nuevoEmailAdmin}
+                  onChange={(e) => setNuevoEmailAdmin(e.target.value)}
+                  placeholder="mail@ejemplo.com"
+                  className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={agregandoAdmin}
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              >
+                {agregandoAdmin ? 'Agregando...' : 'Agregar'}
+              </button>
+            </form>
+
+            {errorAdmin && <p className="text-xs text-[#C1502E] mb-4">{errorAdmin}</p>}
+
+            {cargandoAdministradores ? (
+              <p className="text-sm text-[#6b6455]">Cargando...</p>
+            ) : administradores.length === 0 ? (
+              <p className="text-sm text-[#6b6455]">Todavía no hay administradores cargados.</p>
+            ) : (
+              <div className="space-y-2">
+                {administradores.map((a) => (
+                  <div key={a.email} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
+                    <div>
+                      <p className="text-sm font-semibold text-[#2C2C2A]">{a.email}</p>
+                      <p className="text-xs text-[#8a8471]">
+                        Agregado el {new Date(a.creado_en).toLocaleDateString('es-AR')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleQuitarAdmin(a.email)}
+                      className="text-xs font-semibold text-[#C1502E] hover:opacity-80"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </PageShell>

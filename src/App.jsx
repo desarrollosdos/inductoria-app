@@ -15,12 +15,19 @@ import Empleado from './pages/Empleado';
 import CursoDetalle from './pages/CursoDetalle';
 import AdminPage from './pages/AdminPage';
 
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
-
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [empleadoNombre, setEmpleadoNombre] = useState(null);
+
+  // Antes esto se decidía comparando el mail contra un string fijo
+  // (ADMIN_EMAIL) acá mismo y de nuevo en DashboardNav.jsx. Ahora la
+  // lista de administradores vive en la base (tabla `administradores`),
+  // así que se puede agregar gente sin tocar código ni volver a
+  // desplegar. es_administrador() es una función de Supabase (RPC) que
+  // devuelve true/false según si el mail logueado está en esa tabla.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   const path = window.location.pathname;
 
@@ -36,6 +43,21 @@ export default function App() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Sin sesión no hay nada que consultar: nos ahorramos el pedido a
+    // Supabase y directamente asumimos que no es admin.
+    if (!session) {
+      setIsAdmin(false);
+      setCheckingAdmin(false);
+      return;
+    }
+    setCheckingAdmin(true);
+    supabase.rpc('es_administrador').then(({ data, error }) => {
+      setIsAdmin(!error && data === true);
+      setCheckingAdmin(false);
+    });
+  }, [session]);
 
   function renderContenido() {
     // La pantalla del empleado es pública, no depende de sesión de Supabase.
@@ -77,19 +99,33 @@ export default function App() {
       );
     }
 
-    if (path === '/admin') {
-      if (session.user.email !== ADMIN_EMAIL) {
-        return (
-          <>
-            <Header session={session} />
-            <p className="text-center mt-24 text-[#6b6455]">No tenés acceso a esta sección.</p>
-          </>
-        );
-      }
+    if (checkingAdmin) {
+      return (
+        <>
+          <Header session={session} />
+          <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>
+        </>
+      );
+    }
+
+    // Un administrador solo ve la sección de administración: no le
+    // interesa el resto de la app (sucursales, empleados, contenido,
+    // etc.), así que sea cual sea la ruta se le muestra siempre
+    // AdminPage. Esto reemplaza al viejo chequeo "solo si path === '/admin'".
+    if (isAdmin) {
       return (
         <>
           <Header session={session} />
           <AdminPage session={session} />
+        </>
+      );
+    }
+
+    if (path === '/admin') {
+      return (
+        <>
+          <Header session={session} />
+          <p className="text-center mt-24 text-[#6b6455]">No tenés acceso a esta sección.</p>
         </>
       );
     }

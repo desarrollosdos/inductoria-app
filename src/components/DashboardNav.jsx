@@ -1,5 +1,3 @@
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
-
 function IconSucursales(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -57,15 +55,12 @@ function IconProcedimientos(props) {
   );
 }
 
-function IconAdmin(props) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
-    </svg>
-  );
-}
-
+// Ya no hay lógica de admin acá: antes esta barra le agregaba a
+// desarrollosdos@gmail.com una pestaña extra "Admin" además de las 6 de
+// siempre. Ahora que Admin pasó a ser una sección aparte que reemplaza
+// toda la app para ese mail (ver App.jsx, que decide con
+// supabase.rpc('es_administrador')), esta barra volvió a ser simple: las
+// mismas 6 pestañas para todo el mundo, sin comparar mails acá.
 const TABS = [
   { id: 'suscripcion', label: 'Suscripción', path: '/', Icon: IconSuscripcion },
   { id: 'sucursales', label: 'Sucursales', path: '/sucursales', Icon: IconSucursales },
@@ -75,17 +70,14 @@ const TABS = [
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 
-export default function DashboardNav({ userEmail }) {
+export default function DashboardNav() {
   const path = window.location.pathname;
-  const isAdmin = userEmail === ADMIN_EMAIL;
-  const tabs = isAdmin ? [...TABS, { id: 'admin', label: 'Admin', path: '/admin', Icon: IconAdmin }] : TABS;
 
   return (
     <nav className="max-w-4xl mx-auto mt-4 px-4">
       <div className="flex justify-between sm:justify-start sm:gap-4">
-        {tabs.map((tab) => {
+        {TABS.map((tab) => {
           const active = path === tab.path;
-          const color = tab.id === 'admin' ? '#7C8B6F' : '#C1502E';
           return (
             <a
               key={tab.id}
@@ -94,7 +86,7 @@ export default function DashboardNav({ userEmail }) {
             >
               <span
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-                style={{ background: active ? color : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
+                style={{ background: active ? '#C1502E' : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
               >
                 <tab.Icon />
               </span>
