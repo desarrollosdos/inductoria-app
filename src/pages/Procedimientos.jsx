@@ -54,8 +54,68 @@ function IconBorrar(props) {
 
 const ESTADO_INFO = {
   pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Borrador, a revisar' },
-  aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
+  // Mismo verde salvia que ya se usa en toda la app (chip del usuario logueado
+  // en Header.jsx, pestaña Admin de DashboardNav, podio de Progreso.jsx).
+  aprobado: { bg: '#7C8B6F', color: '#FFFFFF', label: 'Aprobado' },
 };
+
+// Umbral para decidir si un cambio es "chico" (sube la versión menor, ej.
+// 1.0 -> 1.1) o "grande" (sube la versión mayor y resetea la menor, ej.
+// 1.4 -> 2.0). Se mide como fracción de palabras distintas entre el texto
+// completo del procedimiento antes y después de guardar: una comparación
+// simple por bolsa de palabras (sin librería de diff nueva), no perfecta
+// pero suficiente para distinguir "corregí una coma" de "reescribí la mitad
+// del procedimiento". Ajustable si en la práctica queda muy sensible o muy
+// laxo.
+const UMBRAL_CAMBIO_GRANDE = 0.2;
+
+function textoCompletoDesdeProcedimiento(p) {
+  return [
+    p.titulo || '',
+    p.area || '',
+    p.responsable || '',
+    p.objetivo || '',
+    p.alcance || '',
+    ...(p.materiales || []),
+    ...(p.pasos || []),
+    ...(p.excepciones || []).map((e) => `${e.condicion || ''} ${e.accion || ''}`),
+  ].join(' ');
+}
+
+function textoCompletoDesdeForm(form) {
+  return [
+    form.titulo || '',
+    form.area || '',
+    form.responsable || '',
+    form.objetivo || '',
+    form.alcance || '',
+    ...textoAArray(form.materialesTexto),
+    ...textoAArray(form.pasosTexto),
+    ...textoAExcepciones(form.excepcionesTexto).map((e) => `${e.condicion || ''} ${e.accion || ''}`),
+  ].join(' ');
+}
+
+// Fracción (0 a 1) de palabras que cambiaron entre dos textos, comparando
+// por bolsa de palabras (no importa el orden). 0 = idéntico, 1 = totalmente
+// distinto.
+function fraccionDeCambio(textoAnterior, textoNuevo) {
+  const palabrasA = textoAnterior.trim().split(/\s+/).filter(Boolean);
+  const palabrasB = textoNuevo.trim().split(/\s+/).filter(Boolean);
+  if (palabrasA.length === 0 && palabrasB.length === 0) return 0;
+  const frecuencia = {};
+  palabrasA.forEach((w) => {
+    frecuencia[w] = (frecuencia[w] || 0) + 1;
+  });
+  let comunes = 0;
+  palabrasB.forEach((w) => {
+    if (frecuencia[w] > 0) {
+      comunes++;
+      frecuencia[w]--;
+    }
+  });
+  const total = Math.max(palabrasA.length, palabrasB.length);
+  return total === 0 ? 0 : 1 - comunes / total;
+}
 
 // Los mismos separadores en las tres listas editables (materiales, pasos,
 // excepciones), para que el textarea sea simple: una línea = un ítem. En
@@ -209,6 +269,23 @@ export default function Procedimientos({ session }) {
     if (!form) return;
     setGuardando(true);
 
+    // Comparamos contra el procedimiento tal como estaba antes de abrir el
+    // formulario, para decidir si esto fue un cambio chico (sube la versión
+    // menor) o grande (sube la versión mayor y resetea la menor).
+    const original = procedimientos.find((p) => p.id === id);
+    let version_mayor = original?.version_mayor ?? 1;
+    let version_menor = original?.version_menor ?? 0;
+    if (original) {
+      const cambio = fraccionDeCambio(textoCompletoDesdeProcedimiento(original), textoCompletoDesdeForm(form));
+      if (cambio >= UMBRAL_CAMBIO_GRANDE) {
+        version_mayor += 1;
+        version_menor = 0;
+      } else if (cambio > 0) {
+        version_menor += 1;
+      }
+      // cambio === 0: no se modificó nada de contenido real, la versión no se mueve.
+    }
+
     const { data, error } = await supabase
       .from('procedimientos')
       .update({
@@ -220,6 +297,8 @@ export default function Procedimientos({ session }) {
         materiales: textoAArray(form.materialesTexto),
         pasos: textoAArray(form.pasosTexto),
         excepciones: textoAExcepciones(form.excepcionesTexto),
+        version_mayor,
+        version_menor,
       })
       .eq('id', id)
       .select()
@@ -421,12 +500,17 @@ export default function Procedimientos({ session }) {
                               <IconBorrar />
                             </button>
                           </div>
-                          <span
-                            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                            style={{ background: estadoInfo.bg, color: estadoInfo.color }}
-                          >
-                            {estadoInfo.label}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                              style={{ background: estadoInfo.bg, color: estadoInfo.color }}
+                            >
+                              {estadoInfo.label}
+                            </span>
+                            <span className="text-[10px] text-[#8a8471]">
+                              v{p.version_mayor ?? 1}.{p.version_menor ?? 0}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
