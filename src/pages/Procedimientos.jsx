@@ -59,6 +59,7 @@ export default function Procedimientos({ session }) {
   const [form, setForm] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [procesandoId, setProcesandoId] = useState(null);
+  const [errorEstado, setErrorEstado] = useState(null);
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
   const [varianteSuscripcion, setVarianteSuscripcion] = useState('general');
@@ -78,19 +79,28 @@ export default function Procedimientos({ session }) {
     setCuenta(cuentaData);
 
     if (cuentaData) {
-      const { data: contenidosData } = await supabase
-        .from('contenidos')
-        .select('id, archivo_original, texto_procesado, estado')
-        .eq('cuenta_id', cuentaData.id)
-        .in('estado', ['aprobado', 'procesado'])
-        .order('created_at', { ascending: false });
-      setContenidosElegibles(contenidosData || []);
+      const [{ data: contenidosData }, { data: procedimientosData }] = await Promise.all([
+        supabase
+          .from('contenidos')
+          .select('id, archivo_original, texto_procesado, estado')
+          .eq('cuenta_id', cuentaData.id)
+          .in('estado', ['aprobado', 'procesado'])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('procedimientos')
+          .select('*')
+          .eq('cuenta_id', cuentaData.id)
+          .order('created_at', { ascending: false }),
+      ]);
 
-      const { data: procedimientosData } = await supabase
-        .from('procedimientos')
-        .select('*')
-        .eq('cuenta_id', cuentaData.id)
-        .order('created_at', { ascending: false });
+      // Un contenido deja de ser "elegible" en cuanto ya tiene un
+      // procedimiento generado (en cualquier estado, pendiente o
+      // aprobado) — así la card de "Generar procedimiento con IA" no
+      // queda pegada arriba una vez usada. Si el procedimiento se
+      // elimina, el contenido vuelve acá solo, porque cargarTodo() se
+      // vuelve a llamar después de eliminar.
+      const idsConProcedimiento = new Set((procedimientosData || []).map((p) => p.contenido_id));
+      setContenidosElegibles((contenidosData || []).filter((c) => !idsConProcedimiento.has(c.id)));
       setProcedimientos(procedimientosData || []);
     }
 
@@ -147,6 +157,7 @@ export default function Procedimientos({ session }) {
       setForm(null);
       return;
     }
+    setErrorEstado(null);
     setAbiertoId(p.id);
     setForm({
       titulo: p.titulo || '',
@@ -199,6 +210,7 @@ export default function Procedimientos({ session }) {
       return;
     }
 
+    setErrorEstado(null);
     setProcesandoId(id);
     const { data, error } = await supabase
       .from('procedimientos')
@@ -208,7 +220,14 @@ export default function Procedimientos({ session }) {
       .single();
     setProcesandoId(null);
     if (error) {
+      // Antes esto solo quedaba en la consola del navegador y en
+      // pantalla no pasaba nada — ahora se muestra el motivo real
+      // (por ejemplo, un problema de permisos en Supabase) en vez de
+      // que parezca que el botón "no hace nada".
       console.error(error);
+      setErrorEstado(
+        `No se pudo ${nuevoEstado === 'aprobado' ? 'aprobar' : 'volver a borrador'} el procedimiento: ${error.message}`
+      );
       return;
     }
     setProcedimientos(procedimientos.map((p) => (p.id === id ? data : p)));
@@ -221,9 +240,12 @@ export default function Procedimientos({ session }) {
       console.error(error);
       return;
     }
-    setProcedimientos(procedimientos.filter((p) => p.id !== id));
     setAbiertoId(null);
     setForm(null);
+    // Recargamos todo (en vez de solo sacar el item de la lista local)
+    // para que el contenido que quedó sin procedimiento vuelva a
+    // aparecer en "Generar procedimiento con IA".
+    await cargarTodo();
   }
 
   function handleDescargar(p) {
@@ -275,12 +297,13 @@ export default function Procedimientos({ session }) {
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Generar procedimiento con IA</h2>
           <p className="text-xs text-[#8a8471] mb-3">
             Elegí un contenido ya aprobado en la biblioteca. Podés generar un procedimiento y un
-            curso a partir del mismo contenido, no hace falta elegir uno solo.
+            curso a partir del mismo contenido, no hace falta elegir uno solo. Un contenido que ya
+            tiene un procedimiento generado deja de aparecer acá hasta que lo elimines.
           </p>
           {errorGenerar && <p className="text-xs text-[#C1502E] mb-2">{errorGenerar}</p>}
           {contenidosElegibles.length === 0 ? (
             <p className="text-sm text-[#6b6455]">
-              Todavía no tenés contenido aprobado. Subilo y aprobalo desde{' '}
+              Todavía no tenés contenido aprobado sin procedimiento generado. Subilo y aprobalo desde{' '}
               <a href="/contenido" className="font-semibold text-[#C1502E]">
                 Contenido
               </a>
@@ -345,80 +368,109 @@ export default function Procedimientos({ session }) {
                     </button>
 
                     {abierto && form && (
-                      <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
-                        <input
-                          type="text"
-                          value={form.titulo}
-                          onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-                          placeholder="Título"
-                          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                        />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            value={form.area}
-                            onChange={(e) => setForm({ ...form, area: e.target.value })}
-                            placeholder="Área (ej: Caja, Depósito)"
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={form.responsable}
-                            onChange={(e) => setForm({ ...form, responsable: e.target.value })}
-                            placeholder="Responsable (ej: Encargado/a de turno)"
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                          />
-                        </div>
+                      <div className="px-4 pb-4 space-y-4 border-t border-[#EDE0C8] pt-3">
                         <div>
-                          <label className="text-xs font-semibold text-[#8a8471]">Objetivo</label>
-                          <textarea
-                            value={form.objetivo}
-                            onChange={(e) => setForm({ ...form, objetivo: e.target.value })}
-                            rows={2}
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
-                          />
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-[#C1502E] mb-2">
+                            Datos generales
+                          </p>
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={form.titulo}
+                              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                              placeholder="Título"
+                              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={form.area}
+                                onChange={(e) => setForm({ ...form, area: e.target.value })}
+                                placeholder="Área (ej: Caja, Depósito)"
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                              />
+                              <input
+                                type="text"
+                                value={form.responsable}
+                                onChange={(e) => setForm({ ...form, responsable: e.target.value })}
+                                placeholder="Responsable (ej: Encargado/a de turno)"
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-semibold text-[#8a8471]">Alcance</label>
-                          <textarea
-                            value={form.alcance}
-                            onChange={(e) => setForm({ ...form, alcance: e.target.value })}
-                            rows={2}
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
-                          />
+
+                        <div className="border-t border-[#F3EAD9] pt-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-[#C1502E] mb-2">
+                            Objetivo y alcance
+                          </p>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-xs font-semibold text-[#8a8471]">Objetivo</label>
+                              <textarea
+                                value={form.objetivo}
+                                onChange={(e) => setForm({ ...form, objetivo: e.target.value })}
+                                rows={2}
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold text-[#8a8471]">Alcance</label>
+                              <textarea
+                                value={form.alcance}
+                                onChange={(e) => setForm({ ...form, alcance: e.target.value })}
+                                rows={2}
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-semibold text-[#8a8471]">
-                            Qué necesitás a mano (una por línea)
-                          </label>
-                          <textarea
-                            value={form.materialesTexto}
-                            onChange={(e) => setForm({ ...form, materialesTexto: e.target.value })}
-                            rows={3}
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
-                          />
+
+                        <div className="border-t border-[#F3EAD9] pt-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-[#C1502E] mb-2">
+                            Contenido del procedimiento
+                          </p>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-xs font-semibold text-[#8a8471]">
+                                Qué necesitás a mano (una por línea)
+                              </label>
+                              <textarea
+                                value={form.materialesTexto}
+                                onChange={(e) => setForm({ ...form, materialesTexto: e.target.value })}
+                                rows={3}
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold text-[#8a8471]">
+                                Pasos (uno por línea, en orden)
+                              </label>
+                              <textarea
+                                value={form.pasosTexto}
+                                onChange={(e) => setForm({ ...form, pasosTexto: e.target.value })}
+                                rows={6}
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold text-[#8a8471]">
+                                Excepciones — una por línea, formato "condición :: qué hacer"
+                              </label>
+                              <textarea
+                                value={form.excepcionesTexto}
+                                onChange={(e) => setForm({ ...form, excepcionesTexto: e.target.value })}
+                                rows={3}
+                                placeholder="ej: falta un producto en el conteo :: avisar al encargado antes de cerrar caja"
+                                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-semibold text-[#8a8471]">Pasos (uno por línea, en orden)</label>
-                          <textarea
-                            value={form.pasosTexto}
-                            onChange={(e) => setForm({ ...form, pasosTexto: e.target.value })}
-                            rows={6}
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-[#8a8471]">
-                            Excepciones — una por línea, formato "condición :: qué hacer"
-                          </label>
-                          <textarea
-                            value={form.excepcionesTexto}
-                            onChange={(e) => setForm({ ...form, excepcionesTexto: e.target.value })}
-                            rows={3}
-                            placeholder="ej: falta un producto en el conteo :: avisar al encargado antes de cerrar caja"
-                            className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
-                          />
-                        </div>
+
+                        {errorEstado && (
+                          <p className="text-xs text-[#C1502E]">{errorEstado}</p>
+                        )}
 
                         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                           <button
@@ -435,7 +487,11 @@ export default function Procedimientos({ session }) {
                             disabled={procesandoId === p.id}
                             className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2 disabled:opacity-60"
                           >
-                            {p.estado === 'aprobado' ? 'Marcar como borrador' : 'Aprobar procedimiento'}
+                            {procesandoId === p.id
+                              ? 'Procesando...'
+                              : p.estado === 'aprobado'
+                              ? 'Marcar como borrador'
+                              : 'Aprobar procedimiento'}
                           </button>
                           <button
                             type="button"
