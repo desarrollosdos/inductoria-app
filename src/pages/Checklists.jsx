@@ -259,7 +259,7 @@ export default function Checklists({ session }) {
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Checklists operativos</h2>
           <p className="text-xs text-[#8a8471] mb-3">
             Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
-            que se repiten todos los días, y vos ves desde acá quién las completó.
+            que se repiten todos los días y vos ves desde acá quién las completó.
           </p>
           <div className="flex flex-wrap gap-1.5 mb-4">
             {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
