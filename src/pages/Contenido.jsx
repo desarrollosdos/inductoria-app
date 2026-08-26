@@ -852,7 +852,12 @@ export default function Contenido({ session }) {
       });
 
       if (error || data?.error) {
-        setErrorGenerar(data?.error || 'No se pudo iniciar la generación. Probá de nuevo.');
+        // 2026-08-26: si el servidor manda un `detalle` (el motivo técnico
+        // exacto, por ejemplo un error de base de datos), lo mostramos
+        // junto al mensaje para no tener que ir a buscar logs de Supabase
+        // a mano cada vez que algo falla acá.
+        const base = data?.error || 'No se pudo iniciar la generación. Probá de nuevo.';
+        setErrorGenerar(data?.detalle ? `${base} (${data.detalle})` : base);
         setGenerandoId(null);
         return;
       }
