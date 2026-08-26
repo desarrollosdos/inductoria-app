@@ -55,18 +55,38 @@ function IconProcedimientos(props) {
   );
 }
 
+// Mismo cuerpo de clipboard que IconProcedimientos pero con 2 filas de
+// check en vez de 1, para que se lea como "lista de tareas que se repite"
+// y no se confunda con Procedimientos (que es un documento único).
+function IconChecklist(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 3h6l1 2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3l1-2z" />
+      <path d="m8 11 1.3 1.3L12 9.8" />
+      <path d="m8 16 1.3 1.3L12 14.8" />
+    </svg>
+  );
+}
+
 // Ya no hay lógica de admin acá: antes esta barra le agregaba a
-// desarrollosdos@gmail.com una pestaña extra "Admin" además de las 6 de
+// desarrollosdos@gmail.com una pestaña extra "Admin" además de las de
 // siempre. Ahora que Admin pasó a ser una sección aparte que reemplaza
 // toda la app para ese mail (ver App.jsx, que decide con
 // supabase.rpc('es_administrador')), esta barra volvió a ser simple: las
-// mismas 6 pestañas para todo el mundo, sin comparar mails acá.
+// mismas pestañas para todo el mundo, sin comparar mails acá.
+//
+// "Checklists" queda siempre visible (no se oculta según la cuenta):
+// es una función opcional que cualquiera puede activar, y que se vea acá
+// es justamente lo que la hace descubrible. Si la cuenta no la activó
+// todavía, la propia página de Checklists.jsx muestra el cartel para
+// activarla en vez de escondérsela.
 const TABS = [
   { id: 'suscripcion', label: 'Suscripción', path: '/', Icon: IconSuscripcion },
   { id: 'sucursales', label: 'Sucursales', path: '/sucursales', Icon: IconSucursales },
   { id: 'empleados', label: 'Empleados', path: '/empleados', Icon: IconEmpleados },
   { id: 'contenido', label: 'Contenido', path: '/contenido', Icon: IconContenido },
   { id: 'procedimientos', label: 'Procedimientos', path: '/procedimientos', Icon: IconProcedimientos },
+  { id: 'checklists', label: 'Checklists', path: '/checklists', Icon: IconChecklist },
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 
