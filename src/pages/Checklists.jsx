@@ -143,7 +143,7 @@ export default function Checklists({ session }) {
 
   function agregarItem() {
     if (!nuevoItem.trim()) return;
-    setItemsEdit([...itemsEdit, nuevoItem.trim()]);
+    setItemsEdit([...itemsEdit, capitalizarPrimeraLetra(nuevoItem.trim())]);
     setNuevoItem('');
   }
 
@@ -257,7 +257,7 @@ export default function Checklists({ session }) {
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Checklists operativos</h2>
-          <p className="text-xs text-[#8a8471] mb-3">
+          <p className="text-xs font-medium text-[#6b6455] mb-3">
             Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
             que se repiten todos los días y vos ves desde acá quién las completó.
           </p>
@@ -276,7 +276,8 @@ export default function Checklists({ session }) {
               type="button"
               onClick={handleDesactivar}
               disabled={cambiandoActivacion}
-              className="text-xs font-bold tracking-wide text-[#6b6455] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full px-4 py-2 disabled:opacity-60"
+              className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               Desactivar
             </button>
@@ -417,7 +418,8 @@ export default function Checklists({ session }) {
                       <button
                         type="button"
                         onClick={agregarItem}
-                        className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] rounded-full px-4"
+                        className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                       >
                         Agregar
                       </button>
@@ -436,8 +438,7 @@ export default function Checklists({ session }) {
                       <button
                         type="button"
                         onClick={() => setEditandoNegocioId(null)}
-                        className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                        className="text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2"
                       >
                         Salir
                       </button>
