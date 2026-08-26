@@ -95,7 +95,15 @@ export default function DashboardNav() {
 
   return (
     <nav className="max-w-4xl mx-auto mt-4 px-4">
-      <div className="flex justify-between sm:justify-start sm:gap-4">
+      {/* Con 7 pestañas ahora (se sumó Checklists), cada columna en mobile
+          quedaba bastante angosta. Antes el texto tenía whitespace-nowrap
+          y sin gap entre columnas, así que una etiqueta larga como
+          "Suscripción" se salía de su propia columna y quedaba pegada a
+          la de al lado. Con un gap chico entre columnas y dejando que el
+          texto pueda partirse en 2 líneas en mobile (nowrap solo desde
+          sm: en adelante, donde ya hay más aire), cada etiqueta se queda
+          dentro de su propio espacio en vez de invadir el vecino. */}
+      <div className="flex justify-between gap-1 sm:justify-start sm:gap-4">
         {TABS.map((tab) => {
           const active = path === tab.path;
           return (
@@ -105,13 +113,13 @@ export default function DashboardNav() {
               className="flex-1 sm:flex-none flex flex-col items-center gap-2.5 text-center"
             >
               <span
-                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
                 style={{ background: active ? '#C1502E' : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
               >
                 <tab.Icon />
               </span>
               <span
-                className={`text-[9.5px] sm:text-xs font-semibold whitespace-nowrap ${
+                className={`text-[9.5px] sm:text-xs font-semibold leading-tight sm:whitespace-nowrap ${
                   active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
                 }`}
               >
