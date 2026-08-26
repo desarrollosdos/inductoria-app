@@ -46,18 +46,23 @@ function IconContenido(props) {
   );
 }
 
+// Antes era el mismo cuerpo de "portapapeles" que Checklist, solo con un
+// tilde adentro en vez de dos filas de tildes: a 36px (tamaño real en esta
+// barra) los dos se veían casi iguales. Ahora es una hoja con la esquina
+// doblada arriba y líneas de texto: silueta bien distinta, y además se lee
+// como "documento" en vez de "lista que se marca", que es justo lo que es
+// un procedimiento (un instructivo, no una tarea diaria).
 function IconProcedimientos(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 3h6l1 2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3l1-2z" />
-      <path d="m9 13 2 2 4-4" />
+      <path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z" />
+      <path d="M13 3v4.5A1.5 1.5 0 0 0 14.5 9H19" />
+      <line x1="8.5" y1="13" x2="15.5" y2="13" />
+      <line x1="8.5" y1="17" x2="15.5" y2="17" />
     </svg>
   );
 }
 
-// Mismo cuerpo de clipboard que IconProcedimientos pero con 2 filas de
-// check en vez de 1, para que se lea como "lista de tareas que se repite"
-// y no se confunda con Procedimientos (que es un documento único).
 function IconChecklist(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
