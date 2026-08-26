@@ -620,7 +620,8 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleGuardar(p.id)}
                             disabled={guardando}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#1B2A3D] bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {guardando ? 'Guardando...' : 'Guardar cambios'}
                           </button>
@@ -642,7 +643,8 @@ export default function Procedimientos({ session }) {
                               setAbiertoId(null);
                               setForm(null);
                             }}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#1B2A3D] bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             Salir
                           </button>
