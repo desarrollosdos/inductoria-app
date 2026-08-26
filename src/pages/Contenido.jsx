@@ -813,22 +813,37 @@ export default function Contenido({ session }) {
     setGenerandoId(id);
     setErrorGenerar(null);
 
-    const { data, error } = await supabase.functions.invoke('procesar-contenido', {
-      method: 'POST',
-      body: { contenido_id: id },
-    });
+    // Antes esto no tenía try/catch, y si la función tardaba demasiado y
+    // la plataforma la cortaba a mitad de camino, supabase-js podía
+    // resolver sin error pero también sin datos usables. Como después se
+    // leía data.microcurso_id sin chequear que existiera, eso tiraba una
+    // excepción silenciosa: el botón volvía a la normalidad sin mensaje
+    // de error y sin haber generado nada (el bug que reportó Roberto).
+    // Ahora se valida explícitamente que venga microcurso_id, y todo el
+    // bloque está en try/catch/finally para que cualquier falla, sea cual
+    // sea, siempre termine mostrando un mensaje en vez de fallar en
+    // silencio.
+    try {
+      const { data, error } = await supabase.functions.invoke('procesar-contenido', {
+        method: 'POST',
+        body: { contenido_id: id },
+      });
 
-    setGenerandoId(null);
+      if (error || data?.error || !data?.microcurso_id) {
+        setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
+        return;
+      }
 
-    if (error || data?.error) {
-      setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
-      return;
+      await cargarTodo();
+      const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
+      setAbiertoId(id);
+      abrirItem(actualizado);
+    } catch (err) {
+      console.error(err);
+      setErrorGenerar('No se pudo generar el curso. Probá de nuevo.');
+    } finally {
+      setGenerandoId(null);
     }
-
-    await cargarTodo();
-    const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
-    setAbiertoId(id);
-    abrirItem(actualizado);
   }
 
   async function handleAprobarCurso() {
