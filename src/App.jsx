@@ -10,6 +10,7 @@ import Empleados from './pages/Empleados';
 import Contenido from './pages/Contenido';
 import Procedimientos from './pages/Procedimientos';
 import Progreso from './pages/Progreso';
+import Checklists from './pages/Checklists';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
 import CursoDetalle from './pages/CursoDetalle';
@@ -162,6 +163,15 @@ export default function App() {
         <>
           <Header session={session} />
           <Dashboard session={session} />
+        </>
+      );
+    }
+
+    if (path === '/checklists') {
+      return (
+        <>
+          <Header session={session} />
+          <Checklists session={session} />
         </>
       );
     }
