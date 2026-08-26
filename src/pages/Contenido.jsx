@@ -73,6 +73,10 @@ const DURACION_MAX_GRABACION_SEG = 5 * 60;
 const ESTADO_INFO = {
   pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Pendiente' },
   aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
+  // "generando": la Edge Function ya devolvió la respuesta rápido y el
+  // trabajo pesado (llamar a la IA, armar el curso) sigue en segundo
+  // plano en el servidor. Ver procesar-contenido-index.ts.
+  generando: { bg: '#DCEAF7', color: '#0055A4', label: 'Generando...' },
   procesado: { bg: '#F0EAFB', color: '#7F5FD1', label: 'Curso generado' },
 };
 
@@ -181,12 +185,6 @@ export default function Contenido({ session }) {
 
   const [generandoId, setGenerandoId] = useState(null);
   const [errorGenerar, setErrorGenerar] = useState(null);
-  // Aviso que sobrevive a una recarga de página, para el caso en que
-  // "Generar curso con IA" se corta porque el celular pierde la conexión
-  // o la pestaña se recarga sola a mitad de la espera (no porque la IA
-  // haya fallado). Ver la marca en localStorage en handleGenerarCurso y
-  // el chequeo en cargarTodo más abajo.
-  const [avisoRecuperado, setAvisoRecuperado] = useState(null);
 
   const [borrador, setBorrador] = useState(null); // { microcurso, pasos }
   const [cargandoBorrador, setCargandoBorrador] = useState(false);
@@ -290,39 +288,17 @@ export default function Contenido({ session }) {
       // de solo lectura.
       setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
 
-      // Si en la carga anterior quedó una marca de "generando" sin
-      // limpiar (porque handleGenerarCurso nunca llegó a su propio
-      // finally, típicamente porque la página se recargó sola a mitad de
-      // camino), la revisamos acá contra el estado real recién traído de
-      // la base. Si el contenido ya está procesado, la generación en
-      // realidad SÍ terminó bien del lado del servidor, solo que nadie lo
-      // vio: no hace falta avisar nada, ya se ve normal en la lista. Si
-      // sigue en "aprobado", confirma que se cortó de verdad y avisamos.
-      try {
-        const prefijo = 'inductoria_generando_';
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (!key || !key.startsWith(prefijo)) continue;
-          const contenidoId = key.slice(prefijo.length);
-          const marcaTs = parseInt(localStorage.getItem(key) || '0', 10);
-          // Margen de 15s: si la marca es recentísima, todavía puede estar
-          // en curso una pestaña nuestra en otro lado, no la tocamos.
-          if (Date.now() - marcaTs < 15000) continue;
-
-          const contenidoRelacionado = (contenidosData || []).find((c) => c.id === contenidoId);
-          if (contenidoRelacionado?.estado === 'procesado') {
-            localStorage.removeItem(key);
-          } else {
-            localStorage.removeItem(key);
-            setAvisoRecuperado(
-              'La generación de un curso con IA se cortó antes de terminar (probablemente se perdió la conexión). El contenido sigue en "Aprobado", podés intentar generarlo de nuevo.'
-            );
-          }
-        }
-      } catch (_) {
-        // localStorage puede no estar disponible en algún navegador raro;
-        // si falla, seguimos sin este chequeo extra, no es crítico.
-      }
+      // Si algún contenido quedó en "generando" (por ejemplo porque se
+      // arrancó la generación, se cerró la pestaña o se cortó el
+      // celular, y recién ahora se vuelve a abrir la página), el trabajo
+      // real puede seguir corriendo en el servidor sin que nadie lo esté
+      // mirando. Retomamos la consulta periódica automáticamente acá, sin
+      // que haga falta apretar el botón de nuevo.
+      (contenidosData || [])
+        .filter((c) => c.estado === 'generando')
+        .forEach((c) => {
+          esperarResultadoGeneracion(c.id);
+        });
 
       supabase.functions.invoke('gaps-conocimiento', { method: 'GET' }).then(({ data, error }) => {
         if (error || !data?.gaps) return;
@@ -843,6 +819,22 @@ export default function Contenido({ session }) {
     setAbiertoId(null);
   }
 
+  // Rediseño 2026-08-26 (tercera vuelta sobre este bug): las dos vueltas
+  // anteriores intentaban detectar cuándo se cortaba la conexión del
+  // celular durante la espera. El cartel que le apareció a Roberto
+  // confirmó que la conexión SÍ se corta de verdad — no hay try/catch del
+  // lado del cliente que arregle eso, porque el problema no es el manejo
+  // de errores, es que la pestaña deja de estar viva para recibir la
+  // respuesta.
+  //
+  // La solución de fondo es no depender de que la pestaña siga viva:
+  // ahora procesar-contenido responde CASI AL INSTANTE (marca el
+  // contenido como "generando" y devuelve), y el trabajo pesado (llamar a
+  // la IA, armar el curso) sigue en el SERVIDOR en segundo plano,
+  // completamente independiente de si el celular sigue conectado, la
+  // pestaña se recarga, se cierra la app o se apaga la pantalla. El
+  // frontend después solo pregunta cada pocos segundos "¿ya terminó?" en
+  // vez de mantener una sola conexión larga y frágil abierta.
   async function handleGenerarCurso(id) {
     if (!puedeUsarIA(cuenta, session.user.email)) {
       setVarianteSuscripcion('ia');
@@ -852,49 +844,6 @@ export default function Contenido({ session }) {
 
     setGenerandoId(id);
     setErrorGenerar(null);
-    setAvisoRecuperado(null);
-
-    // Marca que sobrevive a una recarga de página (ver el chequeo en
-    // cargarTodo). Si esta función llega a su propio "finally" de abajo,
-    // la limpiamos ahí porque ya tenemos una respuesta clara (éxito o
-    // error real). Si en cambio la página se recarga a mitad de camino
-    // (el caso que estamos cazando), esta marca queda colgada y la
-    // próxima carga la detecta.
-    const marcaKey = `inductoria_generando_${id}`;
-    try {
-      localStorage.setItem(marcaKey, String(Date.now()));
-    } catch (_) {}
-
-    // Segunda vuelta sobre este mismo bug (2026-08-26): Roberto lo siguió
-    // viendo desde el celular incluso con el try/catch de abajo ya en
-    // producción. Hipótesis más probable ahora: la conexión del celular
-    // se corta del lado del CLIENTE (cambio de red, el navegador suspende
-    // el fetch) mientras la función sigue procesando tranquila del lado
-    // del SERVIDOR y termina generando el curso igual, un poco después de
-    // que el cliente ya se rindió. Si eso pasa, mostrar "no se pudo
-    // generar" sería directamente falso: el curso sí se generó, el
-    // celular fue el que se cortó, no la función.
-    //
-    // Por eso, antes de mostrar cualquier error, verificarSiSeGeneroIgual
-    // vuelve a preguntarle a la base si el contenido ya está "procesado"
-    // con un microcurso vinculado. Si es así, lo mostramos como éxito
-    // real en vez de un error falso. Recién si ni siquiera eso confirma
-    // que se generó, mostramos el mensaje de error.
-    async function verificarSiSeGeneroIgual() {
-      const { data: actual } = await supabase
-        .from('contenidos')
-        .select('estado, microcurso_id')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (actual?.estado === 'procesado' && actual?.microcurso_id) {
-        await cargarTodo();
-        setAbiertoId(id);
-        abrirItem({ id, estado: 'procesado', microcurso_id: actual.microcurso_id });
-        return true;
-      }
-      return false;
-    }
 
     try {
       const { data, error } = await supabase.functions.invoke('procesar-contenido', {
@@ -902,30 +851,75 @@ export default function Contenido({ session }) {
         body: { contenido_id: id },
       });
 
-      if (!error && !data?.error && data?.microcurso_id) {
+      if (error || data?.error) {
+        setErrorGenerar(data?.error || 'No se pudo iniciar la generación. Probá de nuevo.');
+        setGenerandoId(null);
+        return;
+      }
+      // Si llegamos acá, el servidor ya marcó el contenido como
+      // "generando" y sigue trabajando solo, tengamos o no la pestaña
+      // abierta. cargarTodo() ya lo va a mostrar como "Generando...".
+      await cargarTodo();
+      await esperarResultadoGeneracion(id);
+    } catch (err) {
+      console.error(err);
+      // Si esto explotó, puede ser que ni siquiera haya llegado a
+      // arrancar del lado del servidor, o puede ser que la respuesta se
+      // haya cortado justo al volver (y sí haya arrancado). En vez de
+      // asumir nada, preguntamos.
+      await cargarTodo();
+      await esperarResultadoGeneracion(id);
+    }
+  }
+
+  // Consulta el estado real cada pocos segundos hasta que el contenido
+  // deje de estar "generando" (pasó a "procesado" = éxito, o volvió a
+  // "aprobado" = terminó con error). Como cada consulta es corta,
+  // aguanta bien que el celular pierda señal un rato: la próxima consulta
+  // simplemente lo intenta de nuevo. También se llama sola al cargar la
+  // página si encuentra algo que quedó "generando" de una visita anterior
+  // (ver cargarTodo), así que sobrevive incluso a un cierre completo de
+  // la pestaña mientras tanto.
+  async function esperarResultadoGeneracion(id) {
+    const INTERVALO_MS = 4000;
+    const MAX_INTENTOS = 60; // ~4 minutos de margen
+
+    setGenerandoId(id);
+
+    for (let intento = 0; intento < MAX_INTENTOS; intento++) {
+      await new Promise((resolve) => setTimeout(resolve, INTERVALO_MS));
+
+      const { data: actual, error } = await supabase
+        .from('contenidos')
+        .select('estado, microcurso_id, error_generacion')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error || !actual) continue; // problema de red puntual, seguimos intentando
+
+      if (actual.estado === 'procesado' && actual.microcurso_id) {
         await cargarTodo();
-        const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
         setAbiertoId(id);
-        abrirItem(actualizado);
+        abrirItem({ id, estado: 'procesado', microcurso_id: actual.microcurso_id });
+        setGenerandoId(null);
         return;
       }
 
-      if (await verificarSiSeGeneroIgual()) return;
-      setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
-    } catch (err) {
-      console.error(err);
-      try {
-        if (await verificarSiSeGeneroIgual()) return;
-      } catch (_) {
-        // Ni siquiera pudimos chequear la base, seguimos al mensaje genérico.
+      if (actual.estado === 'aprobado') {
+        // Volvió a "aprobado" sin quedar procesado: el trabajo en el
+        // servidor terminó, pero con error.
+        await cargarTodo();
+        setErrorGenerar(actual.error_generacion || 'No se pudo generar el curso. Probá de nuevo.');
+        setGenerandoId(null);
+        return;
       }
-      setErrorGenerar('No se pudo generar el curso. Probá de nuevo.');
-    } finally {
-      setGenerandoId(null);
-      try {
-        localStorage.removeItem(marcaKey);
-      } catch (_) {}
+      // Sigue en "generando", seguimos esperando.
     }
+
+    setErrorGenerar(
+      'La generación está tardando más de lo normal. Podés cerrar esta pantalla: cuando termine vas a verlo como "Curso generado" al volver a entrar.'
+    );
+    setGenerandoId(null);
   }
 
   async function handleAprobarCurso() {
@@ -1285,11 +1279,6 @@ export default function Contenido({ session }) {
               {contenidos.length}
             </span>
           </div>
-          {avisoRecuperado && (
-            <div className="bg-[#FCF3DD] border border-[#D69A2D] rounded-lg p-3 text-xs text-[#8a6d1f] mb-3">
-              {avisoRecuperado}
-            </div>
-          )}
           {contenidos.length === 0 ? (
             <p className="text-sm text-[#6b6455]">Todavía no subiste nada.</p>
           ) : (
@@ -1314,7 +1303,18 @@ export default function Contenido({ session }) {
                       {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
                     </button>
 
-                    {abierto && c.estado !== 'procesado' && (
+                    {abierto && c.estado === 'generando' && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
+                        <p className="text-sm text-[#0055A4]">
+                          Generando el curso con inteligencia artificial. Puede tardar uno o dos
+                          minutos — podés cerrar esta pantalla o incluso el celular, el trabajo
+                          sigue solo en el servidor y cuando termine lo vas a ver acá como "Curso
+                          generado".
+                        </p>
+                      </div>
+                    )}
+
+                    {abierto && c.estado !== 'procesado' && c.estado !== 'generando' && (
                       <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
                         <input
                           type="text"
