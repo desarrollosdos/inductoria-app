@@ -477,7 +477,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleGuardar(p.id)}
                             disabled={guardando}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C2790C] bg-[#FCE38A] border border-[#F0C24D] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#0055A4] border border-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {guardando ? 'Guardando...' : 'Guardar cambios'}
                           </button>
@@ -485,7 +485,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleCambiarEstado(p.id, p.estado)}
                             disabled={procesandoId === p.id}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {procesandoId === p.id
                               ? 'Procesando...'
@@ -503,7 +503,7 @@ export default function Procedimientos({ session }) {
                           <button
                             type="button"
                             onClick={() => handleEliminar(p.id)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FBE0D6] border border-[#F0997B] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2"
                           >
                             Eliminar
                           </button>
