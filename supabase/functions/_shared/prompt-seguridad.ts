@@ -65,7 +65,21 @@ export function validarCursoGenerado(obj: unknown): string | null {
     if (!paso || typeof paso.titulo !== 'string' || typeof paso.contenido !== 'string') {
       return 'Un paso generado tiene un formato inválido.';
     }
-    if (paso.titulo.length > 200 || paso.contenido.length > 6000) {
+    // 2026-08-26: el tope de paso.contenido era 6000 caracteres. La
+    // instrucción le pide a Claude 200-280 palabras "no negociables" por
+    // paso, pero eso es un PISO, no un techo — con material rico (por
+    // ejemplo un audio transcripto largo), un paso bien desarrollado con
+    // ejemplos y listas con guiones supera fácil los 6000 caracteres
+    // estando perfectamente bien, y este validador lo rechazaba igual,
+    // disfrazado de "no se pudo generar el curso" (bug real reportado por
+    // Roberto: dejó de poder generar cursos justo después de que se
+    // agregó este validador). Subido a un techo mucho más generoso
+    // (20000 caracteres, ~3000-3500 palabras) que sigue funcionando como
+    // barrera de seguridad real (una respuesta desviada por una
+    // inyección se nota por tener una FORMA distinta — más o menos
+    // pasos/preguntas, campos faltantes, tipos incorrectos — no por
+    // quedar un poco más larga de lo pedido).
+    if (paso.titulo.length > 200 || paso.contenido.length > 20000) {
       return 'Un paso generado quedó con un largo fuera de lo esperado.';
     }
   }
