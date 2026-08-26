@@ -102,7 +102,7 @@ export default function DashboardNav() {
             <a
               key={tab.id}
               href={tab.path}
-              className="flex-1 sm:flex-none flex flex-col items-center gap-1.5 text-center"
+              className="flex-1 sm:flex-none flex flex-col items-center gap-2.5 text-center"
             >
               <span
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
