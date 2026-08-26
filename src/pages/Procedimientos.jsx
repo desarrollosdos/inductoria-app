@@ -384,7 +384,7 @@ export default function Procedimientos({ session }) {
                 return (
                   <div key={p.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="p-4">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-stretch justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-[#2C2C2A] break-words">{p.titulo}</p>
                           {!abierto && (
@@ -394,7 +394,7 @@ export default function Procedimientos({ session }) {
                             </p>
                           )}
                         </div>
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <div className="flex flex-col items-end justify-between min-h-16 flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
