@@ -257,11 +257,20 @@ export default function Checklists({ session }) {
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Checklists operativos</h2>
-          <p className="text-xs text-[#8a8471] mb-4">
-            Tareas que se repiten todos los días (apertura, cierre, limpieza, caja...), separadas
-            de los cursos de capacitación. Es opcional: si no te sirve, dejalo desactivado y el
-            resto de la app sigue igual.
+          <p className="text-xs text-[#8a8471] mb-3">
+            Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
+            que se repiten todos los días, y vos ves desde acá quién las completó.
           </p>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
+              <span
+                key={ejemplo}
+                className="text-[11px] font-semibold text-[#8a8471] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full px-2.5 py-0.5"
+              >
+                {ejemplo}
+              </span>
+            ))}
+          </div>
           {cuenta.checklists_habilitado ? (
             <button
               type="button"
@@ -279,7 +288,7 @@ export default function Checklists({ session }) {
               className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
-              {cambiandoActivacion ? 'Activando...' : 'Activar checklists operativos'}
+              {cambiandoActivacion ? 'Activando...' : 'Activar'}
             </button>
           )}
         </div>
