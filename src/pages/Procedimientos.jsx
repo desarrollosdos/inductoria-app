@@ -541,7 +541,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleGuardar(p.id)}
                             disabled={guardando}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {guardando ? 'Guardando...' : 'Guardar cambios'}
                           </button>
@@ -549,7 +549,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleCambiarEstado(p.id, p.estado)}
                             disabled={procesandoId === p.id}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {procesandoId === p.id
                               ? 'Procesando...'
