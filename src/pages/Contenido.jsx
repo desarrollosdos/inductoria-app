@@ -813,33 +813,60 @@ export default function Contenido({ session }) {
     setGenerandoId(id);
     setErrorGenerar(null);
 
-    // Antes esto no tenía try/catch, y si la función tardaba demasiado y
-    // la plataforma la cortaba a mitad de camino, supabase-js podía
-    // resolver sin error pero también sin datos usables. Como después se
-    // leía data.microcurso_id sin chequear que existiera, eso tiraba una
-    // excepción silenciosa: el botón volvía a la normalidad sin mensaje
-    // de error y sin haber generado nada (el bug que reportó Roberto).
-    // Ahora se valida explícitamente que venga microcurso_id, y todo el
-    // bloque está en try/catch/finally para que cualquier falla, sea cual
-    // sea, siempre termine mostrando un mensaje en vez de fallar en
-    // silencio.
+    // Segunda vuelta sobre este mismo bug (2026-08-26): Roberto lo siguió
+    // viendo desde el celular incluso con el try/catch de abajo ya en
+    // producción. Hipótesis más probable ahora: la conexión del celular
+    // se corta del lado del CLIENTE (cambio de red, el navegador suspende
+    // el fetch) mientras la función sigue procesando tranquila del lado
+    // del SERVIDOR y termina generando el curso igual, un poco después de
+    // que el cliente ya se rindió. Si eso pasa, mostrar "no se pudo
+    // generar" sería directamente falso: el curso sí se generó, el
+    // celular fue el que se cortó, no la función.
+    //
+    // Por eso, antes de mostrar cualquier error, verificarSiSeGeneroIgual
+    // vuelve a preguntarle a la base si el contenido ya está "procesado"
+    // con un microcurso vinculado. Si es así, lo mostramos como éxito
+    // real en vez de un error falso. Recién si ni siquiera eso confirma
+    // que se generó, mostramos el mensaje de error.
+    async function verificarSiSeGeneroIgual() {
+      const { data: actual } = await supabase
+        .from('contenidos')
+        .select('estado, microcurso_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (actual?.estado === 'procesado' && actual?.microcurso_id) {
+        await cargarTodo();
+        setAbiertoId(id);
+        abrirItem({ id, estado: 'procesado', microcurso_id: actual.microcurso_id });
+        return true;
+      }
+      return false;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('procesar-contenido', {
         method: 'POST',
         body: { contenido_id: id },
       });
 
-      if (error || data?.error || !data?.microcurso_id) {
-        setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
+      if (!error && !data?.error && data?.microcurso_id) {
+        await cargarTodo();
+        const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
+        setAbiertoId(id);
+        abrirItem(actualizado);
         return;
       }
 
-      await cargarTodo();
-      const actualizado = { id, estado: 'procesado', microcurso_id: data.microcurso_id };
-      setAbiertoId(id);
-      abrirItem(actualizado);
+      if (await verificarSiSeGeneroIgual()) return;
+      setErrorGenerar(data?.error || 'No se pudo generar el curso. Probá de nuevo.');
     } catch (err) {
       console.error(err);
+      try {
+        if (await verificarSiSeGeneroIgual()) return;
+      } catch (_) {
+        // Ni siquiera pudimos chequear la base, seguimos al mensaje genérico.
+      }
       setErrorGenerar('No se pudo generar el curso. Probá de nuevo.');
     } finally {
       setGenerandoId(null);
