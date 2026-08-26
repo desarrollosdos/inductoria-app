@@ -9,11 +9,16 @@ import { tieneAccesoBase, puedeUsarIA } from '../lib/acceso';
 import { generarProcedimientoPDF } from '../lib/procedimiento';
 import { capitalizarPrimeraLetra } from '../lib/texto';
 
+// Mismo ícono que ahora usa DashboardNav.jsx para esta sección (hoja con
+// la esquina doblada), para que la barra de arriba de esta página y la
+// pestaña de la barra de navegación se vean consistentes.
 function IconProcedimientos(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 3h6l1 2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3l1-2z" />
-      <path d="m9 13 2 2 4-4" />
+      <path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z" />
+      <path d="M13 3v4.5A1.5 1.5 0 0 0 14.5 9H19" />
+      <line x1="8.5" y1="13" x2="15.5" y2="13" />
+      <line x1="8.5" y1="17" x2="15.5" y2="17" />
     </svg>
   );
 }
