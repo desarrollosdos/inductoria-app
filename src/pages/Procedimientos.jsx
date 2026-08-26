@@ -18,33 +18,36 @@ function IconProcedimientos(props) {
   );
 }
 
+// Mismo ícono de lápiz (path exacto) que ya usás en Empleados.jsx para "Editar".
 function IconLapiz(props) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
     </svg>
   );
 }
 
+// No hay un ícono de descarga en Empleados.jsx para copiar, así que este es
+// nuevo, pero armado con el mismo trazo (viewBox 24, 15x15, strokeWidth 2,
+// puntas redondeadas) para que se sienta de la misma familia.
 function IconDescargar(props) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3v11" />
+      <path d="m7 9 5 5 5-5" />
+      <path d="M4 19h16" />
     </svg>
   );
 }
 
+// Mismo ícono de tacho de basura (paths exactos) que ya usás en Empleados.jsx
+// para "Dar de baja".
 function IconBorrar(props) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
+      <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
   );
 }
@@ -383,50 +386,47 @@ export default function Procedimientos({ session }) {
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center flex-wrap gap-2 mb-1">
-                            <p className="text-sm font-semibold text-[#2C2C2A] break-words">{p.titulo}</p>
-                            <span
-                              className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
-                              style={{ background: estadoInfo.bg, color: estadoInfo.color }}
-                            >
-                              {estadoInfo.label}
-                            </span>
-                          </div>
+                          <p className="text-sm font-semibold text-[#2C2C2A] break-words">{p.titulo}</p>
                           {!abierto && (
-                            <p className="text-xs text-[#8a8471]">
+                            <p className="text-xs text-[#8a8471] mt-0.5">
                               {p.area ? `${p.area} · ` : ''}
                               {(p.pasos || []).length} paso{(p.pasos || []).length === 1 ? '' : 's'}
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => abrirItem(p)}
-                            title="Editar"
-                            aria-label="Editar procedimiento"
-                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#1B2A3D] hover:bg-[#EDE0C8]"
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => abrirItem(p)}
+                              title="Editar"
+                              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+                            >
+                              <IconLapiz />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDescargar(p)}
+                              title="Descargar PDF"
+                              className="w-8 h-8 rounded-full bg-[#1B2A3D] text-white flex items-center justify-center"
+                            >
+                              <IconDescargar />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminar(p.id)}
+                              title="Eliminar"
+                              className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
+                            >
+                              <IconBorrar />
+                            </button>
+                          </div>
+                          <span
+                            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                            style={{ background: estadoInfo.bg, color: estadoInfo.color }}
                           >
-                            <IconLapiz />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDescargar(p)}
-                            title="Descargar PDF"
-                            aria-label="Descargar PDF"
-                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#283B52] hover:bg-[#EDE0C8]"
-                          >
-                            <IconDescargar />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEliminar(p.id)}
-                            title="Eliminar"
-                            aria-label="Eliminar procedimiento"
-                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#C1502E] hover:bg-[#FBE0D6]"
-                          >
-                            <IconBorrar />
-                          </button>
+                            {estadoInfo.label}
+                          </span>
                         </div>
                       </div>
                     </div>
