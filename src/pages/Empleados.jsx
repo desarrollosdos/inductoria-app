@@ -389,7 +389,11 @@ export default function Empleados({ session }) {
         <DashboardNav userEmail={session.user.email} />
         <div className="text-center mt-12 px-4">
           <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
-          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+          <a
+            href="/sucursales"
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
             Ir a Sucursales
           </a>
         </div>
@@ -541,7 +545,8 @@ export default function Empleados({ session }) {
               <button
                 onClick={() => handleGuardarEdicion(e.id)}
                 disabled={guardandoEdit}
-                className="text-xs font-semibold text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:opacity-60"
+                className="text-xs font-bold tracking-wide text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
               </button>
@@ -551,7 +556,8 @@ export default function Empleados({ session }) {
                   setEditFotoBlob(null);
                   setEditFotoPreview(null);
                 }}
-                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5"
+                className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-1.5"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Salir
               </button>
@@ -711,7 +717,8 @@ export default function Empleados({ session }) {
                   !puesto ||
                   (puesto === 'Otro' && !puestoCustom.trim())
                 }
-                className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {creando ? 'Creando...' : 'Dar de alta'}
               </button>
@@ -738,7 +745,7 @@ export default function Empleados({ session }) {
             <div className="flex gap-1 bg-[#EDE0C8] rounded-lg p-1">
               <button
                 onClick={() => setVista('alfabetico')}
-                className={`text-xs font-semibold px-3 py-1 rounded-md ${
+                className={`text-xs font-bold tracking-wide px-3 py-1 rounded-md ${
                   vista === 'alfabetico' ? 'bg-white text-[#2C2C2A]' : 'text-[#8a8471]'
                 }`}
               >
@@ -746,7 +753,7 @@ export default function Empleados({ session }) {
               </button>
               <button
                 onClick={() => setVista('sucursal')}
-                className={`text-xs font-semibold px-3 py-1 rounded-md ${
+                className={`text-xs font-bold tracking-wide px-3 py-1 rounded-md ${
                   vista === 'sucursal' ? 'bg-white text-[#2C2C2A]' : 'text-[#8a8471]'
                 }`}
               >

@@ -87,7 +87,8 @@ export default function Header({ session, empleadoNombre }) {
             <button
               onClick={handleLogout}
               title="Salir"
-              className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-semibold flex items-center justify-center hover:opacity-90 transition-opacity"
+              className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-bold tracking-wide flex items-center justify-center hover:opacity-90 transition-opacity"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               Salir
             </button>

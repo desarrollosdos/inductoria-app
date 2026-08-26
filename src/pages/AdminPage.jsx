@@ -813,7 +813,8 @@ export default function AdminPage({ session }) {
               <button
                 type="submit"
                 disabled={guardandoPrecio}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                className="px-4 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {guardandoPrecio ? 'Guardando...' : 'Guardar'}
               </button>
@@ -866,7 +867,8 @@ export default function AdminPage({ session }) {
               <button
                 type="submit"
                 disabled={agregandoAdmin}
-                className="px-4 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                className="px-4 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {agregandoAdmin ? 'Agregando...' : 'Agregar'}
               </button>

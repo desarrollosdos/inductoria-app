@@ -1051,7 +1051,11 @@ export default function Contenido({ session }) {
         <DashboardNav userEmail={session.user.email} />
         <div className="text-center mt-12 px-4">
           <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
-          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+          <a
+            href="/sucursales"
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
             Ir a Sucursales
           </a>
         </div>
@@ -1102,7 +1106,8 @@ export default function Contenido({ session }) {
                         type="button"
                         onClick={() => abrirSeleccionBase(curso.id)}
                         disabled={yaAgregado}
-                        className="w-full sm:w-auto text-xs font-semibold text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                        className="w-full sm:w-auto text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
+                        style={!yaAgregado ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
                       >
                         {yaAgregado ? 'Ya agregado' : seleccionando ? 'Cancelar' : 'Agregar a los cursos'}
                       </button>
@@ -1121,7 +1126,8 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleAgregarBase(curso)}
                           disabled={puestosBiblioteca.length === 0 || agregandoBaseId === curso.id}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           {agregandoBaseId === curso.id ? 'Agregando...' : 'Confirmar y agregar'}
                         </button>
@@ -1194,7 +1200,8 @@ export default function Contenido({ session }) {
                   type="button"
                   onClick={iniciarGrabacion}
                   disabled={extrayendoArchivo}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-semibold text-white bg-[#7C8B6F] disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#7C8B6F] disabled:opacity-60"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                 >
                   <IconMicrofono />
                   Grabar audio
@@ -1210,7 +1217,8 @@ export default function Contenido({ session }) {
                   <button
                     type="button"
                     onClick={detenerGrabacion}
-                    className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1"
+                    className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-3 py-1"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
                     Detener
                   </button>
@@ -1225,7 +1233,7 @@ export default function Contenido({ session }) {
                       type="button"
                       onClick={descartarGrabacion}
                       disabled={extrayendoArchivo}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
+                      className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
                     >
                       Descartar y grabar de nuevo
                     </button>
@@ -1233,7 +1241,8 @@ export default function Contenido({ session }) {
                       type="button"
                       onClick={usarGrabacion}
                       disabled={extrayendoArchivo}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                      className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                     >
                       {extrayendoArchivo ? 'Transcribiendo...' : 'Usar esta grabación'}
                     </button>
@@ -1270,7 +1279,8 @@ export default function Contenido({ session }) {
             <button
               type="submit"
               disabled={subiendo || !titulo.trim() || !texto.trim()}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               {subiendo ? 'Guardando...' : 'Guardar contenido'}
             </button>
@@ -1346,14 +1356,15 @@ export default function Contenido({ session }) {
                               !textoEdit.trim() ||
                               (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
                             }
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C2790C] bg-[#FCE38A] border border-[#F0C24D] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7] disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2"
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
@@ -1362,7 +1373,8 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#0055A4] bg-[#DCEAF7] border border-[#B5D4F4] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#0055A4] border border-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                             >
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
                             </button>
@@ -1370,14 +1382,16 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleEliminar(c.id)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FBE0D6] border border-[#F0997B] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             Eliminar
                           </button>
                           <button
                             type="button"
                             onClick={() => setAbiertoId(null)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] border border-[#D9C9A3] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             Salir
                           </button>
@@ -1444,7 +1458,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion || puestosNuevoCurso.length === 0}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#7C8B6F] bg-[#ECEFE7] border border-[#C9D2BE] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
@@ -1452,14 +1466,16 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleDescartarCurso}
                                 disabled={procesandoAccion}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#C1502E] bg-[#FBE0D6] border border-[#F0997B] rounded-full px-4 py-2 disabled:bg-[#F1EFE8] disabled:text-[#B4B2A9] disabled:border-[#D3D1C7]"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                               >
                                 Descartar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setAbiertoId(null)}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#8a8471] bg-[#EDE0C8] border border-[#D9C9A3] rounded-full px-4 py-2"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                               >
                                 Salir
                               </button>
@@ -1480,7 +1496,7 @@ export default function Contenido({ session }) {
         {cursosPublicados.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="font-semibold text-[#2C2C2A]">Cursos disponibles para tus empleados</h2>
+              <h2 className="font-semibold text-[#2C2C2A]">Cursos disponibles</h2>
               <span className="w-6 h-6 rounded-full bg-[#1B2A3D] text-white font-bold text-xs flex items-center justify-center">
                 {cursosPublicados.length}
               </span>
@@ -1519,7 +1535,8 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
                           title="Regenerar el contenido de este curso con IA"
-                          className="flex-shrink-0 text-[9px] font-semibold text-white bg-[#0055A4] rounded-full px-2 py-0.5 whitespace-nowrap"
+                          className="flex-shrink-0 text-[9px] font-bold tracking-wide text-white bg-[#0055A4] rounded-full px-2 py-0.5 whitespace-nowrap"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           {editando ? 'Cancelar' : 'Cambiar versión'}
                         </button>
@@ -1528,11 +1545,14 @@ export default function Contenido({ session }) {
                         <button
                           type="button"
                           onClick={() => abrirEdicionPuestos(m)}
-                          className={`text-xs font-semibold rounded-lg px-3 py-1.5 border ${
-                            sinDefinir
+                          className={`text-xs font-bold tracking-wide rounded-lg px-3 py-1.5 border ${
+                            editandoPuestos
+                              ? 'text-white bg-[#C1502E] border-[#C1502E]'
+                              : sinDefinir
                               ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-[#6b6455] border-[#EDE0C8]'
+                              : 'text-[#6b6455] border-[#EDE0C8] bg-[#FBF7EA]'
                           }`}
+                          style={editandoPuestos ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
                         >
                           {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
                         </button>
@@ -1540,7 +1560,7 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => setGapAbiertoId(gapAbiertoId === m.id ? null : m.id)}
-                            className="text-xs font-semibold text-[#D69A2D] border border-[#D69A2D] bg-[#FCF3DD] rounded-lg px-3 py-1.5"
+                            className="text-xs font-bold tracking-wide text-[#D69A2D] border border-[#D69A2D] bg-[#FCF3DD] rounded-lg px-3 py-1.5"
                           >
                             {gapsPorCurso[m.id].total} pregunta{gapsPorCurso[m.id].total === 1 ? '' : 's'} frecuente
                             {gapsPorCurso[m.id].total === 1 ? '' : 's'}
@@ -1577,7 +1597,8 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleGuardarPuestos(m.id)}
                           disabled={guardandoPuestos}
-                          className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>
@@ -1603,7 +1624,8 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleActualizarPublicado(m.id)}
                           disabled={actualizandoId === m.id || !textoNuevoPublicado.trim()}
-                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           <IconVarita />
                           {actualizandoId === m.id ? 'Actualizando...' : 'Actualizar con IA'}

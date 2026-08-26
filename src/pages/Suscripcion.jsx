@@ -173,7 +173,11 @@ export default function Suscripcion({ session }) {
         <DashboardNav userEmail={session.user.email} />
         <div className="text-center mt-12 px-4">
           <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
-          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+          <a
+            href="/sucursales"
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
             Ir a Sucursales
           </a>
         </div>
@@ -235,7 +239,8 @@ export default function Suscripcion({ session }) {
               <button
                 onClick={handleSuscribirme}
                 disabled={iniciandoPago}
-                className="px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                className="px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {iniciandoPago ? 'Redirigiendo...' : `Suscribirme por $${precioMensual.toLocaleString('es-AR')}/mes`}
               </button>

@@ -170,7 +170,8 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
         <button
           type="button"
           onClick={() => setConfirmando(true)}
-          className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+          className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
           Agregar sucursal
         </button>
@@ -192,7 +193,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
           type="button"
           onClick={() => setConfirmando(false)}
           disabled={loading}
-          className="flex-1 py-2 rounded-lg font-semibold text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
+          className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
         >
           Volver
         </button>
@@ -200,7 +201,8 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
           type="button"
           onClick={handleAgregar}
           disabled={loading}
-          className="flex-1 py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+          className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
           {loading ? 'Actualizando...' : 'Confirmar'}
         </button>
@@ -440,7 +442,8 @@ export default function Dashboard({ session }) {
             <button
               type="submit"
               disabled={creandoCuenta}
-              className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               {creandoCuenta ? 'Creando...' : 'Continuar'}
             </button>
@@ -529,7 +532,8 @@ export default function Dashboard({ session }) {
                       type="button"
                       onClick={() => handleGuardarEdicion(n.id)}
                       disabled={guardandoEdit}
-                      className="w-full py-2 rounded-lg font-semibold text-white bg-[#2C2C2A] disabled:opacity-60"
+                      className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#2C2C2A] disabled:opacity-60"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                     >
                       {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                     </button>
@@ -545,7 +549,8 @@ export default function Dashboard({ session }) {
               <button
                 type="button"
                 onClick={() => setMostrarSuscripcion(true)}
-                className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+                className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Suscribirme
               </button>
@@ -568,7 +573,8 @@ export default function Dashboard({ session }) {
               </span>
               <a
                 href="/suscripcion"
-                className="text-xs font-semibold text-white bg-[#1B6E8C] rounded-full px-3 py-1 flex-shrink-0"
+                className="text-xs font-bold tracking-wide text-white bg-[#1B6E8C] rounded-full px-3 py-1 flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Suscribirme
               </a>
@@ -586,7 +592,8 @@ export default function Dashboard({ session }) {
               <button
                 type="submit"
                 disabled={creandoNegocio}
-                className="w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {creandoNegocio ? 'Agregando...' : 'Agregar sucursal'}
               </button>

@@ -97,7 +97,8 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                 <button
                   onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
                   title="Ver PIN de acceso"
-                  className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0"
+                  className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold tracking-wide flex-shrink-0"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                 >
                   PIN
                 </button>
@@ -175,7 +176,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                     fechaCompletado: b.fecha_completado,
                   })
                 }
-                className="text-[10px] font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] rounded-full px-2 py-0.5 flex-shrink-0"
+                className="text-[10px] font-bold tracking-wide text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] rounded-full px-2 py-0.5 flex-shrink-0"
               >
                 Certificado
               </button>
@@ -339,7 +340,7 @@ export default function Progreso({ session }) {
         <DashboardNav userEmail={session.user.email} />
         <div className="text-center mt-12 px-4">
           <p className="text-[#6b6455] mb-3">Primero cargá el nombre de tu negocio.</p>
-          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-semibold text-white bg-[#C1502E]">
+          <a href="/sucursales" className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}>
             Ir a Sucursales
           </a>
         </div>
@@ -545,18 +546,20 @@ export default function Progreso({ session }) {
               <button
                 type="button"
                 onClick={() => setVistaEquipo('sucursal')}
-                className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
+                className={`text-[11px] font-bold tracking-wide px-3 py-1 rounded-full ${
                   vistaEquipo === 'sucursal' ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#8a8471]'
                 }`}
+                style={vistaEquipo === 'sucursal' ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
               >
                 Por sucursal
               </button>
               <button
                 type="button"
                 onClick={() => setVistaEquipo('empleado')}
-                className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
+                className={`text-[11px] font-bold tracking-wide px-3 py-1 rounded-full ${
                   vistaEquipo === 'empleado' ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#8a8471]'
                 }`}
+                style={vistaEquipo === 'empleado' ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
               >
                 Por empleado
               </button>
