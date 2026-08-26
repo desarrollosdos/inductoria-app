@@ -181,6 +181,12 @@ export default function Contenido({ session }) {
 
   const [generandoId, setGenerandoId] = useState(null);
   const [errorGenerar, setErrorGenerar] = useState(null);
+  // Aviso que sobrevive a una recarga de página, para el caso en que
+  // "Generar curso con IA" se corta porque el celular pierde la conexión
+  // o la pestaña se recarga sola a mitad de la espera (no porque la IA
+  // haya fallado). Ver la marca en localStorage en handleGenerarCurso y
+  // el chequeo en cargarTodo más abajo.
+  const [avisoRecuperado, setAvisoRecuperado] = useState(null);
 
   const [borrador, setBorrador] = useState(null); // { microcurso, pasos }
   const [cargandoBorrador, setCargandoBorrador] = useState(false);
@@ -283,6 +289,40 @@ export default function Contenido({ session }) {
       // lista editable: ya están en "Cursos disponibles para tus empleados",
       // de solo lectura.
       setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
+
+      // Si en la carga anterior quedó una marca de "generando" sin
+      // limpiar (porque handleGenerarCurso nunca llegó a su propio
+      // finally, típicamente porque la página se recargó sola a mitad de
+      // camino), la revisamos acá contra el estado real recién traído de
+      // la base. Si el contenido ya está procesado, la generación en
+      // realidad SÍ terminó bien del lado del servidor, solo que nadie lo
+      // vio: no hace falta avisar nada, ya se ve normal en la lista. Si
+      // sigue en "aprobado", confirma que se cortó de verdad y avisamos.
+      try {
+        const prefijo = 'inductoria_generando_';
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith(prefijo)) continue;
+          const contenidoId = key.slice(prefijo.length);
+          const marcaTs = parseInt(localStorage.getItem(key) || '0', 10);
+          // Margen de 15s: si la marca es recentísima, todavía puede estar
+          // en curso una pestaña nuestra en otro lado, no la tocamos.
+          if (Date.now() - marcaTs < 15000) continue;
+
+          const contenidoRelacionado = (contenidosData || []).find((c) => c.id === contenidoId);
+          if (contenidoRelacionado?.estado === 'procesado') {
+            localStorage.removeItem(key);
+          } else {
+            localStorage.removeItem(key);
+            setAvisoRecuperado(
+              'La generación de un curso con IA se cortó antes de terminar (probablemente se perdió la conexión). El contenido sigue en "Aprobado", podés intentar generarlo de nuevo.'
+            );
+          }
+        }
+      } catch (_) {
+        // localStorage puede no estar disponible en algún navegador raro;
+        // si falla, seguimos sin este chequeo extra, no es crítico.
+      }
 
       supabase.functions.invoke('gaps-conocimiento', { method: 'GET' }).then(({ data, error }) => {
         if (error || !data?.gaps) return;
@@ -812,6 +852,18 @@ export default function Contenido({ session }) {
 
     setGenerandoId(id);
     setErrorGenerar(null);
+    setAvisoRecuperado(null);
+
+    // Marca que sobrevive a una recarga de página (ver el chequeo en
+    // cargarTodo). Si esta función llega a su propio "finally" de abajo,
+    // la limpiamos ahí porque ya tenemos una respuesta clara (éxito o
+    // error real). Si en cambio la página se recarga a mitad de camino
+    // (el caso que estamos cazando), esta marca queda colgada y la
+    // próxima carga la detecta.
+    const marcaKey = `inductoria_generando_${id}`;
+    try {
+      localStorage.setItem(marcaKey, String(Date.now()));
+    } catch (_) {}
 
     // Segunda vuelta sobre este mismo bug (2026-08-26): Roberto lo siguió
     // viendo desde el celular incluso con el try/catch de abajo ya en
@@ -870,6 +922,9 @@ export default function Contenido({ session }) {
       setErrorGenerar('No se pudo generar el curso. Probá de nuevo.');
     } finally {
       setGenerandoId(null);
+      try {
+        localStorage.removeItem(marcaKey);
+      } catch (_) {}
     }
   }
 
@@ -1230,6 +1285,11 @@ export default function Contenido({ session }) {
               {contenidos.length}
             </span>
           </div>
+          {avisoRecuperado && (
+            <div className="bg-[#FCF3DD] border border-[#D69A2D] rounded-lg p-3 text-xs text-[#8a6d1f] mb-3">
+              {avisoRecuperado}
+            </div>
+          )}
           {contenidos.length === 0 ? (
             <p className="text-sm text-[#6b6455]">Todavía no subiste nada.</p>
           ) : (
