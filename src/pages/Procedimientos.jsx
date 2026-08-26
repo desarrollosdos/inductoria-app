@@ -18,6 +18,37 @@ function IconProcedimientos(props) {
   );
 }
 
+function IconLapiz(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function IconDescargar(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+}
+
+function IconBorrar(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
 const ESTADO_INFO = {
   pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Borrador, a revisar' },
   aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
@@ -349,23 +380,56 @@ export default function Procedimientos({ session }) {
                 const estadoInfo = ESTADO_INFO[p.estado] || ESTADO_INFO.pendiente;
                 return (
                   <div key={p.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
-                    <button type="button" onClick={() => abrirItem(p)} className="w-full text-left p-4">
-                      <div className="flex items-center justify-between mb-1 gap-2">
-                        <p className="text-sm font-semibold text-[#2C2C2A]">{p.titulo}</p>
-                        <span
-                          className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: estadoInfo.bg, color: estadoInfo.color }}
-                        >
-                          {estadoInfo.label}
-                        </span>
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center flex-wrap gap-2 mb-1">
+                            <p className="text-sm font-semibold text-[#2C2C2A] break-words">{p.titulo}</p>
+                            <span
+                              className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+                              style={{ background: estadoInfo.bg, color: estadoInfo.color }}
+                            >
+                              {estadoInfo.label}
+                            </span>
+                          </div>
+                          {!abierto && (
+                            <p className="text-xs text-[#8a8471]">
+                              {p.area ? `${p.area} · ` : ''}
+                              {(p.pasos || []).length} paso{(p.pasos || []).length === 1 ? '' : 's'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => abrirItem(p)}
+                            title="Editar"
+                            aria-label="Editar procedimiento"
+                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#1B2A3D] hover:bg-[#EDE0C8]"
+                          >
+                            <IconLapiz />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDescargar(p)}
+                            title="Descargar PDF"
+                            aria-label="Descargar PDF"
+                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#283B52] hover:bg-[#EDE0C8]"
+                          >
+                            <IconDescargar />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEliminar(p.id)}
+                            title="Eliminar"
+                            aria-label="Eliminar procedimiento"
+                            className="w-9 h-9 flex items-center justify-center rounded-full text-[#C1502E] hover:bg-[#FBE0D6]"
+                          >
+                            <IconBorrar />
+                          </button>
+                        </div>
                       </div>
-                      {!abierto && (
-                        <p className="text-xs text-[#8a8471]">
-                          {p.area ? `${p.area} · ` : ''}
-                          {(p.pasos || []).length} paso{(p.pasos || []).length === 1 ? '' : 's'}
-                        </p>
-                      )}
-                    </button>
+                    </div>
 
                     {abierto && form && (
                       <div className="px-4 pb-4 space-y-4 border-t border-[#EDE0C8] pt-3">
@@ -477,7 +541,7 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleGuardar(p.id)}
                             disabled={guardando}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2 disabled:opacity-60"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
                           >
                             {guardando ? 'Guardando...' : 'Guardar cambios'}
                           </button>
@@ -495,25 +559,11 @@ export default function Procedimientos({ session }) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDescargar(p)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#283B52] bg-[#AABBCF] border border-[#628ABC] rounded-full px-4 py-2"
-                          >
-                            Descargar PDF
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEliminar(p.id)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2"
-                          >
-                            Eliminar
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => {
                               setAbiertoId(null);
                               setForm(null);
                             }}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-[#283B52] bg-[#E0E5EB] border border-[#AABBCF] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-semibold text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
                           >
                             Salir
                           </button>
