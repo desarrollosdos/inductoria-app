@@ -214,24 +214,41 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
       {f.badges.length > 0 && (
         <div className="flex flex-col gap-1.5 mt-2">
           {f.badges.map((b) => (
-            <div key={b.microcurso_id} className="flex items-center justify-between gap-2">
-              <CursoCompletadoFila titulo={b.titulo} />
-              <button
-                type="button"
-                onClick={() =>
-                  generarCertificadoPDF({
-                    nombreEmpleado: f.nombre,
-                    negocioNombre: f.negocioNombre,
-                    tituloCurso: b.titulo,
-                    puntaje: b.puntaje,
-                    fechaCompletado: b.fecha_completado,
-                  })
-                }
-                title="Descargar certificado"
-                className="w-[26px] h-[26px] rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
-              >
-                <IconCertificado />
-              </button>
+            <div key={b.microcurso_id}>
+              <div className="flex items-center justify-between gap-2">
+                <CursoCompletadoFila titulo={b.titulo} />
+                <button
+                  type="button"
+                  onClick={() =>
+                    generarCertificadoPDF({
+                      nombreEmpleado: f.nombre,
+                      negocioNombre: f.negocioNombre,
+                      tituloCurso: b.titulo,
+                      puntaje: b.puntaje,
+                      fechaCompletado: b.fecha_completado,
+                    })
+                  }
+                  title="Descargar certificado"
+                  className="w-[26px] h-[26px] rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
+                >
+                  <IconCertificado />
+                </button>
+              </div>
+              {/* Acuse de recibido: solo aplica a Seguridad e Higiene
+                  (confirmar-acuse graba progreso_empleado.acuse_confirmado_at).
+                  Antes esto no se veía en ningún lado de Progreso — el dueño
+                  no tenía forma de saber si un empleado lo había confirmado. */}
+              {b.especial && (
+                <p
+                  className={`text-[10px] font-semibold pl-3.5 mt-0.5 ${
+                    b.acuse_confirmado_at ? 'text-[#7C8B6F]' : 'text-[#C1502E]'
+                  }`}
+                >
+                  {b.acuse_confirmado_at
+                    ? `Acuse confirmado el ${new Date(b.acuse_confirmado_at).toLocaleDateString('es-AR')}`
+                    : 'Acuse de recibido pendiente'}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -326,7 +343,7 @@ export default function Progreso({ session }) {
     if (empleadoIds.length > 0) {
       const { data: progresoData } = await supabase
         .from('progreso_empleado')
-        .select('empleado_id, microcurso_id, completado, fecha_completado, puntaje')
+        .select('empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at')
         .in('empleado_id', empleadoIds);
 
       (progresoData || []).forEach((p) => {
@@ -349,6 +366,7 @@ export default function Progreso({ session }) {
             especial: esCursoSeguridadEHigiene(titulo),
             puntaje: p.puntaje,
             fecha_completado: p.fecha_completado,
+            acuse_confirmado_at: p.acuse_confirmado_at,
           });
           conteoPorCurso[p.microcurso_id] = (conteoPorCurso[p.microcurso_id] || 0) + 1;
         }
