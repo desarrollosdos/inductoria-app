@@ -129,7 +129,7 @@ function EmpleadoInterno({ onDatosCargados }) {
             <IconChecklistMini className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-[#2C2C2A]">Checklist de hoy</p>
+            <p className="text-sm font-bold text-[#2C2C2A]">Checklists</p>
             <p className="text-xs text-[#8a8471]">Tocá para ver y marcar las tareas de tu sucursal</p>
           </div>
         </a>

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import PinGate from '../components/PinGate';
 
+// Cada checklist puede ser diario, semanal o mensual (lo elige el dueño en
+// su pantalla) — el texto de "ya completado" tiene que reflejar el período
+// que corresponde, no siempre decir "hoy".
+const ETIQUETA_PERIODO = { diario: 'hoy', semanal: 'esta semana', mensual: 'este mes' };
+
 // Mismo ícono que usa Checklists.jsx del lado del dueño, para que se
 // reconozca como la misma funcionalidad.
 function IconChecklistMini(props) {
@@ -22,6 +27,8 @@ function TarjetaChecklist({ checklist, token, onEnviado }) {
   const [errorEnvio, setErrorEnvio] = useState(null);
   const [enviado, setEnviado] = useState(false);
 
+  const periodicidad = checklist.periodicidad || 'diario';
+  const etiquetaPeriodo = ETIQUETA_PERIODO[periodicidad] || 'hoy';
   const yaCompletadoHoy = checklist.completado_hoy || enviado;
   const completadoPor = enviado ? null : checklist.completado_por;
   const todosMarcados = checklist.items.length > 0 && checklist.items.every((i) => marcados[i.id]);
@@ -70,7 +77,7 @@ function TarjetaChecklist({ checklist, token, onEnviado }) {
 
       {yaCompletadoHoy ? (
         <div className="text-center py-2">
-          <p className="text-base font-bold text-[#2C2C2A] mb-1">✓ Completado hoy</p>
+          <p className="text-base font-bold text-[#2C2C2A] mb-1">✓ Completado {etiquetaPeriodo}</p>
           <p className="text-sm text-[#6b6455]">
             {completadoPor ? `Lo completó ${completadoPor}.` : 'Gracias por completarlo.'}
           </p>
@@ -179,7 +186,7 @@ function ChecklistInterno() {
 
   return (
     <div className="max-w-md sm:max-w-xl mx-auto mt-8 px-4 sm:px-0 pb-16">
-      <h1 className="font-bold text-[#2C2C2A] text-lg mb-5">Checklist de hoy</h1>
+      <h1 className="font-bold text-[#2C2C2A] text-lg mb-5">Tus checklists</h1>
 
       <div className="space-y-4">
         {checklists.map((c) => (

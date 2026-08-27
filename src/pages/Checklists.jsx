@@ -5,11 +5,10 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import { capitalizarPrimeraLetra } from '../lib/texto';
 
-// Mismo catálogo exacto que usa Empleados.jsx para elegir el puesto de
-// cada empleado. Duplicado acá a propósito (no hay un módulo compartido
-// para esto todavía): si alguna vez se agrega o saca un puesto del
-// catálogo, hay que tocar los dos archivos. Sin "Otro" — acá no se puede
-// inventar un puesto nuevo, solo elegir entre los que ya existen.
+// Mismo catálogo que usa Empleados.jsx / Contenido.jsx para el campo
+// "puesto" — se duplica acá porque son archivos separados sin un módulo
+// compartido de constantes todavía. Si agregás un puesto nuevo al
+// catálogo, replicalo en los tres archivos.
 const PUESTOS_CATALOGO_BASE = [
   'Vendedor/a',
   'Cajero/a',
@@ -21,6 +20,48 @@ const PUESTOS_CATALOGO_BASE = [
   'Kiosquero/a',
   'Panadero/a',
 ];
+
+// Mismo componente exacto que usa Contenido.jsx para "¿a qué puestos
+// aplica este curso?" — acá se reutiliza tal cual (mismo desplegable,
+// mismos colores de selección del navegador) para que sea la misma
+// interacción en toda la app.
+function SelectorPuestos({ seleccionados, onChange, disabled }) {
+  return (
+    <select
+      multiple
+      value={seleccionados}
+      onChange={onChange}
+      disabled={disabled}
+      size={Math.min(PUESTOS_CATALOGO_BASE.length + 1, 6)}
+      className="w-full border border-[#EFDDCE] rounded-lg text-sm outline-none px-1 py-1 disabled:opacity-60"
+    >
+      <option value="TODOS">Todos los puestos</option>
+      {PUESTOS_CATALOGO_BASE.map((p) => (
+        <option key={p} value={p}>
+          {p}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Misma regla de negocio que Contenido.jsx: "Todos los puestos" es
+// excluyente con puestos puntuales.
+function manejarSeleccionPuestos(setPuestos) {
+  return (e) => {
+    const nuevos = Array.from(e.target.selectedOptions, (o) => o.value);
+    setPuestos((prev) => {
+      const todosPrev = prev.includes('TODOS');
+      const todosNuevo = nuevos.includes('TODOS');
+      if (todosNuevo && !todosPrev) return ['TODOS'];
+      if (todosNuevo && todosPrev) {
+        const especificos = nuevos.filter((p) => p !== 'TODOS');
+        return especificos.length > 0 ? especificos : ['TODOS'];
+      }
+      return nuevos;
+    });
+  };
+}
 
 function IconChecklistMini(props) {
   return (
@@ -41,32 +82,77 @@ function IconQuitarChico(props) {
   );
 }
 
-// Fecha de hoy en formato yyyy-mm-dd, según el reloj del navegador de
-// quien esté mirando la pantalla. Alcanza para esto (no es un sistema de
-// turnos con huso horario crítico), es la misma fecha que va a usar el
-// empleado cuando complete el checklist desde su celular.
-function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+const ETIQUETA_PERIODO = { diario: 'hoy', semanal: 'esta semana', mensual: 'este mes' };
+const NOMBRE_PERIODICIDAD = { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual' };
+// Cuántos períodos hacia atrás se miran para calcular el % de
+// cumplimiento — 30 días, 12 semanas o 6 meses son ventanas razonables
+// para que el número diga algo sin ir a buscar años de historial.
+const VENTANA_METRICAS = { diario: 30, semanal: 12, mensual: 6 };
+
+// El "ancla" del período al que pertenece una fecha dada, según la
+// periodicidad del checklist: el día exacto si es diario, el lunes de
+// esa semana si es semanal, o el día 1 del mes si es mensual. Mismo
+// criterio que usa empleado-checklist del lado del servidor — checklist_runs.fecha
+// se sigue usando tal cual, solo cambia qué representa.
+function fechaAncla(periodicidad, base) {
+  if (periodicidad === 'semanal') {
+    const dia = base.getUTCDay(); // 0 = domingo
+    const diff = (dia === 0 ? -6 : 1) - dia;
+    const lunes = new Date(base);
+    lunes.setUTCDate(base.getUTCDate() + diff);
+    return lunes.toISOString().slice(0, 10);
+  }
+  if (periodicidad === 'mensual') {
+    return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, '0')}-01`;
+  }
+  return base.toISOString().slice(0, 10);
 }
 
-// Mismo criterio que usan empleado-info y empleado-checklist para
-// microcursos.puestos_aplicables / checklists.puestos_aplicables: sin
-// nada cargado = todavía no publicado, ['TODOS'] = para cualquier
-// puesto, lista puntual = solo esos.
+function anclaActual(periodicidad) {
+  return fechaAncla(periodicidad, new Date());
+}
+
+// Las anclas de los últimos N períodos (el actual incluido), de más
+// reciente a más viejo — para calcular el % de cumplimiento contra el
+// historial real.
+function anclasRecientes(periodicidad, cantidad) {
+  const hoy = new Date();
+  const anclas = [];
+  for (let i = 0; i < cantidad; i++) {
+    const base = new Date(hoy);
+    if (periodicidad === 'semanal') base.setUTCDate(hoy.getUTCDate() - i * 7);
+    else if (periodicidad === 'mensual') base.setUTCMonth(hoy.getUTCMonth() - i);
+    else base.setUTCDate(hoy.getUTCDate() - i);
+    anclas.push(fechaAncla(periodicidad, base));
+  }
+  return anclas;
+}
+
 function resumenPuestos(puestos) {
   if (!puestos || puestos.length === 0) return 'sin publicar (elegí a quién aplica)';
   if (puestos.includes('TODOS')) return 'todos los puestos';
   return `solo ${puestos.join(', ')}`;
 }
 
+function formatearFechaAncla(fecha, periodicidad) {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  if (periodicidad === 'mensual') {
+    return d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  if (periodicidad === 'semanal') {
+    return `semana del ${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+  }
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
 export default function Checklists({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
-  const [empleados, setEmpleados] = useState([]); // solo para armar la lista de puestos ya en uso
-  const [checklists, setChecklists] = useState([]); // ahora puede haber varios por sucursal
-  const [runsHoy, setRunsHoy] = useState({}); // checklist_id -> corrida de hoy (o nada)
+  const [checklists, setChecklists] = useState([]); // puede haber varios por sucursal
+  const [runsPorChecklist, setRunsPorChecklist] = useState({}); // checklist_id -> [{fecha, empleado_nombre}], más reciente primero
   const [loading, setLoading] = useState(true);
   const [cambiandoActivacion, setCambiandoActivacion] = useState(false);
+  const [historialAbiertoId, setHistorialAbiertoId] = useState(null);
 
   // Solo uno de los dos puede estar abierto a la vez: o se está editando
   // un checklist que ya existe, o se está creando uno nuevo para una
@@ -77,18 +163,9 @@ export default function Checklists({ session }) {
   const [tituloEdit, setTituloEdit] = useState('');
   const [itemsEdit, setItemsEdit] = useState([]);
   const [nuevoItem, setNuevoItem] = useState('');
-  const [todosPuestosEdit, setTodosPuestosEdit] = useState(true);
-  const [puestosEdit, setPuestosEdit] = useState([]);
+  const [periodicidadEdit, setPeriodicidadEdit] = useState('diario');
+  const [puestosEdit, setPuestosEdit] = useState(['TODOS']);
   const [guardando, setGuardando] = useState(false);
-
-  // Mismo criterio que Empleados.jsx: el catálogo fijo, más cualquier
-  // puesto "Otro" que ya se le haya cargado a algún empleado real de esta
-  // cuenta. Así el selector de checklists ofrece exactamente los mismos
-  // puestos que existen hoy, ni uno más.
-  const puestosPersonalizados = [...new Set(empleados.map((e) => e.puesto).filter(Boolean))].filter(
-    (p) => !PUESTOS_CATALOGO_BASE.includes(p)
-  );
-  const puestosDisponibles = [...PUESTOS_CATALOGO_BASE, ...puestosPersonalizados.sort()];
 
   useEffect(() => {
     cargarTodo();
@@ -112,17 +189,6 @@ export default function Checklists({ session }) {
         .order('nombre', { ascending: true });
       setNegocios(negociosData || []);
 
-      const negocioIds = (negociosData || []).map((n) => n.id);
-      if (negocioIds.length > 0) {
-        const { data: empleadosData } = await supabase
-          .from('empleados')
-          .select('puesto')
-          .in('negocio_id', negocioIds);
-        setEmpleados(empleadosData || []);
-      } else {
-        setEmpleados([]);
-      }
-
       const { data: checklistsData } = await supabase
         .from('checklists')
         .select('*, checklist_items(*)')
@@ -135,16 +201,23 @@ export default function Checklists({ session }) {
       setChecklists(listas);
 
       if (listas.length > 0) {
+        // Se trae TODO el historial (no solo el período actual): hace
+        // falta para la lista de "ver historial" y para calcular el %
+        // de cumplimiento de cada checklist.
         const { data: runsData } = await supabase
           .from('checklist_runs')
-          .select('*')
+          .select('checklist_id, fecha, empleado_nombre')
           .in('checklist_id', listas.map((c) => c.id))
-          .eq('fecha', hoyISO());
+          .order('fecha', { ascending: false });
+
         const mapa = {};
-        (runsData || []).forEach((r) => (mapa[r.checklist_id] = r));
-        setRunsHoy(mapa);
+        (runsData || []).forEach((r) => {
+          if (!mapa[r.checklist_id]) mapa[r.checklist_id] = [];
+          mapa[r.checklist_id].push(r);
+        });
+        setRunsPorChecklist(mapa);
       } else {
-        setRunsHoy({});
+        setRunsPorChecklist({});
       }
     }
 
@@ -191,13 +264,12 @@ export default function Checklists({ session }) {
   }
 
   function cargarFormularioDesde(checklistExistente) {
-    setTituloEdit(checklistExistente?.titulo || 'Checklist diario');
+    setTituloEdit(checklistExistente?.titulo || '');
     setItemsEdit(checklistExistente ? checklistExistente.checklist_items.map((i) => i.texto) : []);
     setNuevoItem('');
+    setPeriodicidadEdit(checklistExistente?.periodicidad || 'diario');
     const puestos = checklistExistente?.puestos_aplicables;
-    const esTodos = !puestos || puestos.length === 0 ? true : puestos.includes('TODOS');
-    setTodosPuestosEdit(esTodos);
-    setPuestosEdit(esTodos ? [] : puestos);
+    setPuestosEdit(!puestos || puestos.length === 0 ? ['TODOS'] : puestos);
   }
 
   function abrirEdicionExistente(checklist) {
@@ -230,30 +302,23 @@ export default function Checklists({ session }) {
     setItemsEdit(itemsEdit.filter((_, i) => i !== index));
   }
 
-  function togglePuesto(puesto) {
-    setPuestosEdit((actual) =>
-      actual.includes(puesto) ? actual.filter((p) => p !== puesto) : [...actual, puesto]
-    );
-  }
-
   // Reemplaza todos los ítems en vez de calcular un diff ítem por ítem:
   // la lista siempre es corta (una checklist diaria, no un documento
   // largo como en Contenido/Procedimientos), así que no vale la pena la
   // complejidad extra.
   async function guardarChecklist(negocio, checklistExistente) {
-    if (!tituloEdit.trim() || itemsEdit.length === 0) return;
-    if (!todosPuestosEdit && puestosEdit.length === 0) return;
+    if (!tituloEdit.trim() || itemsEdit.length === 0 || puestosEdit.length === 0) return;
     setGuardando(true);
 
     let checklistId = checklistExistente?.id;
-    const puestosAplicables = todosPuestosEdit ? ['TODOS'] : puestosEdit;
 
     if (checklistId) {
       await supabase
         .from('checklists')
         .update({
           titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
-          puestos_aplicables: puestosAplicables,
+          puestos_aplicables: puestosEdit,
+          periodicidad: periodicidadEdit,
         })
         .eq('id', checklistId);
       await supabase.from('checklist_items').delete().eq('checklist_id', checklistId);
@@ -264,7 +329,8 @@ export default function Checklists({ session }) {
           cuenta_id: cuenta.id,
           negocio_id: negocio.id,
           titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
-          puestos_aplicables: puestosAplicables,
+          puestos_aplicables: puestosEdit,
+          periodicidad: periodicidadEdit,
         })
         .select()
         .single();
@@ -326,48 +392,31 @@ export default function Checklists({ session }) {
         />
 
         <div>
-          <p className="text-xs font-semibold text-[#6b6455] mb-1.5">¿A qué puestos aplica?</p>
-          <label className="flex items-center gap-2 text-sm text-[#2C2C2A] font-medium mb-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={todosPuestosEdit}
-              onChange={(e) => setTodosPuestosEdit(e.target.checked)}
-              className="accent-[#C1502E]"
-            />
-            Todos los puestos
-          </label>
+          <p className="text-xs font-semibold text-[#6b6455] mb-1.5">¿Con qué frecuencia se completa?</p>
+          <div className="flex gap-1.5">
+            {Object.entries(NOMBRE_PERIODICIDAD).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => setPeriodicidadEdit(valor)}
+                className={`text-xs font-bold tracking-wide rounded-full px-3 py-1.5 ${
+                  periodicidadEdit === valor
+                    ? 'text-white bg-[#C1502E]'
+                    : 'text-[#2C2C2A] bg-[#FBF7EA] border border-[#EDE0C8]'
+                }`}
+                style={periodicidadEdit === valor ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {!todosPuestosEdit && (
-            <>
-              {puestosDisponibles.length === 0 ? (
-                <p className="text-xs text-[#8a8471]">
-                  Todavía no cargaste ningún puesto en Empleados — cargá al menos un empleado con
-                  puesto para poder elegir acá.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {puestosDisponibles.map((puesto) => {
-                    const elegido = puestosEdit.includes(puesto);
-                    return (
-                      <button
-                        key={puesto}
-                        type="button"
-                        onClick={() => togglePuesto(puesto)}
-                        className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
-                          elegido
-                            ? 'text-white bg-[#C1502E] border-[#C1502E]'
-                            : 'text-[#2C2C2A] bg-[#FBF7EA] border-[#EDE0C8]'
-                        }`}
-                        style={elegido ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
-                      >
-                        {puesto}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
+        <div>
+          <p className="text-xs font-semibold text-[#6b6455] mb-1.5">
+            ¿A qué puestos aplica? (Ctrl/Cmd para elegir varios)
+          </p>
+          <SelectorPuestos seleccionados={puestosEdit} onChange={manejarSeleccionPuestos(setPuestosEdit)} />
         </div>
 
         {itemsEdit.length > 0 && (
@@ -419,9 +468,7 @@ export default function Checklists({ session }) {
           <button
             type="button"
             onClick={() => guardarChecklist(negocio, checklistExistente)}
-            disabled={
-              guardando || !tituloEdit.trim() || itemsEdit.length === 0 || (!todosPuestosEdit && puestosEdit.length === 0)
-            }
+            disabled={guardando || !tituloEdit.trim() || itemsEdit.length === 0 || puestosEdit.length === 0}
             className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
@@ -435,6 +482,66 @@ export default function Checklists({ session }) {
           >
             Salir
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Historial + métricas de un checklist puntual, colapsable. Se calcula
+  // todo en el cliente a partir de runsPorChecklist (ya trae todo el
+  // historial, no solo el período actual).
+  function HistorialYMetricas({ checklist }) {
+    const runs = runsPorChecklist[checklist.id] || [];
+    const ventana = VENTANA_METRICAS[checklist.periodicidad] || 30;
+    const anclas = anclasRecientes(checklist.periodicidad, ventana);
+    const fechasConRun = new Set(runs.map((r) => r.fecha));
+    const cumplidos = anclas.filter((a) => fechasConRun.has(a)).length;
+    const tasa = Math.round((cumplidos / ventana) * 100);
+
+    const conteoPorEmpleado = {};
+    runs.forEach((r) => {
+      if (!r.empleado_nombre) return;
+      conteoPorEmpleado[r.empleado_nombre] = (conteoPorEmpleado[r.empleado_nombre] || 0) + 1;
+    });
+    const topEmpleado = Object.entries(conteoPorEmpleado).sort((a, b) => b[1] - a[1])[0];
+
+    return (
+      <div className="mt-3 bg-[#FBF7EA] border border-[#EDE0C8] rounded-xl p-3 space-y-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8471]">
+              Cumplimiento (últimos {ventana})
+            </p>
+            <p className="text-sm font-bold text-[#2C2C2A]">
+              {cumplidos}/{ventana} · {tasa}%
+            </p>
+          </div>
+          {topEmpleado && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8471]">Lo completa más</p>
+              <p className="text-sm font-bold text-[#2C2C2A]">
+                {topEmpleado[0]} ({topEmpleado[1]})
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
+            Historial reciente
+          </p>
+          {runs.length === 0 ? (
+            <p className="text-xs text-[#8a8471]">Todavía no se completó ninguna vez.</p>
+          ) : (
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {runs.slice(0, 15).map((r, i) => (
+                <p key={i} className="text-xs text-[#3d382c]">
+                  {formatearFechaAncla(r.fecha, checklist.periodicidad)}
+                  {r.empleado_nombre && ` · ${r.empleado_nombre}`}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -480,9 +587,9 @@ export default function Checklists({ session }) {
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Checklists operativos</h2>
           <p className="text-xs font-medium text-[#6b6455] mb-3">
             Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
-            que se repiten todos los días y vos ves desde acá quién las completó. Podés armar más
-            de un checklist por sucursal y elegir a qué puestos le aplica cada uno — por ejemplo,
-            que "Cierre de caja" solo lo vea el cajero.
+            que se repiten y vos ves desde acá quién las completó. Podés armar más de un checklist
+            por sucursal, elegir si es diario, semanal o mensual, y a qué puestos le aplica cada
+            uno — por ejemplo, que "Cierre de caja" solo lo vea el cajero.
           </p>
           <div className="flex flex-wrap gap-1.5 mb-4">
             {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
@@ -539,7 +646,9 @@ export default function Checklists({ session }) {
                 <div className="space-y-4">
                   {checklistsDelNegocio.map((checklist) => {
                     const editando = editandoChecklistId === checklist.id;
-                    const run = runsHoy[checklist.id];
+                    const periodicidad = checklist.periodicidad || 'diario';
+                    const runs = runsPorChecklist[checklist.id] || [];
+                    const runActual = runs.find((r) => r.fecha === anclaActual(periodicidad));
                     const nombresItems = checklist.checklist_items.map((i) => i.texto);
                     const resumenItems =
                       nombresItems.length === 0
@@ -547,6 +656,7 @@ export default function Checklists({ session }) {
                         : nombresItems.length <= 2
                         ? nombresItems.join(', ')
                         : `${nombresItems.slice(0, 2).join(', ')} y ${nombresItems.length - 2} más`;
+                    const historialAbierto = historialAbiertoId === checklist.id;
 
                     return (
                       <div key={checklist.id} className={checklistsDelNegocio.length > 1 ? 'border-t border-[#F3EEE1] pt-4 first:border-t-0 first:pt-0' : ''}>
@@ -555,17 +665,17 @@ export default function Checklists({ session }) {
                           {checklist.activo && (
                             <span
                               className={
-                                run
+                                runActual
                                   ? 'text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full'
                                   : 'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border'
                               }
                               style={
-                                run
+                                runActual
                                   ? { background: '#7C8B6F', color: '#FFFFFF' }
                                   : { background: '#FFF3C4', color: '#C2670A', borderColor: '#E5DAB0' }
                               }
                             >
-                              {run ? 'Completado hoy' : 'Pendiente hoy'}
+                              {runActual ? `Completado ${ETIQUETA_PERIODO[periodicidad]}` : `Pendiente ${ETIQUETA_PERIODO[periodicidad]}`}
                             </span>
                           )}
                         </div>
@@ -573,9 +683,9 @@ export default function Checklists({ session }) {
                         {!editando && (
                           <>
                             <p className="text-xs font-medium text-[#6b6455] mb-0.5">
-                              {resumenItems}
+                              {NOMBRE_PERIODICIDAD[periodicidad]} · {resumenItems}
                               {!checklist.activo && ' · en pausa'}
-                              {run?.empleado_nombre && ` · lo completó ${run.empleado_nombre}`}
+                              {runActual?.empleado_nombre && ` · lo completó ${runActual.empleado_nombre}`}
                             </p>
                             <p className="text-xs font-medium text-[#8a8471] mb-3">
                               Para: {resumenPuestos(checklist.puestos_aplicables)}
@@ -587,6 +697,13 @@ export default function Checklists({ session }) {
                                 className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
                               >
                                 Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setHistorialAbiertoId(historialAbierto ? null : checklist.id)}
+                                className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
+                              >
+                                {historialAbierto ? 'Ocultar historial' : 'Ver historial'}
                               </button>
                               <button
                                 type="button"
@@ -605,6 +722,7 @@ export default function Checklists({ session }) {
                                 Eliminar
                               </button>
                             </div>
+                            {historialAbierto && <HistorialYMetricas checklist={checklist} />}
                           </>
                         )}
 
