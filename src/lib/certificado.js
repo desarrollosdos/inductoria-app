@@ -103,15 +103,21 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
   }
 
   // Sello del escudo (Seguridad e Higiene o Diploma, el mismo criterio que
-  // ya se usa en CursoDetalle.jsx y Empleado.jsx), en la esquina inferior
-  // izquierda para no chocar con el bloque de texto centrado.
+  // ya se usa en CursoDetalle.jsx y Empleado.jsx), centrado en el espacio
+  // libre entre el puntaje y la línea separadora de abajo (antes iba en
+  // la esquina inferior izquierda, quedaba desconectado del resto de la
+  // info). El alto se ajusta al espacio real disponible, por si el título
+  // del curso ocupó 2 o 3 líneas y dejó menos lugar.
   const esEspecial = esCursoSeguridadEHigiene(tituloCurso);
   const badgeB64 = esEspecial ? BADGE_SEGURIDAD_E_HIGIENE_B64 : BADGE_DIPLOMA_B64;
   const badgeRatio = esEspecial ? RATIO_SEGURIDAD_E_HIGIENE : RATIO_DIPLOMA;
-  const badgeAlto = 20;
+  const topeSuperior = y + 6;
+  const topeInferior = h - 26 - 5;
+  const espacioDisponible = topeInferior - topeSuperior;
+  const badgeAlto = Math.max(14, Math.min(20, espacioDisponible));
   const badgeAncho = badgeAlto * badgeRatio;
-  const badgeX = 14;
-  const badgeY = h - 32;
+  const badgeX = centroX - badgeAncho / 2;
+  const badgeY = topeSuperior + Math.max(0, (espacioDisponible - badgeAlto) / 2);
   doc.addImage(badgeB64, 'PNG', badgeX, badgeY, badgeAncho, badgeAlto);
 
   // Línea separadora antes del pie
