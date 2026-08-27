@@ -305,6 +305,17 @@ export default function Checklists({ session }) {
             const checklist = checklists.find((c) => c.negocio_id === negocio.id);
             const editando = editandoNegocioId === negocio.id;
             const run = checklist ? runsHoy[checklist.id] : null;
+            // Antes acá se mostraba solo la cantidad ("1 ítem"), que no dice
+            // nada de qué se trata el checklist. Mostramos los nombres de
+            // los ítems (los primeros 2, con "y N más" si hay más), así se
+            // ve de qué es el checklist sin tener que entrar a editarlo.
+            const nombresItems = checklist ? checklist.checklist_items.map((i) => i.texto) : [];
+            const resumenItems =
+              nombresItems.length === 0
+                ? 'sin ítems'
+                : nombresItems.length <= 2
+                ? nombresItems.join(', ')
+                : `${nombresItems.slice(0, 2).join(', ')} y ${nombresItems.length - 2} más`;
 
             return (
               <div key={negocio.id} className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -327,8 +338,7 @@ export default function Checklists({ session }) {
                 {checklist && !editando && (
                   <>
                     <p className="text-xs text-[#8a8471] mb-3">
-                      {checklist.titulo} · {checklist.checklist_items.length} ítem
-                      {checklist.checklist_items.length === 1 ? '' : 's'}
+                      {checklist.titulo} · {resumenItems}
                       {!checklist.activo && ' · en pausa'}
                       {run?.empleado_nombre && ` · lo completó ${run.empleado_nombre}`}
                     </p>
@@ -336,14 +346,15 @@ export default function Checklists({ session }) {
                       <button
                         type="button"
                         onClick={() => abrirEdicion(negocio, checklist)}
-                        className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] rounded-full px-4 py-2"
+                        className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
                       >
                         Editar
                       </button>
                       <button
                         type="button"
                         onClick={() => toggleActivo(checklist)}
-                        className="text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2"
+                        className="text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                       >
                         {checklist.activo ? 'Pausar' : 'Reactivar'}
                       </button>
