@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { generarCertificadoPDF } from '../lib/certificado';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
@@ -514,11 +514,11 @@ export default function Progreso({ session }) {
                 </p>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
+            <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5 h-full flex flex-col justify-center">
               {masActivo ? (
-                <div className="flex items-center gap-2">
-                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={44} grosor={5} color="#A26769">
-                    <span className="text-[10px] font-bold text-[#2C2C2A]">
+                <div className="flex items-center gap-3">
+                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={64} grosor={7} color="#5B7C99">
+                    <span className="text-[13px] font-bold text-[#2C2C2A]">
                       {Math.round(porcentajeAvance(masActivo) * 100)}%
                     </span>
                   </AnilloProgreso>
@@ -536,7 +536,7 @@ export default function Progreso({ session }) {
                   </span>
                 </div>
               ) : hayEmpateActivo ? null : (
-                <p className="text-sm text-[#8a8471] mt-1 text-center">Todavía nadie</p>
+                <p className="text-sm text-[#8a8471] text-center">Todavía nadie</p>
               )}
             </div>
           </div>
@@ -565,22 +565,26 @@ export default function Progreso({ session }) {
         {cursosRanking.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
-            <div className="space-y-3">
+            {/* Grid con UNA sola columna de nombres compartida entre todas
+                las filas (en vez de que cada fila mida su propio ancho de
+                texto) — así todas las barras arrancan del mismo punto,
+                alineadas con el nombre más largo, y cada una respeta su
+                propio % desde ahí. */}
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr' }}>
               {cursosRanking.map((c) => {
                 // % sobre el total de empleados (no sobre el curso más
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
                 // relativo al primero del ranking.
                 const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
                 // Nombre abreviado (hasta los ":", sin incluirlos) SIN
-                // truncar — el nombre se queda con el ancho que necesite,
-                // la barra (flex-1) es la que cede espacio si hace falta.
+                // truncar — el nombre se queda con el ancho que necesite.
                 const nombreCorto = c.titulo && c.titulo.includes(':') ? c.titulo.split(':')[0] : c.titulo;
                 return (
-                  <div key={c.microcurso_id} className="flex items-center gap-3">
-                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] flex-shrink-0 whitespace-nowrap">
+                  <Fragment key={c.microcurso_id}>
+                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] whitespace-nowrap">
                       {nombreCorto}
                     </p>
-                    <div className="flex-1 min-w-[60px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
+                    <div className="min-w-[60px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
                       <div
                         className="h-full bg-[#7C8B6F] rounded-md flex items-center justify-end px-2"
                         style={{ width: `${Math.max(porcentajeEquipo, 24)}%` }}
@@ -590,7 +594,7 @@ export default function Progreso({ session }) {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </Fragment>
                 );
               })}
             </div>
