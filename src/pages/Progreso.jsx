@@ -246,9 +246,9 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                       })
                     }
                     title="Descargar certificado"
-                    className="w-[26px] h-[26px] rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
+                    className="w-6 h-6 rounded-full bg-[#6B655A] text-white flex items-center justify-center flex-shrink-0"
                   >
-                    <IconCertificado />
+                    <IconCertificado width="11" height="11" />
                   </button>
                   {/* Acuse de recibido: solo aplica a Seguridad e Higiene
                       (confirmar-acuse graba progreso_empleado.acuse_confirmado_at).
@@ -587,7 +587,7 @@ export default function Progreso({ session }) {
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5 h-full flex flex-col justify-center">
               {masActivo ? (
                 <div className="flex items-center gap-3">
-                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={64} grosor={7} color="#5B7C99">
+                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={64} grosor={7} color="#7C8B6F">
                     <span className="text-[13px] font-bold text-[#2C2C2A]">
                       {Math.round(porcentajeAvance(masActivo) * 100)}%
                     </span>
