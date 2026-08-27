@@ -41,6 +41,21 @@ function IconCertificado(props) {
   );
 }
 
+// Ícono de acuse de recibido: formulario con tilde. Mismo tamaño que PIN /
+// copiar link / QR (24px, ícono interno de 11px) — no el de certificado,
+// que es un poco más grande. El color del botón ya indica el estado (verde
+// oliva confirmado, terracota pendiente), así que el ícono en sí queda
+// neutro en blanco.
+function IconActa(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 14l2 2 4-4.5" />
+    </svg>
+  );
+}
+
 function IconBirrete(props) {
   return (
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -131,6 +146,7 @@ function BarraSegmentada({ completados, total }) {
 // (alfabética, sin agrupar) — misma fila, distinto criterio de orden afuera.
 function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
   const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
+  const [acuseAbierto, setAcuseAbierto] = useState(null);
   return (
     <div className="px-6 py-2.5 border-t border-[#F3EEE1]">
       <div className="flex items-center gap-3 mb-1">
@@ -214,40 +230,64 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
       {f.badges.length > 0 && (
         <div className="flex flex-col gap-1.5 mt-2">
           {f.badges.map((b) => (
-            <div key={b.microcurso_id}>
+            <div key={b.microcurso_id} className="relative">
               <div className="flex items-center justify-between gap-2">
                 <CursoCompletadoFila titulo={b.titulo} />
-                <button
-                  type="button"
-                  onClick={() =>
-                    generarCertificadoPDF({
-                      nombreEmpleado: f.nombre,
-                      negocioNombre: f.negocioNombre,
-                      tituloCurso: b.titulo,
-                      puntaje: b.puntaje,
-                      fechaCompletado: b.fecha_completado,
-                    })
-                  }
-                  title="Descargar certificado"
-                  className="w-[26px] h-[26px] rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
-                >
-                  <IconCertificado />
-                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      generarCertificadoPDF({
+                        nombreEmpleado: f.nombre,
+                        negocioNombre: f.negocioNombre,
+                        tituloCurso: b.titulo,
+                        puntaje: b.puntaje,
+                        fechaCompletado: b.fecha_completado,
+                      })
+                    }
+                    title="Descargar certificado"
+                    className="w-[26px] h-[26px] rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <IconCertificado />
+                  </button>
+                  {/* Acuse de recibido: solo aplica a Seguridad e Higiene
+                      (confirmar-acuse graba progreso_empleado.acuse_confirmado_at).
+                      El color del ícono ya dice el estado de un vistazo; al
+                      tocarlo se abre el detalle con la fecha y hora. */}
+                  {b.especial && (
+                    <button
+                      type="button"
+                      onClick={() => setAcuseAbierto(acuseAbierto === b.microcurso_id ? null : b.microcurso_id)}
+                      title="Ver acuse de recibido"
+                      className={`w-6 h-6 rounded-full text-white flex items-center justify-center flex-shrink-0 ${
+                        b.acuse_confirmado_at ? 'bg-[#7C8B6F]' : 'bg-[#C1502E]'
+                      }`}
+                    >
+                      <IconActa />
+                    </button>
+                  )}
+                </div>
               </div>
-              {/* Acuse de recibido: solo aplica a Seguridad e Higiene
-                  (confirmar-acuse graba progreso_empleado.acuse_confirmado_at).
-                  Antes esto no se veía en ningún lado de Progreso — el dueño
-                  no tenía forma de saber si un empleado lo había confirmado. */}
-              {b.especial && (
-                <p
-                  className={`text-[10px] font-semibold pl-3.5 mt-0.5 ${
-                    b.acuse_confirmado_at ? 'text-[#7C8B6F]' : 'text-[#C1502E]'
-                  }`}
+              {b.especial && acuseAbierto === b.microcurso_id && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 z-10 bg-[#2C2C2A] text-white text-[11px] font-semibold px-3 py-2 rounded-lg whitespace-nowrap text-right"
+                  style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
                 >
-                  {b.acuse_confirmado_at
-                    ? `Acuse confirmado el ${new Date(b.acuse_confirmado_at).toLocaleDateString('es-AR')}`
-                    : 'Acuse de recibido pendiente'}
-                </p>
+                  {b.acuse_confirmado_at ? (
+                    <>
+                      Acuse confirmado
+                      <br />
+                      {new Date(b.acuse_confirmado_at).toLocaleDateString('es-AR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                      , {new Date(b.acuse_confirmado_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                    </>
+                  ) : (
+                    'Acuse de recibido pendiente'
+                  )}
+                </div>
               )}
             </div>
           ))}
