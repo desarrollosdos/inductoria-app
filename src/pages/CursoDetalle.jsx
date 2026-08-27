@@ -27,6 +27,16 @@ function ContenidoPaso({ texto }) {
   return <p className="text-[15px] text-[#2C2C2A] font-medium leading-relaxed">{texto}</p>;
 }
 
+// Clave de localStorage para recordar que este empleado ya terminó este
+// curso puntual. Antes, si terminaba el curso y por error (o a propósito)
+// hacía refresh en la pantalla de resultado, "resultado" volvía a null y
+// lo mandaba a rehacer el curso de cero — nada le avisaba que ya lo había
+// completado. Guardando el resultado acá, un refresh restaura esa misma
+// pantalla en vez de reiniciar el curso.
+function claveResultado(token, microcursoId) {
+  return `inductoria-resultado:${token}:${microcursoId}`;
+}
+
 // Título del curso: siempre se muestra completo. Se achica con el ancho
 // disponible pero puede pasar a una segunda línea si hace falta, en vez
 // de cortarse.
@@ -100,6 +110,17 @@ function CursoDetalleInterno() {
         }
         setCurso(data);
         setRespuestas(new Array(data.preguntas.length).fill(null));
+
+        // Si ya había un resultado guardado de una vez anterior (completó
+        // el curso y volvió, o refrescó la página sin querer), lo mostramos
+        // directamente en vez de arrancar el curso desde el paso 1.
+        try {
+          const guardado = localStorage.getItem(claveResultado(token, microcursoId));
+          if (guardado) setResultado(JSON.parse(guardado));
+        } catch {
+          // localStorage puede fallar (modo privado, cuota llena, etc.) —
+          // en el peor caso el empleado ve el curso de nuevo, no es grave.
+        }
       })
       .catch(() => setError('No se pudo cargar el curso.'))
       .finally(() => setLoading(false));
@@ -155,6 +176,11 @@ function CursoDetalleInterno() {
       return;
     }
     setResultado(data);
+    try {
+      localStorage.setItem(claveResultado(token, microcursoId), JSON.stringify(data));
+    } catch {
+      // idem arriba: si falla, no rompe el flujo, solo no persiste el refresh.
+    }
   }
 
   async function handleConfirmarAcuse() {
@@ -360,8 +386,12 @@ function CursoDetalleInterno() {
   if (!hayPasos && !hayPreguntas) {
     return (
       <div className="max-w-md sm:max-w-xl mx-auto mt-24 px-4 sm:px-0 text-center">
-        <p className="text-[#C1502E] font-semibold">Este curso todavía no tiene contenido cargado.</p>
-        <a href={`/empleado?token=${token}`} className="text-sm text-[#6b6455] underline mt-2 inline-block">
+        <p className="text-[#C1502E] font-semibold mb-4">Este curso todavía no tiene contenido cargado.</p>
+        <a
+          href={`/empleado?token=${token}`}
+          className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A]"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
           Volver a Mi perfil
         </a>
       </div>
