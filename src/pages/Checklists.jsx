@@ -32,18 +32,36 @@ function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Mismo criterio que usan empleado-info y empleado-checklist para
+// microcursos.puestos_aplicables / checklists.puestos_aplicables: sin
+// nada cargado = todavía no publicado, ['TODOS'] = para cualquier
+// puesto, lista puntual = solo esos.
+function resumenPuestos(puestos) {
+  if (!puestos || puestos.length === 0) return 'sin publicar (elegí a quién aplica)';
+  if (puestos.includes('TODOS')) return 'todos los puestos';
+  return `solo ${puestos.join(', ')}`;
+}
+
 export default function Checklists({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
-  const [checklists, setChecklists] = useState([]); // v1: como máximo uno por sucursal
+  const [checklists, setChecklists] = useState([]); // ahora puede haber varios por sucursal
   const [runsHoy, setRunsHoy] = useState({}); // checklist_id -> corrida de hoy (o nada)
   const [loading, setLoading] = useState(true);
   const [cambiandoActivacion, setCambiandoActivacion] = useState(false);
 
-  const [editandoNegocioId, setEditandoNegocioId] = useState(null);
+  // Solo uno de los dos puede estar abierto a la vez: o se está editando
+  // un checklist que ya existe, o se está creando uno nuevo para una
+  // sucursal puntual.
+  const [editandoChecklistId, setEditandoChecklistId] = useState(null);
+  const [agregandoNegocioId, setAgregandoNegocioId] = useState(null);
+
   const [tituloEdit, setTituloEdit] = useState('');
   const [itemsEdit, setItemsEdit] = useState([]);
   const [nuevoItem, setNuevoItem] = useState('');
+  const [todosPuestosEdit, setTodosPuestosEdit] = useState(true);
+  const [puestosEdit, setPuestosEdit] = useState([]);
+  const [nuevoPuesto, setNuevoPuesto] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -130,15 +148,40 @@ export default function Checklists({ session }) {
     setCuenta({ ...cuenta, checklists_habilitado: false });
   }
 
-  function abrirEdicion(negocio, checklistExistente) {
-    if (editandoNegocioId === negocio.id) {
-      setEditandoNegocioId(null);
-      return;
-    }
-    setEditandoNegocioId(negocio.id);
+  function cerrarEdicion() {
+    setEditandoChecklistId(null);
+    setAgregandoNegocioId(null);
+  }
+
+  function cargarFormularioDesde(checklistExistente) {
     setTituloEdit(checklistExistente?.titulo || 'Checklist diario');
     setItemsEdit(checklistExistente ? checklistExistente.checklist_items.map((i) => i.texto) : []);
     setNuevoItem('');
+    const puestos = checklistExistente?.puestos_aplicables;
+    const esTodos = !puestos || puestos.length === 0 ? true : puestos.includes('TODOS');
+    setTodosPuestosEdit(esTodos);
+    setPuestosEdit(esTodos ? [] : puestos);
+    setNuevoPuesto('');
+  }
+
+  function abrirEdicionExistente(checklist) {
+    if (editandoChecklistId === checklist.id) {
+      cerrarEdicion();
+      return;
+    }
+    setAgregandoNegocioId(null);
+    setEditandoChecklistId(checklist.id);
+    cargarFormularioDesde(checklist);
+  }
+
+  function abrirNuevoChecklist(negocioId) {
+    if (agregandoNegocioId === negocioId) {
+      cerrarEdicion();
+      return;
+    }
+    setEditandoChecklistId(null);
+    setAgregandoNegocioId(negocioId);
+    cargarFormularioDesde(null);
   }
 
   function agregarItem() {
@@ -151,20 +194,39 @@ export default function Checklists({ session }) {
     setItemsEdit(itemsEdit.filter((_, i) => i !== index));
   }
 
+  // Los puestos NO se capitalizan ni se transforman: tienen que calzar
+  // exacto con empleados.puesto (texto libre) para que el filtro del
+  // lado del empleado los reconozca.
+  function agregarPuesto() {
+    const valor = nuevoPuesto.trim();
+    if (!valor || puestosEdit.includes(valor)) return;
+    setPuestosEdit([...puestosEdit, valor]);
+    setNuevoPuesto('');
+  }
+
+  function quitarPuesto(index) {
+    setPuestosEdit(puestosEdit.filter((_, i) => i !== index));
+  }
+
   // Reemplaza todos los ítems en vez de calcular un diff ítem por ítem:
   // la lista siempre es corta (una checklist diaria, no un documento
   // largo como en Contenido/Procedimientos), así que no vale la pena la
   // complejidad extra.
   async function guardarChecklist(negocio, checklistExistente) {
     if (!tituloEdit.trim() || itemsEdit.length === 0) return;
+    if (!todosPuestosEdit && puestosEdit.length === 0) return;
     setGuardando(true);
 
     let checklistId = checklistExistente?.id;
+    const puestosAplicables = todosPuestosEdit ? ['TODOS'] : puestosEdit;
 
     if (checklistId) {
       await supabase
         .from('checklists')
-        .update({ titulo: capitalizarPrimeraLetra(tituloEdit.trim()) })
+        .update({
+          titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
+          puestos_aplicables: puestosAplicables,
+        })
         .eq('id', checklistId);
       await supabase.from('checklist_items').delete().eq('checklist_id', checklistId);
     } else {
@@ -174,6 +236,7 @@ export default function Checklists({ session }) {
           cuenta_id: cuenta.id,
           negocio_id: negocio.id,
           titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
+          puestos_aplicables: puestosAplicables,
         })
         .select()
         .single();
@@ -190,7 +253,7 @@ export default function Checklists({ session }) {
     if (itemsError) console.error(itemsError);
 
     setGuardando(false);
-    setEditandoNegocioId(null);
+    cerrarEdicion();
     await cargarTodo();
   }
 
@@ -217,6 +280,152 @@ export default function Checklists({ session }) {
       return;
     }
     await cargarTodo();
+  }
+
+  // Formulario de alta/edición, compartido entre "editar uno que ya
+  // existe" y "crear uno nuevo para esta sucursal" — es el mismo bloque
+  // en los dos casos, solo cambia a qué checklist (o negocio, si es
+  // nuevo) se le aplica al guardar.
+  function FormularioChecklist({ negocio, checklistExistente }) {
+    return (
+      <div className="space-y-3 border-t border-[#EDE0C8] pt-3 mt-2">
+        <input
+          type="text"
+          value={tituloEdit}
+          onChange={(e) => setTituloEdit(e.target.value)}
+          placeholder="Título (ej: Apertura del local)"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+
+        <div>
+          <p className="text-xs font-semibold text-[#6b6455] mb-1.5">¿A qué puestos aplica?</p>
+          <label className="flex items-center gap-2 text-sm text-[#2C2C2A] font-medium mb-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={todosPuestosEdit}
+              onChange={(e) => setTodosPuestosEdit(e.target.checked)}
+              className="accent-[#C1502E]"
+            />
+            Todos los puestos
+          </label>
+
+          {!todosPuestosEdit && (
+            <>
+              {puestosEdit.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {puestosEdit.map((puesto, i) => (
+                    <span
+                      key={i}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2A] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full pl-3 pr-1.5 py-1"
+                    >
+                      {puesto}
+                      <button
+                        type="button"
+                        onClick={() => quitarPuesto(i)}
+                        title="Quitar"
+                        className="w-4 h-4 rounded-full bg-[#EDE0C8] text-[#8a8471] flex items-center justify-center flex-shrink-0"
+                      >
+                        <IconQuitarChico width="9" height="9" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevoPuesto}
+                  onChange={(e) => setNuevoPuesto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      agregarPuesto();
+                    }
+                  }}
+                  placeholder="Puesto (ej: Cajero) — tal cual lo cargaste en Empleados"
+                  className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={agregarPuesto}
+                  className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  Agregar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {itemsEdit.length > 0 && (
+          <div className="space-y-1.5">
+            {itemsEdit.map((texto, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 bg-[#FBF7EA] border border-[#EDE0C8] rounded-lg px-3 py-2"
+              >
+                <span className="flex-1 text-sm text-[#2C2C2A]">{texto}</span>
+                <button
+                  type="button"
+                  onClick={() => quitarItem(i)}
+                  title="Quitar"
+                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#8a8471] flex items-center justify-center flex-shrink-0"
+                >
+                  <IconQuitarChico />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nuevoItem}
+            onChange={(e) => setNuevoItem(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarItem();
+              }
+            }}
+            placeholder="Agregar ítem (ej: Contar la caja)"
+            className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+          />
+          <button
+            type="button"
+            onClick={agregarItem}
+            className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            Agregar
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => guardarChecklist(negocio, checklistExistente)}
+            disabled={
+              guardando || !tituloEdit.trim() || itemsEdit.length === 0 || (!todosPuestosEdit && puestosEdit.length === 0)
+            }
+            className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            {guardando ? 'Guardando...' : 'Guardar checklist'}
+          </button>
+          <button
+            type="button"
+            onClick={cerrarEdicion}
+            className="text-xs font-bold tracking-wide text-white bg-[#A26769] rounded-full px-4 py-2"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            Salir
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -259,7 +468,9 @@ export default function Checklists({ session }) {
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Checklists operativos</h2>
           <p className="text-xs font-medium text-[#6b6455] mb-3">
             Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
-            que se repiten todos los días y vos ves desde acá quién las completó.
+            que se repiten todos los días y vos ves desde acá quién las completó. Podés armar más
+            de un checklist por sucursal y elegir a qué puestos le aplica cada uno — por ejemplo,
+            que "Cierre de caja" solo lo vea el cajero.
           </p>
           <div className="flex flex-wrap gap-1.5 mb-4">
             {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
@@ -302,165 +513,109 @@ export default function Checklists({ session }) {
 
         {cuenta.checklists_habilitado &&
           negocios.map((negocio) => {
-            const checklist = checklists.find((c) => c.negocio_id === negocio.id);
-            const editando = editandoNegocioId === negocio.id;
-            const run = checklist ? runsHoy[checklist.id] : null;
-            // Antes acá se mostraba solo la cantidad ("1 ítem"), que no dice
-            // nada de qué se trata el checklist. Mostramos los nombres de
-            // los ítems (los primeros 2, con "y N más" si hay más), así se
-            // ve de qué es el checklist sin tener que entrar a editarlo.
-            const nombresItems = checklist ? checklist.checklist_items.map((i) => i.texto) : [];
-            const resumenItems =
-              nombresItems.length === 0
-                ? 'sin ítems'
-                : nombresItems.length <= 2
-                ? nombresItems.join(', ')
-                : `${nombresItems.slice(0, 2).join(', ')} y ${nombresItems.length - 2} más`;
+            const checklistsDelNegocio = checklists.filter((c) => c.negocio_id === negocio.id);
+            const agregandoAca = agregandoNegocioId === negocio.id;
 
             return (
               <div key={negocio.id} className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-                <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-                  <h3 className="font-semibold text-[#2C2C2A]">{negocio.nombre}</h3>
-                  {checklist && checklist.activo && (
-                    <span
-                      className={
-                        run
-                          ? 'text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full'
-                          : 'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border'
-                      }
-                      style={
-                        run
-                          ? { background: '#7C8B6F', color: '#FFFFFF' }
-                          : { background: '#FFF3C4', color: '#C2670A', borderColor: '#E5DAB0' }
-                      }
-                    >
-                      {run ? 'Completado hoy' : 'Pendiente hoy'}
-                    </span>
-                  )}
-                </div>
+                <h3 className="font-semibold text-[#2C2C2A] mb-3">{negocio.nombre}</h3>
 
-                {checklist && !editando && (
-                  <>
-                    <p className="text-xs font-medium text-[#6b6455] mb-3">
-                      {checklist.titulo} · {resumenItems}
-                      {!checklist.activo && ' · en pausa'}
-                      {run?.empleado_nombre && ` · lo completó ${run.empleado_nombre}`}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => abrirEdicion(negocio, checklist)}
-                        className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleActivo(checklist)}
-                        className="text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                      >
-                        {checklist.activo ? 'Pausar' : 'Reactivar'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => eliminarChecklist(checklist.id)}
-                        className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </>
+                {checklistsDelNegocio.length === 0 && !agregandoAca && (
+                  <p className="text-xs text-[#8a8471] mb-3">Todavía no armaste ningún checklist acá.</p>
                 )}
 
-                {!checklist && !editando && (
+                <div className="space-y-4">
+                  {checklistsDelNegocio.map((checklist) => {
+                    const editando = editandoChecklistId === checklist.id;
+                    const run = runsHoy[checklist.id];
+                    const nombresItems = checklist.checklist_items.map((i) => i.texto);
+                    const resumenItems =
+                      nombresItems.length === 0
+                        ? 'sin ítems'
+                        : nombresItems.length <= 2
+                        ? nombresItems.join(', ')
+                        : `${nombresItems.slice(0, 2).join(', ')} y ${nombresItems.length - 2} más`;
+
+                    return (
+                      <div key={checklist.id} className={checklistsDelNegocio.length > 1 ? 'border-t border-[#F3EEE1] pt-4 first:border-t-0 first:pt-0' : ''}>
+                        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+                          <p className="text-sm font-bold text-[#2C2C2A]">{checklist.titulo}</p>
+                          {checklist.activo && (
+                            <span
+                              className={
+                                run
+                                  ? 'text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full'
+                                  : 'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border'
+                              }
+                              style={
+                                run
+                                  ? { background: '#7C8B6F', color: '#FFFFFF' }
+                                  : { background: '#FFF3C4', color: '#C2670A', borderColor: '#E5DAB0' }
+                              }
+                            >
+                              {run ? 'Completado hoy' : 'Pendiente hoy'}
+                            </span>
+                          )}
+                        </div>
+
+                        {!editando && (
+                          <>
+                            <p className="text-xs font-medium text-[#6b6455] mb-0.5">
+                              {resumenItems}
+                              {!checklist.activo && ' · en pausa'}
+                              {run?.empleado_nombre && ` · lo completó ${run.empleado_nombre}`}
+                            </p>
+                            <p className="text-xs font-medium text-[#8a8471] mb-3">
+                              Para: {resumenPuestos(checklist.puestos_aplicables)}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => abrirEdicionExistente(checklist)}
+                                className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleActivo(checklist)}
+                                className="text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                              >
+                                {checklist.activo ? 'Pausar' : 'Reactivar'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => eliminarChecklist(checklist.id)}
+                                className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </>
+                        )}
+
+                        {editando && <FormularioChecklist negocio={negocio} checklistExistente={checklist} />}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {!agregandoAca && (
                   <button
                     type="button"
-                    onClick={() => abrirEdicion(negocio, null)}
-                    className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2"
+                    onClick={() => abrirNuevoChecklist(negocio.id)}
+                    className={`text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 ${
+                      checklistsDelNegocio.length > 0 ? 'mt-4' : ''
+                    }`}
                     style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
-                    Crear checklist para esta sucursal
+                    Agregar checklist
                   </button>
                 )}
 
-                {editando && (
-                  <div className="space-y-2 border-t border-[#EDE0C8] pt-3 mt-2">
-                    <input
-                      type="text"
-                      value={tituloEdit}
-                      onChange={(e) => setTituloEdit(e.target.value)}
-                      placeholder="Título (ej: Apertura del local)"
-                      className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                    />
-
-                    {itemsEdit.length > 0 && (
-                      <div className="space-y-1.5">
-                        {itemsEdit.map((texto, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 bg-[#FBF7EA] border border-[#EDE0C8] rounded-lg px-3 py-2"
-                          >
-                            <span className="flex-1 text-sm text-[#2C2C2A]">{texto}</span>
-                            <button
-                              type="button"
-                              onClick={() => quitarItem(i)}
-                              title="Quitar"
-                              className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#8a8471] flex items-center justify-center flex-shrink-0"
-                            >
-                              <IconQuitarChico />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={nuevoItem}
-                        onChange={(e) => setNuevoItem(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            agregarItem();
-                          }
-                        }}
-                        placeholder="Agregar ítem (ej: Contar la caja)"
-                        className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={agregarItem}
-                        className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                      >
-                        Agregar
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => guardarChecklist(negocio, checklist)}
-                        disabled={guardando || !tituloEdit.trim() || itemsEdit.length === 0}
-                        className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                      >
-                        {guardando ? 'Guardando...' : 'Guardar checklist'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditandoNegocioId(null)}
-                        className="text-xs font-bold tracking-wide text-white bg-[#A26769] rounded-full px-4 py-2"
-                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                      >
-                        Salir
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {agregandoAca && <FormularioChecklist negocio={negocio} checklistExistente={null} />}
               </div>
             );
           })}
