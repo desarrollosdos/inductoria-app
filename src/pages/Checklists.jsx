@@ -341,7 +341,7 @@ export default function Checklists({ session }) {
 
                 {checklist && !editando && (
                   <>
-                    <p className="text-xs text-[#8a8471] mb-3">
+                    <p className="text-xs font-medium text-[#6b6455] mb-3">
                       {checklist.titulo} · {resumenItems}
                       {!checklist.activo && ' · en pausa'}
                       {run?.empleado_nombre && ` · lo completó ${run.empleado_nombre}`}
@@ -453,7 +453,8 @@ export default function Checklists({ session }) {
                       <button
                         type="button"
                         onClick={() => setEditandoNegocioId(null)}
-                        className="text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2"
+                        className="text-xs font-bold tracking-wide text-white bg-[#A26769] rounded-full px-4 py-2"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                       >
                         Salir
                       </button>
