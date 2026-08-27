@@ -5,6 +5,23 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import { capitalizarPrimeraLetra } from '../lib/texto';
 
+// Mismo catálogo exacto que usa Empleados.jsx para elegir el puesto de
+// cada empleado. Duplicado acá a propósito (no hay un módulo compartido
+// para esto todavía): si alguna vez se agrega o saca un puesto del
+// catálogo, hay que tocar los dos archivos. Sin "Otro" — acá no se puede
+// inventar un puesto nuevo, solo elegir entre los que ya existen.
+const PUESTOS_CATALOGO_BASE = [
+  'Vendedor/a',
+  'Cajero/a',
+  'Encargado/a',
+  'Estilista / Peluquero/a',
+  'Manicura / Cosmetóloga',
+  'Recepcionista',
+  'Repositor/a',
+  'Kiosquero/a',
+  'Panadero/a',
+];
+
 function IconChecklistMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -45,6 +62,7 @@ function resumenPuestos(puestos) {
 export default function Checklists({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
+  const [empleados, setEmpleados] = useState([]); // solo para armar la lista de puestos ya en uso
   const [checklists, setChecklists] = useState([]); // ahora puede haber varios por sucursal
   const [runsHoy, setRunsHoy] = useState({}); // checklist_id -> corrida de hoy (o nada)
   const [loading, setLoading] = useState(true);
@@ -61,8 +79,16 @@ export default function Checklists({ session }) {
   const [nuevoItem, setNuevoItem] = useState('');
   const [todosPuestosEdit, setTodosPuestosEdit] = useState(true);
   const [puestosEdit, setPuestosEdit] = useState([]);
-  const [nuevoPuesto, setNuevoPuesto] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  // Mismo criterio que Empleados.jsx: el catálogo fijo, más cualquier
+  // puesto "Otro" que ya se le haya cargado a algún empleado real de esta
+  // cuenta. Así el selector de checklists ofrece exactamente los mismos
+  // puestos que existen hoy, ni uno más.
+  const puestosPersonalizados = [...new Set(empleados.map((e) => e.puesto).filter(Boolean))].filter(
+    (p) => !PUESTOS_CATALOGO_BASE.includes(p)
+  );
+  const puestosDisponibles = [...PUESTOS_CATALOGO_BASE, ...puestosPersonalizados.sort()];
 
   useEffect(() => {
     cargarTodo();
@@ -85,6 +111,17 @@ export default function Checklists({ session }) {
         .eq('cuenta_id', cuentaData.id)
         .order('nombre', { ascending: true });
       setNegocios(negociosData || []);
+
+      const negocioIds = (negociosData || []).map((n) => n.id);
+      if (negocioIds.length > 0) {
+        const { data: empleadosData } = await supabase
+          .from('empleados')
+          .select('puesto')
+          .in('negocio_id', negocioIds);
+        setEmpleados(empleadosData || []);
+      } else {
+        setEmpleados([]);
+      }
 
       const { data: checklistsData } = await supabase
         .from('checklists')
@@ -161,7 +198,6 @@ export default function Checklists({ session }) {
     const esTodos = !puestos || puestos.length === 0 ? true : puestos.includes('TODOS');
     setTodosPuestosEdit(esTodos);
     setPuestosEdit(esTodos ? [] : puestos);
-    setNuevoPuesto('');
   }
 
   function abrirEdicionExistente(checklist) {
@@ -194,18 +230,10 @@ export default function Checklists({ session }) {
     setItemsEdit(itemsEdit.filter((_, i) => i !== index));
   }
 
-  // Los puestos NO se capitalizan ni se transforman: tienen que calzar
-  // exacto con empleados.puesto (texto libre) para que el filtro del
-  // lado del empleado los reconozca.
-  function agregarPuesto() {
-    const valor = nuevoPuesto.trim();
-    if (!valor || puestosEdit.includes(valor)) return;
-    setPuestosEdit([...puestosEdit, valor]);
-    setNuevoPuesto('');
-  }
-
-  function quitarPuesto(index) {
-    setPuestosEdit(puestosEdit.filter((_, i) => i !== index));
+  function togglePuesto(puesto) {
+    setPuestosEdit((actual) =>
+      actual.includes(puesto) ? actual.filter((p) => p !== puesto) : [...actual, puesto]
+    );
   }
 
   // Reemplaza todos los ítems en vez de calcular un diff ítem por ítem:
@@ -311,49 +339,33 @@ export default function Checklists({ session }) {
 
           {!todosPuestosEdit && (
             <>
-              {puestosEdit.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {puestosEdit.map((puesto, i) => (
-                    <span
-                      key={i}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2A] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full pl-3 pr-1.5 py-1"
-                    >
-                      {puesto}
+              {puestosDisponibles.length === 0 ? (
+                <p className="text-xs text-[#8a8471]">
+                  Todavía no cargaste ningún puesto en Empleados — cargá al menos un empleado con
+                  puesto para poder elegir acá.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {puestosDisponibles.map((puesto) => {
+                    const elegido = puestosEdit.includes(puesto);
+                    return (
                       <button
+                        key={puesto}
                         type="button"
-                        onClick={() => quitarPuesto(i)}
-                        title="Quitar"
-                        className="w-4 h-4 rounded-full bg-[#EDE0C8] text-[#8a8471] flex items-center justify-center flex-shrink-0"
+                        onClick={() => togglePuesto(puesto)}
+                        className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
+                          elegido
+                            ? 'text-white bg-[#C1502E] border-[#C1502E]'
+                            : 'text-[#2C2C2A] bg-[#FBF7EA] border-[#EDE0C8]'
+                        }`}
+                        style={elegido ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
                       >
-                        <IconQuitarChico width="9" height="9" />
+                        {puesto}
                       </button>
-                    </span>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={nuevoPuesto}
-                  onChange={(e) => setNuevoPuesto(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      agregarPuesto();
-                    }
-                  }}
-                  placeholder="Puesto (ej: Cajero) — tal cual lo cargaste en Empleados"
-                  className="flex-1 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={agregarPuesto}
-                  className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
-                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                >
-                  Agregar
-                </button>
-              </div>
             </>
           )}
         </div>
