@@ -130,6 +130,11 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
               Última actividad: {new Date(f.ultimaActividad).toLocaleDateString('es-AR')}
             </p>
           )}
+          {f.intentosFallidos > 0 && (
+            <p className="text-[10px] font-bold tracking-wide text-[#C1502E] mt-0.5">
+              {f.intentosFallidos} intento{f.intentosFallidos === 1 ? '' : 's'} sin aprobar
+            </p>
+          )}
           <BarraSegmentada completados={f.completados} total={f.totalCursos} />
         </div>
       </div>
@@ -304,6 +309,24 @@ export default function Progreso({ session }) {
       });
     }
 
+    // Intentos de evaluación sin aprobar (tabla `intentos_evaluacion`,
+    // nueva). Si la tabla todavía no existe porque no se corrió la
+    // migración, el select da error y esto queda en 0 para todos sin
+    // romper el resto de la pantalla.
+    let intentosFallidosPorEmpleado = {};
+    if (empleadoIds.length > 0) {
+      const { data: intentosData, error: intentosError } = await supabase
+        .from('intentos_evaluacion')
+        .select('empleado_id, aprobado')
+        .in('empleado_id', empleadoIds)
+        .eq('aprobado', false);
+      if (!intentosError) {
+        (intentosData || []).forEach((it) => {
+          intentosFallidosPorEmpleado[it.empleado_id] = (intentosFallidosPorEmpleado[it.empleado_id] || 0) + 1;
+        });
+      }
+    }
+
     const cursosRanking = Object.entries(conteoPorCurso)
       .map(([microcurso_id, cantidad]) => ({
         microcurso_id,
@@ -325,6 +348,7 @@ export default function Progreso({ session }) {
       totalCursos: totalCursosParaPuesto(e.puesto),
       ultimaActividad: progresoPorEmpleado[e.id]?.ultimaActividad || null,
       badges: progresoPorEmpleado[e.id]?.badges || [],
+      intentosFallidos: intentosFallidosPorEmpleado[e.id] || 0,
     }));
 
     setFilas(filasArmadas);

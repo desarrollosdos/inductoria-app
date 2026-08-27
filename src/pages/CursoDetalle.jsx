@@ -183,6 +183,20 @@ function CursoDetalleInterno() {
     }
   }
 
+  // No aprobó: vuelve a la evaluación desde cero (respuestas en blanco),
+  // borrando el resultado guardado para que un refresh no lo devuelva a
+  // la pantalla de "no aprobado" de antes.
+  function handleReintentar() {
+    setRespuestas(new Array((curso?.preguntas || []).length).fill(null));
+    setResultado(null);
+    try {
+      localStorage.removeItem(claveResultado(token, microcursoId));
+    } catch {
+      // no-op
+    }
+    setEnEvaluacion(true);
+  }
+
   async function handleConfirmarAcuse() {
     if (!acuseChecked || enviandoAcuse) return;
     setEnviandoAcuse(true);
@@ -270,12 +284,11 @@ function CursoDetalleInterno() {
 
   if (resultado) {
     const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
-    // No había ningún criterio de aprobado/reprobado en este archivo (el
-    // pill del porcentaje siempre se pintaba igual, verde/celeste). 70% es
-    // el estándar más común en plataformas de capacitación — si tenés otro
-    // número en mente, o la función empleado-completar-curso ya devuelve
-    // un campo `aprobado` propio, avisame y lo cambio por ese.
-    const aprobado = resultado.puntaje >= 70;
+    // empleado-completar-curso ahora manda `aprobado` calculado en el
+    // servidor con el mismo 70% de corte. El fallback de acá es solo por
+    // compatibilidad con un resultado viejo que haya quedado guardado en
+    // localStorage de antes de este cambio (no tenía el campo `aprobado`).
+    const aprobado = resultado.aprobado ?? resultado.puntaje >= 70;
     return (
       <div className="max-w-md sm:max-w-xl mx-auto mt-10 px-4 sm:px-0 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
@@ -284,16 +297,21 @@ function CursoDetalleInterno() {
           </p>
           <TituloCurso titulo={curso.titulo} className="mb-5" />
 
-          <div className="flex justify-center mb-3">
-            {esEspecial ? <BadgeEspecialImg /> : <BadgeCursoImg />}
-          </div>
-          {esEspecial && (
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#C1502E] mb-3">
-              Badge especial · Seguridad e Higiene
-            </p>
+          {aprobado ? (
+            <>
+              <div className="flex justify-center mb-3">
+                {esEspecial ? <BadgeEspecialImg /> : <BadgeCursoImg />}
+              </div>
+              {esEspecial && (
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#C1502E] mb-3">
+                  Badge especial · Seguridad e Higiene
+                </p>
+              )}
+              <h1 className="text-lg font-bold text-[#2C2C2A] mb-3">¡Felicitaciones !!!</h1>
+            </>
+          ) : (
+            <h1 className="text-lg font-bold text-[#C1502E] mb-3">No llegaste al puntaje mínimo</h1>
           )}
-
-          <h1 className="text-lg font-bold text-[#2C2C2A] mb-3">¡Felicitaciones !!!</h1>
 
           <div
             className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-4"
@@ -312,6 +330,12 @@ function CursoDetalleInterno() {
               · {resultado.correctas}/{resultado.total} correctas
             </span>
           </div>
+
+          {!aprobado && (
+            <p className="text-sm text-[#6b6455] mb-4">
+              Necesitás al menos 70% para aprobar este curso. Podés volver a intentarlo cuando quieras.
+            </p>
+          )}
 
           {esEspecial && (
             <div className="text-left bg-[#FBF7EA] border border-[#EFDDCE] rounded-xl p-4 mb-4">
@@ -351,14 +375,24 @@ function CursoDetalleInterno() {
           )}
 
           <div className="flex flex-col gap-2">
-            <button
-              onClick={handleDescargarCertificado}
-              disabled={generandoCertificado}
-              className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
-              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-            >
-              {generandoCertificado ? 'Generando...' : 'Descargar certificado (PDF)'}
-            </button>
+            {aprobado ? (
+              <button
+                onClick={handleDescargarCertificado}
+                disabled={generandoCertificado}
+                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                {generandoCertificado ? 'Generando...' : 'Descargar certificado (PDF)'}
+              </button>
+            ) : (
+              <button
+                onClick={handleReintentar}
+                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A]"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                Volver a intentar
+              </button>
+            )}
             <a
               href={`/empleado?token=${token}`}
               className="inline-block w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
