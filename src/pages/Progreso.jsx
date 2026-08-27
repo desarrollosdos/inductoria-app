@@ -39,6 +39,40 @@ function IconBirrete(props) {
   );
 }
 
+// Anillo de progreso circular (opción 2 del mock de "Ranking del equipo"
+// que eligió Roberto). El % que llena el anillo es completados/total DEL
+// PROPIO empleado, no relativo al resto del podio — así dos empleados con
+// los mismos cursos completados sobre el mismo total quedan visualmente
+// idénticos, sin inventar una diferencia de lugar entre ellos.
+function AnilloProgreso({ pct, size = 68, grosor = 7, children }) {
+  const r = (size - grosor) / 2;
+  const circunferencia = 2 * Math.PI * r;
+  const pctAcotado = Math.min(100, Math.max(0, pct));
+  const offset = circunferencia * (1 - pctAcotado / 100);
+  const centro = size / 2;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={centro} cy={centro} r={r} fill="none" stroke="#EDE0C8" strokeWidth={grosor} />
+        <circle
+          cx={centro}
+          cy={centro}
+          r={r}
+          fill="none"
+          stroke="#7C8B6F"
+          strokeWidth={grosor}
+          strokeLinecap="round"
+          strokeDasharray={circunferencia}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-[#2C2C2A]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Avatar({ e, size = 32 }) {
   const estilo = { width: size, height: size, border: '2px solid #C1502E' };
   if (e.foto_url) {
@@ -398,7 +432,6 @@ export default function Progreso({ session }) {
     .filter((f) => f.completados > 0)
     .sort((a, b) => b.completados - a.completados)
     .slice(0, 3);
-  const maxPodio = podio.length > 0 ? podio[0].completados : 0;
   const sinArrancar = filas.filter((f) => f.completados === 0);
 
   // Sección "Tu equipo": agrupada por sucursal (en vez de mostrar el
@@ -498,26 +531,16 @@ export default function Progreso({ session }) {
         {podio.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Ranking del equipo</h2>
-            <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
               {podio.map((f) => {
-                const anchoBarra = maxPodio > 0 ? Math.round((f.completados / maxPodio) * 100) : 0;
+                const pct = f.totalCursos > 0 ? Math.round((f.completados / f.totalCursos) * 100) : 0;
                 return (
-                  <div key={f.id} className="flex items-center gap-3">
-                    <Avatar e={f} size={32} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-[#2C2C2A] truncate">{f.nombre}</p>
-                        <span className="text-xs font-bold tracking-wide text-[#7C8B6F] flex-shrink-0 ml-2">
-                          {f.completados} curso{f.completados === 1 ? '' : 's'}
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[#7C8B6F] transition-all"
-                          style={{ width: `${anchoBarra}%` }}
-                        />
-                      </div>
-                    </div>
+                  <div key={f.id} className="flex flex-col items-center gap-2 text-center">
+                    <AnilloProgreso pct={pct}>{pct}%</AnilloProgreso>
+                    <p className="text-xs font-semibold text-[#2C2C2A] truncate w-full">{f.nombre}</p>
+                    <p className="text-[10.5px] font-bold tracking-wide text-[#8a8471]">
+                      {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
+                    </p>
                   </div>
                 );
               })}
