@@ -323,11 +323,15 @@ export default function Checklists({ session }) {
                   <h3 className="font-semibold text-[#2C2C2A]">{negocio.nombre}</h3>
                   {checklist && checklist.activo && (
                     <span
-                      className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                      className={
+                        run
+                          ? 'text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full'
+                          : 'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border'
+                      }
                       style={
                         run
                           ? { background: '#7C8B6F', color: '#FFFFFF' }
-                          : { background: '#EDE0C8', color: '#8a8471' }
+                          : { background: '#FFF3C4', color: '#C2670A', borderColor: '#E5DAB0' }
                       }
                     >
                       {run ? 'Completado hoy' : 'Pendiente hoy'}
