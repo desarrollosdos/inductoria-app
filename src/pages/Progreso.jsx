@@ -164,7 +164,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
         <div className="flex flex-col gap-1.5 mt-2">
           {f.badges.map((b) => (
             <div key={b.microcurso_id} className="flex items-center justify-between gap-2">
-              <CursoCompletadoFila titulo={b.titulo} especial={b.especial} />
+              <CursoCompletadoFila titulo={b.titulo} />
               <button
                 type="button"
                 onClick={() =>
@@ -176,7 +176,8 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                     fechaCompletado: b.fecha_completado,
                   })
                 }
-                className="text-[10px] font-bold tracking-wide text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] rounded-full px-2 py-0.5 flex-shrink-0"
+                className="text-[10px] font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Certificado
               </button>
@@ -361,15 +362,19 @@ export default function Progreso({ session }) {
   // como Crehana: no solo el promedio, también quién arrancó y quién no,
   // y quién viene más activo.
   const yaArrancaron = filas.filter((f) => f.completados > 0).length;
-  // Si nadie completó nada todavía, no hay "más activo" que mostrar —
-  // antes esto elegía a cualquiera con 0 completados con tal de que
-  // hubiera empleados cargados.
-  const topActivo = filas.length > 0 ? [...filas].sort((a, b) => b.completados - a.completados)[0] : null;
-  const masActivo = topActivo && topActivo.completados > 0 ? topActivo : null;
+  // "Más activo": solo se muestra a alguien si tiene ESTRICTAMENTE más
+  // cursos completados que el resto. Si hay empate en el máximo (varios
+  // con la misma cantidad, ninguno se destaca), no se elige a nadie —
+  // antes se mostraba al primero del sort aunque estuviera empatado.
+  const maxCompletados = filas.length > 0 ? Math.max(...filas.map((f) => f.completados)) : 0;
+  const empatadosEnMax = filas.filter((f) => f.completados === maxCompletados);
+  const masActivo = maxCompletados > 0 && empatadosEnMax.length === 1 ? empatadosEnMax[0] : null;
+  const hayEmpateActivo = maxCompletados > 0 && empatadosEnMax.length > 1;
   const podio = [...filas]
     .filter((f) => f.completados > 0)
     .sort((a, b) => b.completados - a.completados)
     .slice(0, 3);
+  const maxPodio = podio.length > 0 ? podio[0].completados : 0;
   const sinArrancar = filas.filter((f) => f.completados === 0);
 
   // Sección "Tu equipo": agrupada por sucursal (en vez de mostrar el
@@ -414,10 +419,13 @@ export default function Progreso({ session }) {
             <p className="text-sm text-[#6b6455]">Todavía no tenés cursos aprobados cargados.</p>
           ) : (
             <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+              <span
+                className="w-8 h-8 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
                 {totalCursos}
               </span>
-              <p className="text-sm font-medium text-[#3d382c]">cursos aprobados</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-[#3d382c]">CURSOS APROBADOS</p>
             </div>
           )}
         </div>
@@ -425,31 +433,38 @@ export default function Progreso({ session }) {
         {filas.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">
                 Ya arrancaron
               </p>
-              <p className="text-2xl font-bold text-[#2C2C2A]">
-                {Math.round((yaArrancaron / filas.length) * 100)}%
-              </p>
-              <p className="text-[11px] text-[#8a8471] mt-0.5">
-                {yaArrancaron} de {filas.length} empleado{filas.length === 1 ? '' : 's'}
-              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
+                  <span
+                    className="text-sm font-bold tracking-wide text-white"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    {Math.round((yaArrancaron / filas.length) * 100)}%
+                  </span>
+                </div>
+                <p className="text-[13px] font-bold tracking-wide text-[#3d382c]">
+                  {yaArrancaron} de {filas.length} empleado{filas.length === 1 ? '' : 's'}
+                </p>
+              </div>
             </div>
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">
                 Más activo
               </p>
               {masActivo ? (
-                <div className="flex items-start gap-2 mt-1">
-                  <Avatar e={masActivo} size={28} />
+                <div className="flex items-center gap-3">
+                  <Avatar e={masActivo} size={32} />
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words">{masActivo.nombre}</p>
-                    <p className="text-[11px] text-[#8a8471]">
+                    <p className="text-[13px] font-bold tracking-wide text-[#3d382c]">
                       {masActivo.completados} curso{masActivo.completados === 1 ? '' : 's'}
                     </p>
                   </div>
                 </div>
-              ) : (
+              ) : hayEmpateActivo ? null : (
                 <p className="text-sm text-[#8a8471] mt-1">Todavía nadie</p>
               )}
             </div>
@@ -459,27 +474,29 @@ export default function Progreso({ session }) {
         {podio.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Ranking del equipo</h2>
-            <div className="space-y-3">
-              {podio.map((f, i) => (
-                <div key={f.id} className="flex items-center gap-3">
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                      i === 0
-                        ? 'bg-[#F0C349] text-[#7A3A1D]'
-                        : i === 1
-                        ? 'bg-[#D8D8D8] text-[#3d382c]'
-                        : 'bg-[#D89B6B] text-white'
-                    }`}
-                  >
-                    {i + 1}
-                  </span>
-                  <Avatar e={f} size={30} />
-                  <p className="text-sm font-semibold text-[#2C2C2A] flex-1 truncate">{f.nombre}</p>
-                  <p className="text-xs font-semibold text-[#C1502E]">
-                    {f.completados} curso{f.completados === 1 ? '' : 's'}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-4">
+              {podio.map((f) => {
+                const anchoBarra = maxPodio > 0 ? Math.round((f.completados / maxPodio) * 100) : 0;
+                return (
+                  <div key={f.id} className="flex items-center gap-3">
+                    <Avatar e={f} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold text-[#2C2C2A] truncate">{f.nombre}</p>
+                        <span className="text-xs font-bold tracking-wide text-[#7C8B6F] flex-shrink-0 ml-2">
+                          {f.completados} curso{f.completados === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[#7C8B6F] transition-all"
+                          style={{ width: `${anchoBarra}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -487,29 +504,22 @@ export default function Progreso({ session }) {
         {cursosRanking.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
-            <div className="space-y-2">
-              {cursosRanking.map((c) => {
-                const porcentajeBarra = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
-                return (
-                  <div key={c.microcurso_id}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-[13px] font-medium truncate">
-                        <TituloCursoInline titulo={c.titulo} corto />
-                        {c.especial && <span className="ml-1 text-[#C1502E]">★</span>}
-                      </p>
-                      <span className="text-xs font-semibold text-[#8a8471] flex-shrink-0 ml-2">
-                        {c.cantidad} empleado{c.cantidad === 1 ? '' : 's'}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[#7C8B6F] transition-all"
-                        style={{ width: `${porcentajeBarra}%` }}
-                      />
-                    </div>
+            <div className="space-y-3">
+              {cursosRanking.map((c) => (
+                <div key={c.microcurso_id} className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#EDE0C8] flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-[#C1502E]">{c.cantidad}</span>
                   </div>
-                );
-              })}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium truncate">
+                      <TituloCursoInline titulo={c.titulo} corto />
+                    </p>
+                    <p className="text-[11px] text-[#8a8471]">
+                      empleado{c.cantidad === 1 ? '' : 's'} que lo completaron
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

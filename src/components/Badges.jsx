@@ -40,14 +40,14 @@ export function TituloCursoInline({ titulo, className = '', corto = false }) {
   );
 }
 
-// Fila compacta: tilde de color (sin círculo de fondo) + nombre del curso.
-// Usado en Progreso.jsx para la lista de cursos completados por empleado.
-export function CursoCompletadoFila({ titulo, especial }) {
+// Fila compacta: bullet + nombre del curso (antes era un tilde de color,
+// sacado a pedido porque quedaba redundante en una lista que ya es "lo que
+// completó"). Usado en Progreso.jsx para la lista de cursos completados por
+// empleado.
+export function CursoCompletadoFila({ titulo }) {
   return (
     <div className="flex items-center gap-2">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={especial ? '#185FA5' : '#3B6D11'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-        <path d="M4 12.5 L9.5 18 L20 6" />
-      </svg>
+      <span className="w-1.5 h-1.5 rounded-full bg-[#C1502E] flex-shrink-0" />
       <TituloCursoInline titulo={titulo} className="text-[13px]" corto />
     </div>
   );
