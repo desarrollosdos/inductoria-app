@@ -13,45 +13,21 @@ function IconChecklistMini(props) {
   );
 }
 
-function ChecklistInterno() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [checklist, setChecklist] = useState(null);
+// Una tarjeta por checklist: cada uno se completa y se envía por separado
+// (un empleado puede tener más de uno asignado a su puesto el mismo día,
+// por ejemplo "Apertura" y "Cierre de caja").
+function TarjetaChecklist({ checklist, token, onEnviado }) {
   const [marcados, setMarcados] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState(null);
   const [enviado, setEnviado] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
-      setError('Falta información en el link.');
-      setLoading(false);
-      return;
-    }
-
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    fetch(`${base}/functions/v1/empleado-checklist?token=${encodeURIComponent(token)}`, {
-      headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
-        if (!ok) {
-          setError(data.error || 'No se pudo cargar el checklist.');
-          return;
-        }
-        setChecklist(data.checklist);
-      })
-      .catch(() => setError('No se pudo cargar el checklist.'))
-      .finally(() => setLoading(false));
-  }, [token]);
+  const yaCompletadoHoy = checklist.completado_hoy || enviado;
+  const completadoPor = enviado ? null : checklist.completado_por;
+  const todosMarcados = checklist.items.length > 0 && checklist.items.every((i) => marcados[i.id]);
 
   async function handleEnviar() {
-    if (!checklist || enviando) return;
+    if (enviando) return;
     setEnviando(true);
     setErrorEnvio(null);
 
@@ -75,6 +51,7 @@ function ChecklistInterno() {
         return;
       }
       setEnviado(true);
+      if (onEnviado) onEnviado();
     } catch {
       setErrorEnvio('No se pudo enviar el checklist. Probá de nuevo.');
     } finally {
@@ -82,75 +59,24 @@ function ChecklistInterno() {
     }
   }
 
-  if (loading) {
-    return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-md mx-auto mt-24 px-4 text-center">
-        <p className="text-[#C1502E] font-semibold mb-4">{error}</p>
-        <a
-          href={`/empleado?token=${token}`}
-          className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
-          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-        >
-          Volver a Mi perfil
-        </a>
-      </div>
-    );
-  }
-
-  if (!checklist) {
-    return (
-      <div className="max-w-md mx-auto mt-24 px-4 text-center">
-        <p className="text-[#6b6455] font-medium">Tu sucursal no tiene un checklist activo en este momento.</p>
-        <a
-          href={`/empleado?token=${token}`}
-          className="inline-block mt-4 px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
-          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-        >
-          Volver a Mi perfil
-        </a>
-      </div>
-    );
-  }
-
-  // Ya se completó hoy (por este empleado o por otro — es una sola
-  // corrida por sucursal por día, no por persona).
-  const yaCompletadoHoy = checklist.completado_hoy || enviado;
-  const completadoPor = enviado ? null : checklist.completado_por;
-  const todosMarcados = checklist.items.length > 0 && checklist.items.every((i) => marcados[i.id]);
-
   return (
-    <div className="max-w-md sm:max-w-xl mx-auto mt-8 px-4 sm:px-0 pb-16">
-      <div className="flex items-center gap-2.5 mb-5">
+    <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+      <div className="flex items-center gap-2.5 mb-4">
         <div className="w-[26px] h-[26px] rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
           <IconChecklistMini width="14" height="14" className="text-white" />
         </div>
-        <h1 className="font-bold text-[#2C2C2A] text-lg">{checklist.titulo}</h1>
+        <h2 className="font-bold text-[#2C2C2A] text-base">{checklist.titulo}</h2>
       </div>
 
       {yaCompletadoHoy ? (
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8 text-center">
-          <p className="text-lg font-bold text-[#2C2C2A] mb-2">✓ Checklist completado hoy</p>
-          <p className="text-sm text-[#6b6455] mb-5">
+        <div className="text-center py-2">
+          <p className="text-base font-bold text-[#2C2C2A] mb-1">✓ Completado hoy</p>
+          <p className="text-sm text-[#6b6455]">
             {completadoPor ? `Lo completó ${completadoPor}.` : 'Gracias por completarlo.'}
           </p>
-          <a
-            href={`/empleado?token=${token}`}
-            className="inline-block w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
-            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-          >
-            Volver a Mi perfil
-          </a>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <p className="text-sm text-[#6b6455] mb-4">
-            Marcá cada ítem a medida que lo vas haciendo y enviá el checklist al terminar.
-          </p>
-
+        <>
           <div className="space-y-2 mb-5">
             {checklist.items.map((item) => (
               <label
@@ -178,16 +104,96 @@ function ChecklistInterno() {
           >
             {enviando ? 'Enviando...' : 'Enviar checklist'}
           </button>
-
-          <a
-            href={`/empleado?token=${token}`}
-            className="block w-full py-2 rounded-lg text-center font-bold tracking-wide text-white bg-[#C1502E] mt-3"
-            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-          >
-            Volver a Mi perfil
-          </a>
-        </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function ChecklistInterno() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [checklists, setChecklists] = useState([]);
+
+  useEffect(() => {
+    if (!token) {
+      setError('Falta información en el link.');
+      setLoading(false);
+      return;
+    }
+
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    fetch(`${base}/functions/v1/empleado-checklist?token=${encodeURIComponent(token)}`, {
+      headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setError(data.error || 'No se pudo cargar el checklist.');
+          return;
+        }
+        setChecklists(data.checklists || []);
+      })
+      .catch(() => setError('No se pudo cargar el checklist.'))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) {
+    return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto mt-24 px-4 text-center">
+        <p className="text-[#C1502E] font-semibold mb-4">{error}</p>
+        <a
+          href={`/empleado?token=${token}`}
+          className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
+          Volver a Mi perfil
+        </a>
+      </div>
+    );
+  }
+
+  if (checklists.length === 0) {
+    return (
+      <div className="max-w-md mx-auto mt-24 px-4 text-center">
+        <p className="text-[#6b6455] font-medium">No tenés ningún checklist activo por el momento.</p>
+        <a
+          href={`/empleado?token=${token}`}
+          className="inline-block mt-4 px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
+          Volver a Mi perfil
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md sm:max-w-xl mx-auto mt-8 px-4 sm:px-0 pb-16">
+      <h1 className="font-bold text-[#2C2C2A] text-lg mb-5">Checklist de hoy</h1>
+
+      <div className="space-y-4">
+        {checklists.map((c) => (
+          <TarjetaChecklist key={c.id} checklist={c} token={token} onEnviado={() => {}} />
+        ))}
+      </div>
+
+      <a
+        href={`/empleado?token=${token}`}
+        className="block w-full py-2 rounded-lg text-center font-bold tracking-wide text-white bg-[#C1502E] mt-5"
+        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+      >
+        Volver a Mi perfil
+      </a>
     </div>
   );
 }
