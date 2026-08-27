@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PinGate from '../components/PinGate';
+import { esCursoSeguridadEHigiene, BadgeEspecialImg, BadgeCursoImg } from '../components/Badges';
 
 function Avatar({ nombre, fotoUrl, size = 72 }) {
   const estilo = { width: size, height: size, border: '2px solid #C1502E' };
@@ -13,15 +14,6 @@ function Avatar({ nombre, fotoUrl, size = 72 }) {
     >
       {nombre.charAt(0).toUpperCase()}
     </div>
-  );
-}
-
-function IconBadge(props) {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="8" r="6" />
-      <path d="M9 14 6.5 21 12 18l5.5 3L15 14" />
-    </svg>
   );
 }
 
@@ -181,9 +173,11 @@ function EmpleadoInterno({ onDatosCargados }) {
                   className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-full bg-[#eef9f4] text-[#1D9E75] flex items-center justify-center flex-shrink-0">
-                      <IconBadge />
-                    </span>
+                    {esCursoSeguridadEHigiene(m.titulo) ? (
+                      <BadgeEspecialImg size={36} />
+                    ) : (
+                      <BadgeCursoImg size={36} />
+                    )}
                     <div>
                       <p>
                         {m.titulo.includes(':') ? (
@@ -209,7 +203,6 @@ function EmpleadoInterno({ onDatosCargados }) {
                       )}
                     </div>
                   </div>
-                  {!contenidoActualizado && <span className="text-xs font-semibold text-[#1D9E75]">✓</span>}
                 </Wrapper>
               );
             })}
