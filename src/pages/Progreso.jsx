@@ -44,7 +44,7 @@ function IconBirrete(props) {
 // PROPIO empleado, no relativo al resto del podio — así dos empleados con
 // los mismos cursos completados sobre el mismo total quedan visualmente
 // idénticos, sin inventar una diferencia de lugar entre ellos.
-function AnilloProgreso({ pct, size = 68, grosor = 7, children }) {
+function AnilloProgreso({ pct, size = 68, grosor = 7, color = '#7C8B6F', children }) {
   const r = (size - grosor) / 2;
   const circunferencia = 2 * Math.PI * r;
   const pctAcotado = Math.min(100, Math.max(0, pct));
@@ -59,7 +59,7 @@ function AnilloProgreso({ pct, size = 68, grosor = 7, children }) {
           cy={centro}
           r={r}
           fill="none"
-          stroke="#7C8B6F"
+          stroke={color}
           strokeWidth={grosor}
           strokeLinecap="round"
           strokeDasharray={circunferencia}
@@ -514,25 +514,28 @@ export default function Progreso({ session }) {
               </div>
             </div>
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">
-                Más activo
-              </p>
               {masActivo ? (
-                <div className="flex items-center gap-2.5">
-                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={48} grosor={5}>
-                    <span className="text-[11px] font-bold text-[#2C2C2A]">
-                      {Math.round(porcentajeAvance(masActivo) * 100)}%
-                    </span>
-                  </AnilloProgreso>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words">{masActivo.nombre}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 flex flex-col items-center text-center min-w-0">
+                    <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={48} grosor={5} color="#A26769">
+                      <span className="text-[11px] font-bold text-[#2C2C2A]">
+                        {Math.round(porcentajeAvance(masActivo) * 100)}%
+                      </span>
+                    </AnilloProgreso>
+                    <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words mt-1">{masActivo.nombre}</p>
                     <p className="text-[11px] font-bold tracking-wide text-[#8a8471]">
                       {masActivo.completados} de {masActivo.totalCursos} curso{masActivo.totalCursos === 1 ? '' : 's'}
                     </p>
                   </div>
+                  <span
+                    className="text-[10px] font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-2 py-2 flex-shrink-0 text-center leading-tight"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    MÁS<br />ACTIVO
+                  </span>
                 </div>
               ) : hayEmpateActivo ? null : (
-                <p className="text-sm text-[#8a8471] mt-1">Todavía nadie</p>
+                <p className="text-sm text-[#8a8471] mt-1 text-center">Todavía nadie</p>
               )}
             </div>
           </div>
@@ -609,10 +612,7 @@ export default function Progreso({ session }) {
             <div className="w-[26px] h-[26px] rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
               <IconBirrete className="text-white" />
             </div>
-            <div>
-              <h2 className="font-bold text-[#2C2C2A] text-[14.5px]">Tu equipo</h2>
-              <p className="text-[11px] text-[#8a8471]">Acá activás los cursos de cada empleado</p>
-            </div>
+            <h2 className="font-bold text-[#2C2C2A] text-[14.5px]">Acá activás los cursos de cada empleado</h2>
           </div>
 
           {gruposPorSucursal.length > 1 && (
