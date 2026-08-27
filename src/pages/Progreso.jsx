@@ -216,7 +216,6 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                   })
                 }
                 className="text-[10px] font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 flex-shrink-0"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Certificado
               </button>
@@ -420,14 +419,21 @@ export default function Progreso({ session }) {
   // como Crehana: no solo el promedio, también quién arrancó y quién no,
   // y quién viene más activo.
   const yaArrancaron = filas.filter((f) => f.completados > 0).length;
-  // "Más activo": solo se muestra a alguien si tiene ESTRICTAMENTE más
-  // cursos completados que el resto. Si hay empate en el máximo (varios
-  // con la misma cantidad, ninguno se destaca), no se elige a nadie —
-  // antes se mostraba al primero del sort aunque estuviera empatado.
-  const maxCompletados = filas.length > 0 ? Math.max(...filas.map((f) => f.completados)) : 0;
-  const empatadosEnMax = filas.filter((f) => f.completados === maxCompletados);
-  const masActivo = maxCompletados > 0 && empatadosEnMax.length === 1 ? empatadosEnMax[0] : null;
-  const hayEmpateActivo = maxCompletados > 0 && empatadosEnMax.length > 1;
+  // "Más activo": se mide por PORCENTAJE de avance (completados sobre lo
+  // que le corresponde a cada uno), no por cantidad absoluta — alguien con
+  // 2 de 3 cursos (66%) viene más adelantado que alguien con 2 de 4 (50%),
+  // aunque completó la misma cantidad. Bug real corregido acá: antes
+  // comparaba `completados` a secas, así que a alguien con menos cursos
+  // asignados pero mejor avance nunca le tocaba destacarse.
+  // Solo se muestra a alguien si tiene ESTRICTAMENTE mejor porcentaje que
+  // el resto. Si hay empate en el máximo, no se elige a nadie.
+  function porcentajeAvance(f) {
+    return f.totalCursos > 0 ? f.completados / f.totalCursos : 0;
+  }
+  const maxPorcentajeAvance = filas.length > 0 ? Math.max(...filas.map(porcentajeAvance)) : 0;
+  const empatadosEnMax = filas.filter((f) => porcentajeAvance(f) === maxPorcentajeAvance);
+  const masActivo = maxPorcentajeAvance > 0 && empatadosEnMax.length === 1 ? empatadosEnMax[0] : null;
+  const hayEmpateActivo = maxPorcentajeAvance > 0 && empatadosEnMax.length > 1;
   const podio = [...filas]
     .filter((f) => f.completados > 0)
     .sort((a, b) => b.completados - a.completados)
@@ -512,12 +518,16 @@ export default function Progreso({ session }) {
                 Más activo
               </p>
               {masActivo ? (
-                <div className="flex items-center gap-3">
-                  <Avatar e={masActivo} size={32} />
+                <div className="flex items-center gap-2.5">
+                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={48} grosor={5}>
+                    <span className="text-[11px] font-bold text-[#2C2C2A]">
+                      {Math.round(porcentajeAvance(masActivo) * 100)}%
+                    </span>
+                  </AnilloProgreso>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words">{masActivo.nombre}</p>
-                    <p className="text-[13px] font-bold tracking-wide text-[#3d382c]">
-                      {masActivo.completados} curso{masActivo.completados === 1 ? '' : 's'}
+                    <p className="text-[11px] font-bold tracking-wide text-[#8a8471]">
+                      {masActivo.completados} de {masActivo.totalCursos} curso{masActivo.totalCursos === 1 ? '' : 's'}
                     </p>
                   </div>
                 </div>
@@ -552,21 +562,28 @@ export default function Progreso({ session }) {
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
             <div className="space-y-3">
-              {cursosRanking.map((c) => (
-                <div key={c.microcurso_id} className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#EDE0C8] flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-bold text-[#C1502E]">{c.cantidad}</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium truncate">
+              {cursosRanking.map((c) => {
+                // % sobre el total de empleados (no sobre el curso más
+                // hecho): dice algo real ("le falta a la mayoría"), no solo
+                // relativo al primero del ranking.
+                const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
+                return (
+                  <div key={c.microcurso_id} className="flex items-center gap-3">
+                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] w-28 flex-shrink-0 truncate text-left">
                       <TituloCursoInline titulo={c.titulo} corto />
                     </p>
-                    <p className="text-[11px] text-[#8a8471]">
-                      empleado{c.cantidad === 1 ? '' : 's'} que lo completaron
-                    </p>
+                    <div className="flex-1 h-4 bg-[#EDE0C8] rounded-md overflow-hidden">
+                      <div
+                        className="h-full bg-[#7C8B6F] rounded-md"
+                        style={{ width: `${porcentajeEquipo}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] font-bold text-[#3d382c] flex-shrink-0 w-10 text-right">
+                      {c.cantidad}/{filas.length}
+                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

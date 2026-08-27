@@ -42,13 +42,15 @@ export function TituloCursoInline({ titulo, className = '', corto = false }) {
 
 // Fila compacta: bullet + nombre del curso (antes era un tilde de color,
 // sacado a pedido porque quedaba redundante en una lista que ya es "lo que
-// completó"). Usado en Progreso.jsx para la lista de cursos completados por
-// empleado.
+// completó"). Bullet y texto en negro/tinta oscura — a pedido, sin el
+// terracota de TituloCursoInline (que es el resaltado que se usa para
+// cursos por hacer, no para algo ya completado). Usado en Progreso.jsx
+// para la lista de cursos completados por empleado.
 export function CursoCompletadoFila({ titulo }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#C1502E] flex-shrink-0" />
-      <TituloCursoInline titulo={titulo} className="text-[13px]" corto />
+      <span className="w-1.5 h-1.5 rounded-full bg-[#2C2C2A] flex-shrink-0" />
+      <span className="text-[13px] font-medium text-[#2C2C2A]">{titulo}</span>
     </div>
   );
 }
