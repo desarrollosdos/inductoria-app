@@ -89,8 +89,12 @@ function ChecklistInterno() {
   if (error) {
     return (
       <div className="max-w-md mx-auto mt-24 px-4 text-center">
-        <p className="text-[#C1502E] font-semibold">{error}</p>
-        <a href={`/empleado?token=${token}`} className="text-sm text-[#6b6455] underline mt-2 inline-block">
+        <p className="text-[#C1502E] font-semibold mb-4">{error}</p>
+        <a
+          href={`/empleado?token=${token}`}
+          className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
           Volver a Mi perfil
         </a>
       </div>
@@ -103,7 +107,7 @@ function ChecklistInterno() {
         <p className="text-[#6b6455] font-medium">Tu sucursal no tiene un checklist activo en este momento.</p>
         <a
           href={`/empleado?token=${token}`}
-          className="inline-block mt-4 px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A]"
+          className="inline-block mt-4 px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
           Volver a Mi perfil
@@ -135,7 +139,8 @@ function ChecklistInterno() {
           </p>
           <a
             href={`/empleado?token=${token}`}
-            className="inline-block w-full py-2 rounded-lg font-semibold text-white bg-[#C1502E]"
+            className="inline-block w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             Volver a Mi perfil
           </a>
@@ -176,7 +181,8 @@ function ChecklistInterno() {
 
           <a
             href={`/empleado?token=${token}`}
-            className="block text-center text-sm text-[#6b6455] underline mt-4"
+            className="block w-full py-2 rounded-lg text-center font-bold tracking-wide text-white bg-[#C1502E] mt-3"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             Volver a Mi perfil
           </a>
