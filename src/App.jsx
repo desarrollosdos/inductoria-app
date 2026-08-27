@@ -14,6 +14,7 @@ import Checklists from './pages/Checklists';
 import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
 import CursoDetalle from './pages/CursoDetalle';
+import Checklist from './pages/Checklist';
 import AdminPage from './pages/AdminPage';
 
 export default function App() {
@@ -78,6 +79,18 @@ export default function App() {
         <>
           <Header empleadoNombre={empleadoNombre} />
           <CursoDetalle />
+        </>
+      );
+    }
+
+    // Pantalla nueva del empleado para ver y marcar el checklist operativo
+    // de su sucursal. Pública igual que /empleado y /curso: usa el mismo
+    // token de acceso, no depende de sesión de Supabase.
+    if (path === '/checklist') {
+      return (
+        <>
+          <Header empleadoNombre={empleadoNombre} />
+          <Checklist />
         </>
       );
     }
@@ -207,9 +220,9 @@ export default function App() {
       <VisitTracker />
       <div className="flex-1 flex flex-col">{renderContenido()}</div>
       <Footer />
-      {/* Solo para el dueño logueado (no en /empleado ni /curso, que son
-          públicas): ofrece instalar Inductoria como app de escritorio. */}
-      {session && path !== '/empleado' && path !== '/curso' && <InstalarAppPrompt />}
+      {/* Solo para el dueño logueado (no en /empleado, /curso ni /checklist,
+          que son públicas): ofrece instalar Inductoria como app de escritorio. */}
+      {session && path !== '/empleado' && path !== '/curso' && path !== '/checklist' && <InstalarAppPrompt />}
     </div>
   );
 }

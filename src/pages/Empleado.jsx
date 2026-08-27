@@ -17,6 +17,18 @@ function Avatar({ nombre, fotoUrl, size = 72 }) {
   );
 }
 
+// Mismo ícono que usa Checklists.jsx del lado del dueño y Checklist.jsx
+// del lado del empleado, para que se reconozca como la misma funcionalidad.
+function IconChecklistMini(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 3h6l1 2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3l1-2z" />
+      <path d="m8 11 1.3 1.3L12 9.8" />
+      <path d="m8 16 1.3 1.3L12 14.8" />
+    </svg>
+  );
+}
+
 function IconAviso(props) {
   return (
     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -79,7 +91,7 @@ function EmpleadoInterno({ onDatosCargados }) {
     );
   }
 
-  const { empleado, negocio, cuenta, microcursos } = datos;
+  const { empleado, negocio, cuenta, microcursos, checklist_disponible } = datos;
   const completados = microcursos.filter((m) => m.completado);
   const pendientes = microcursos.filter((m) => !m.completado);
 
@@ -103,6 +115,25 @@ function EmpleadoInterno({ onDatosCargados }) {
           </p>
         </div>
       </div>
+
+      {/* Antes no había ninguna forma de llegar a esta pantalla — no
+          existía. Usa el mismo token de acceso, así que no hace falta
+          repartir un link ni un PIN nuevo. Solo se muestra si el dueño
+          activó los checklists y armó uno activo para esta sucursal. */}
+      {checklist_disponible && (
+        <a
+          href={`/checklist?token=${token}`}
+          className="bg-white rounded-2xl border border-[#EFDDCE] p-4 mb-6 flex items-center gap-3"
+        >
+          <div className="w-[34px] h-[34px] rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
+            <IconChecklistMini className="text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#2C2C2A]">Checklist de hoy</p>
+            <p className="text-xs text-[#8a8471]">Tocá para ver y marcar las tareas de tu sucursal</p>
+          </div>
+        </a>
+      )}
 
       {microcursos.length === 0 && (
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 text-center">
