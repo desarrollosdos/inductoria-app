@@ -390,7 +390,7 @@ function CursoDetalleInterno() {
           {esEspecial && aprobado && (
             <div className="text-left bg-[#FBF7EA] border border-[#EFDDCE] rounded-xl p-4 mb-4">
               {acuseFecha ? (
-                <p className="text-sm font-semibold text-[#185FA5]">
+                <p className="text-sm font-semibold text-[#2C2C2A]">
                   ✓ Acuse de recibido confirmado el{' '}
                   {new Date(acuseFecha).toLocaleDateString('es-AR', {
                     day: 'numeric',
