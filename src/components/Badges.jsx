@@ -98,3 +98,31 @@ export function BadgeConTitulo({ titulo, especial, size = 24 }) {
     </div>
   );
 }
+
+// Escudos ilustrados para la pantalla de "Completaste" en CursoDetalle.jsx
+// ÚNICAMENTE — no tocan el círculo con tilde de arriba (BadgeCurso /
+// BadgeEspecial / BadgeConTitulo), que sigue igual en el resto de la app.
+// Los archivos van en public/badges/ (no se importan, se sirven como
+// estáticos): seguridad-e-higiene.png para el curso especial, más chico;
+// diploma.png para el resto de los cursos.
+export function BadgeEspecialImg({ size = 64 }) {
+  return (
+    <img
+      src="/badges/seguridad-e-higiene.png"
+      alt="Curso de Seguridad e Higiene completado"
+      style={{ height: size, width: 'auto' }}
+      className="flex-shrink-0"
+    />
+  );
+}
+
+export function BadgeCursoImg({ size = 96 }) {
+  return (
+    <img
+      src="/badges/diploma.png"
+      alt="Curso completado"
+      style={{ height: size, width: 'auto' }}
+      className="flex-shrink-0"
+    />
+  );
+}

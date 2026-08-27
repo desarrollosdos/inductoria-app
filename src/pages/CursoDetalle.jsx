@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { generarCertificadoPDF } from '../lib/certificado';
-import { esCursoSeguridadEHigiene, BadgeCurso, BadgeEspecial } from '../components/Badges';
+import { esCursoSeguridadEHigiene, BadgeCursoImg, BadgeEspecialImg } from '../components/Badges';
 import PinGate from '../components/PinGate';
 
 // Si el contenido del paso viene en varias líneas (cosas puntuales), se
@@ -244,16 +244,22 @@ function CursoDetalleInterno() {
 
   if (resultado) {
     const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
+    // No había ningún criterio de aprobado/reprobado en este archivo (el
+    // pill del porcentaje siempre se pintaba igual, verde/celeste). 70% es
+    // el estándar más común en plataformas de capacitación — si tenés otro
+    // número en mente, o la función empleado-completar-curso ya devuelve
+    // un campo `aprobado` propio, avisame y lo cambio por ese.
+    const aprobado = resultado.puntaje >= 70;
     return (
       <div className="max-w-md sm:max-w-xl mx-auto mt-10 px-4 sm:px-0 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8471] mb-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[#6b6455] mb-1">
             Completaste
           </p>
           <TituloCurso titulo={curso.titulo} className="mb-5" />
 
           <div className="flex justify-center mb-3">
-            {esEspecial ? <BadgeEspecial /> : <BadgeCurso />}
+            {esEspecial ? <BadgeEspecialImg /> : <BadgeCursoImg />}
           </div>
           {esEspecial && (
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#C1502E] mb-3">
@@ -261,11 +267,22 @@ function CursoDetalleInterno() {
             </p>
           )}
 
-          <h1 className="text-lg font-bold text-[#2C2C2A] mb-3">¡Listo!</h1>
+          <h1 className="text-lg font-bold text-[#2C2C2A] mb-3">¡Felicitaciones !!!</h1>
 
-          <div className="inline-flex items-center gap-2 bg-[#eef9f4] border-2 border-[#1D9E75] rounded-full px-4 py-1.5 mb-4">
-            <span className="text-base font-bold text-[#1D9E75]">{resultado.puntaje}%</span>
-            <span className="text-xs text-[#3d382c] font-medium">
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-4"
+            style={{ background: aprobado ? '#7C8B6F' : '#C1502E' }}
+          >
+            <span
+              className="text-base font-bold tracking-wide text-white"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+            >
+              {resultado.puntaje}%
+            </span>
+            <span
+              className="text-xs font-semibold text-white"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+            >
               · {resultado.correctas}/{resultado.total} correctas
             </span>
           </div>
@@ -289,7 +306,7 @@ function CursoDetalleInterno() {
                       type="checkbox"
                       checked={acuseChecked}
                       onChange={(e) => setAcuseChecked(e.target.checked)}
-                      className="mt-0.5 flex-shrink-0"
+                      className="mt-0.5 flex-shrink-0 accent-[#6B655A]"
                     />
                     Confirmo que leí y entendí el contenido de este curso de Seguridad e Higiene.
                   </label>
@@ -297,7 +314,8 @@ function CursoDetalleInterno() {
                   <button
                     onClick={handleConfirmarAcuse}
                     disabled={!acuseChecked || enviandoAcuse}
-                    className="w-full py-2 rounded-lg font-semibold text-white bg-[#185FA5] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                    className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:bg-[#EFDDCE] disabled:text-[#8a8471] disabled:font-semibold disabled:tracking-normal"
+                    style={!acuseChecked || enviandoAcuse ? undefined : { textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
                     {enviandoAcuse ? 'Confirmando...' : 'Confirmar acuse de recibido'}
                   </button>
@@ -310,7 +328,8 @@ function CursoDetalleInterno() {
             <button
               onClick={handleDescargarCertificado}
               disabled={generandoCertificado}
-              className="w-full py-2 rounded-lg font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3] disabled:opacity-60"
+              className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               {generandoCertificado ? 'Generando...' : 'Descargar certificado (PDF)'}
             </button>
@@ -327,9 +346,30 @@ function CursoDetalleInterno() {
   }
 
   const { titulo, pasos, preguntas } = curso;
+  // Antes acá se asumía que "pasos" siempre tenía al menos un elemento:
+  // pasos[pasoActual].titulo se leía sin chequear nada. Si un curso queda
+  // sin pasos cargados (por ejemplo "Manejo de situaciones difíciles",
+  // que se quedaba en blanco al abrirlo), eso tira una excepción durante
+  // el render que no cae en ningún catch — React desmonta todo y la
+  // pantalla queda en blanco, sin ningún mensaje. Con este chequeo, si no
+  // hay pasos pero sí hay evaluación, se va directo a la evaluación; si no
+  // hay ninguna de las dos cosas, se avisa en vez de romperse.
+  const hayPasos = Array.isArray(pasos) && pasos.length > 0;
+  const hayPreguntas = Array.isArray(preguntas) && preguntas.length > 0;
 
-  // Evaluación
-  if (enEvaluacion) {
+  if (!hayPasos && !hayPreguntas) {
+    return (
+      <div className="max-w-md sm:max-w-xl mx-auto mt-24 px-4 sm:px-0 text-center">
+        <p className="text-[#C1502E] font-semibold">Este curso todavía no tiene contenido cargado.</p>
+        <a href={`/empleado?token=${token}`} className="text-sm text-[#6b6455] underline mt-2 inline-block">
+          Volver a Mi perfil
+        </a>
+      </div>
+    );
+  }
+
+  // Evaluación (o directo acá si el curso no tiene pasos, solo evaluación)
+  if (enEvaluacion || !hayPasos) {
     const todasRespondidas = respuestas.every((r) => r !== null);
     return (
       <div className="max-w-md sm:max-w-2xl mx-auto mt-8 px-4 sm:px-0 pb-16">
@@ -357,6 +397,7 @@ function CursoDetalleInterno() {
                         nuevas[i] = j;
                         setRespuestas(nuevas);
                       }}
+                      className="accent-[#C1502E]"
                     />
                     {op}
                   </label>
@@ -421,7 +462,8 @@ function CursoDetalleInterno() {
         {!chatAbierto ? (
           <button
             onClick={() => setChatAbierto(true)}
-            className="w-full py-2 rounded-lg font-semibold text-[#C1502E] border border-[#C1502E] bg-[#FBEAE3]"
+            className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             ¿Tenés una duda puntual?
           </button>
