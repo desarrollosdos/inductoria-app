@@ -5,7 +5,7 @@ import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import TrialBanner from '../components/TrialBanner';
-import { esCursoSeguridadEHigiene, CursoCompletadoFila, TituloCursoInline } from '../components/Badges';
+import { esCursoSeguridadEHigiene, CursoCompletadoFila } from '../components/Badges';
 
 // Mismo ícono que usa DashboardNav.jsx para el tab "Progreso" (antes este
 // era un ícono de gráfico de barras distinto al del menú).
@@ -215,7 +215,8 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                     fechaCompletado: b.fecha_completado,
                   })
                 }
-                className="text-[10px] font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 flex-shrink-0"
+                className="text-[10px] font-medium tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 Certificado
               </button>
@@ -515,23 +516,23 @@ export default function Progreso({ session }) {
             </div>
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
               {masActivo ? (
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 flex flex-col items-center text-center min-w-0">
-                    <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={48} grosor={5} color="#A26769">
-                      <span className="text-[11px] font-bold text-[#2C2C2A]">
-                        {Math.round(porcentajeAvance(masActivo) * 100)}%
-                      </span>
-                    </AnilloProgreso>
-                    <p className="text-sm font-bold text-[#2C2C2A] leading-tight break-words mt-1">{masActivo.nombre}</p>
-                    <p className="text-[11px] font-bold tracking-wide text-[#8a8471]">
+                <div className="flex items-center gap-2">
+                  <AnilloProgreso pct={Math.round(porcentajeAvance(masActivo) * 100)} size={44} grosor={5} color="#A26769">
+                    <span className="text-[10px] font-bold text-[#2C2C2A]">
+                      {Math.round(porcentajeAvance(masActivo) * 100)}%
+                    </span>
+                  </AnilloProgreso>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#2C2C2A] leading-tight truncate">{masActivo.nombre}</p>
+                    <p className="text-[10.5px] font-bold tracking-wide text-[#8a8471] whitespace-nowrap">
                       {masActivo.completados} de {masActivo.totalCursos} curso{masActivo.totalCursos === 1 ? '' : 's'}
                     </p>
                   </div>
                   <span
-                    className="text-[10px] font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-2 py-2 flex-shrink-0 text-center leading-tight"
+                    className="text-[9px] font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-2 py-1.5 flex-shrink-0 whitespace-nowrap"
                     style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
-                    MÁS<br />ACTIVO
+                    MÁS ACTIVO
                   </span>
                 </div>
               ) : hayEmpateActivo ? null : (
@@ -570,20 +571,25 @@ export default function Progreso({ session }) {
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
                 // relativo al primero del ranking.
                 const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
+                // Nombre abreviado (hasta los ":", sin incluirlos) SIN
+                // truncar — el nombre se queda con el ancho que necesite,
+                // la barra (flex-1) es la que cede espacio si hace falta.
+                const nombreCorto = c.titulo && c.titulo.includes(':') ? c.titulo.split(':')[0] : c.titulo;
                 return (
                   <div key={c.microcurso_id} className="flex items-center gap-3">
-                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] w-28 flex-shrink-0 truncate text-left">
-                      <TituloCursoInline titulo={c.titulo} corto />
+                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] flex-shrink-0 whitespace-nowrap">
+                      {nombreCorto}
                     </p>
-                    <div className="flex-1 h-4 bg-[#EDE0C8] rounded-md overflow-hidden">
+                    <div className="flex-1 min-w-[60px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
                       <div
-                        className="h-full bg-[#7C8B6F] rounded-md"
-                        style={{ width: `${porcentajeEquipo}%` }}
-                      />
+                        className="h-full bg-[#7C8B6F] rounded-md flex items-center justify-end px-2"
+                        style={{ width: `${Math.max(porcentajeEquipo, 24)}%` }}
+                      >
+                        <span className="text-[10px] font-bold text-white whitespace-nowrap">
+                          {c.cantidad}/{filas.length}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[11px] font-bold text-[#3d382c] flex-shrink-0 w-10 text-right">
-                      {c.cantidad}/{filas.length}
-                    </span>
                   </div>
                 );
               })}
