@@ -111,15 +111,38 @@ function CursoDetalleInterno() {
         setCurso(data);
         setRespuestas(new Array(data.preguntas.length).fill(null));
 
-        // Si ya había un resultado guardado de una vez anterior (completó
-        // el curso y volvió, o refrescó la página sin querer), lo mostramos
-        // directamente en vez de arrancar el curso desde el paso 1.
-        try {
-          const guardado = localStorage.getItem(claveResultado(token, microcursoId));
-          if (guardado) setResultado(JSON.parse(guardado));
-        } catch {
-          // localStorage puede fallar (modo privado, cuota llena, etc.) —
-          // en el peor caso el empleado ve el curso de nuevo, no es grave.
+        // El servidor ahora es la fuente de verdad del progreso de este
+        // empleado en este curso puntual (viene de progreso_empleado). Si
+        // ya lo completó alguna vez —apruebe o no, y sin importar desde
+        // qué dispositivo o navegador— reconstruimos acá la pantalla de
+        // resultado. Esto es lo que permite volver a entrar en cualquier
+        // momento, por ejemplo para terminar de confirmar un acuse de
+        // recibido pendiente o volver a descargar el certificado, en vez
+        // de depender de que el resultado siga guardado en el localStorage
+        // de ese mismo navegador.
+        if (data.progreso) {
+          setResultado({
+            puntaje: data.progreso.puntaje,
+            correctas: data.progreso.correctas,
+            total: data.progreso.total,
+            aprobado: data.progreso.completado,
+            fecha_completado: data.progreso.fecha_completado,
+          });
+          if (data.progreso.acuse_confirmado_at) {
+            setAcuseFecha(data.progreso.acuse_confirmado_at);
+          }
+        } else {
+          // Fallback de compatibilidad: un resultado guardado en
+          // localStorage de antes de este cambio, o de un instante en que
+          // el registro en el servidor todavía no se haya terminado de
+          // escribir.
+          try {
+            const guardado = localStorage.getItem(claveResultado(token, microcursoId));
+            if (guardado) setResultado(JSON.parse(guardado));
+          } catch {
+            // localStorage puede fallar (modo privado, cuota llena, etc.) —
+            // en el peor caso el empleado ve el curso de nuevo, no es grave.
+          }
         }
       })
       .catch(() => setError('No se pudo cargar el curso.'))
@@ -175,9 +198,15 @@ function CursoDetalleInterno() {
       setError(data.error || 'No se pudo guardar tu resultado.');
       return;
     }
-    setResultado(data);
+    // El endpoint no manda fecha_completado (no la necesita para calificar),
+    // así que la completamos acá mismo con el mismo criterio que usa el
+    // servidor: solo si aprobó, y con el momento real en que lo hizo. La
+    // próxima vez que este empleado entre a esta pantalla, esa fecha ya va
+    // a venir directamente del servidor (progreso_empleado.fecha_completado).
+    const resultadoCompleto = { ...data, fecha_completado: data.aprobado ? new Date().toISOString() : null };
+    setResultado(resultadoCompleto);
     try {
-      localStorage.setItem(claveResultado(token, microcursoId), JSON.stringify(data));
+      localStorage.setItem(claveResultado(token, microcursoId), JSON.stringify(resultadoCompleto));
     } catch {
       // idem arriba: si falla, no rompe el flujo, solo no persiste el refresh.
     }
@@ -289,6 +318,19 @@ function CursoDetalleInterno() {
     // compatibilidad con un resultado viejo que haya quedado guardado en
     // localStorage de antes de este cambio (no tenía el campo `aprobado`).
     const aprobado = resultado.aprobado ?? resultado.puntaje >= 70;
+    // Fecha real en que se hizo (y aprobó) el curso — viene del servidor
+    // (progreso_empleado.fecha_completado), no del momento en que se
+    // confirma o se revisa el acuse, que puede ser bastante después. Las
+    // dos fechas se muestran por separado más abajo: esta es "cuándo lo
+    // hizo", la del acuse es "cuándo confirmó que lo leyó".
+    const fechaRealizacion = resultado.fecha_completado
+      ? new Date(resultado.fecha_completado).toLocaleDateString('es-AR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : null;
+    const tieneDetalleIntento = resultado.correctas != null && resultado.total != null;
     return (
       <div className="max-w-md sm:max-w-xl mx-auto mt-10 px-4 sm:px-0 text-center">
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-8">
@@ -314,7 +356,9 @@ function CursoDetalleInterno() {
           )}
 
           <div
-            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-4"
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 ${
+              aprobado && fechaRealizacion ? 'mb-1' : 'mb-4'
+            }`}
             style={{ background: aprobado ? '#7C8B6F' : '#C1502E' }}
           >
             <span
@@ -323,13 +367,19 @@ function CursoDetalleInterno() {
             >
               {resultado.puntaje}%
             </span>
-            <span
-              className="text-xs font-semibold text-white"
-              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-            >
-              · {resultado.correctas}/{resultado.total} correctas
-            </span>
+            {tieneDetalleIntento && (
+              <span
+                className="text-xs font-semibold text-white"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                · {resultado.correctas}/{resultado.total} correctas
+              </span>
+            )}
           </div>
+
+          {aprobado && fechaRealizacion && (
+            <p className="text-xs text-[#8a8471] mb-4">Realizado el {fechaRealizacion}</p>
+          )}
 
           {!aprobado && (
             <p className="text-sm text-[#6b6455] mb-4">
@@ -337,7 +387,7 @@ function CursoDetalleInterno() {
             </p>
           )}
 
-          {esEspecial && (
+          {esEspecial && aprobado && (
             <div className="text-left bg-[#FBF7EA] border border-[#EFDDCE] rounded-xl p-4 mb-4">
               {acuseFecha ? (
                 <p className="text-sm font-semibold text-[#185FA5]">

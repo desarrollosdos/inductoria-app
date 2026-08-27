@@ -162,14 +162,17 @@ function EmpleadoInterno({ onDatosCargados }) {
           <div className="space-y-2">
             {completados.map((m) => {
               const contenidoActualizado = m.actualizado_despues_de_completar;
-              const Wrapper = contenidoActualizado ? 'a' : 'div';
-              const wrapperProps = contenidoActualizado
-                ? { href: `/curso?token=${token}&curso=${m.id}` }
-                : {};
+              // Antes esto solo era clickeable si el contenido se había
+              // actualizado — el resto de los cursos completados quedaban
+              // sin ninguna forma de volver a entrar (ni para confirmar un
+              // acuse pendiente ni para volver a descargar el certificado).
+              // Ahora siempre es un link: empleado-curso trae el progreso
+              // guardado y CursoDetalle.jsx reconstruye la pantalla de
+              // resultado con eso, así que volver a entrar es seguro.
               return (
-                <Wrapper
+                <a
                   key={m.id}
-                  {...wrapperProps}
+                  href={`/curso?token=${token}&curso=${m.id}`}
                   className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
@@ -203,7 +206,7 @@ function EmpleadoInterno({ onDatosCargados }) {
                       )}
                     </div>
                   </div>
-                </Wrapper>
+                </a>
               );
             })}
           </div>
