@@ -404,7 +404,7 @@ export default function Procedimientos({ session }) {
             </span>
           }
         />
-        <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
+        <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
           Acá podés generar <strong>procedimientos (SOPs)</strong> a partir del mismo contenido que
           ya cargaste en la biblioteca: objetivo, alcance, qué necesitás a mano, pasos numerados y
           qué hacer ante excepciones. Listo para revisar, ajustar, aprobar y descargar en PDF

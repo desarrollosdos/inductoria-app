@@ -796,7 +796,7 @@ export default function Empleados({ session }) {
                 if (deEstaSucursal.length === 0) return null;
                 return (
                   <div key={n.id}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#C1502E] mb-2">
                       {n.nombre}
                     </p>
                     <div className="space-y-2">

@@ -1079,7 +1079,7 @@ export default function Contenido({ session }) {
             </span>
           }
         />
-        <div className="bg-[#E9F1F5] border border-[#CFE0E8] rounded-xl p-4 text-sm text-[#1B3540] font-medium">
+        <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
           Esta es tu <strong>biblioteca de contenido</strong>: subís el material de capacitación
           (manuales en PDF o Word, apuntes de texto, fotos o capturas de pantalla, notas de voz
           grabadas acá mismo o archivos de audio ya grabados), lo marcás como aprobado y desde

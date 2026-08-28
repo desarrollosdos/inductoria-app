@@ -163,7 +163,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
   if (!confirmando) {
     return (
       <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3">
-        <span>
+        <span className="font-semibold tracking-wide">
           Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
           {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Podés sumar una más ahora mismo.
         </span>
@@ -580,7 +580,7 @@ export default function Dashboard({ session }) {
               </a>
             </div>
           ) : cupoLleno ? (
-            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A]">
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] font-semibold tracking-wide">
               Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
               necesitás sumar más.
