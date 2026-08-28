@@ -81,7 +81,7 @@ const SECCIONES = [
     path: '/',
     Icon: IconSuscripcion,
     texto:
-      'Es la pantalla de inicio. Acá ves el estado de tu plan (prueba gratis, activa, pago pendiente, etc.) y el precio según cuántas sucursales tenés. Desde acá te suscribís cuando termina la prueba gratis, y también podés cancelar la suscripción si hace falta.',
+      'Es la pantalla de inicio. Acá ves el estado de tu plan (prueba gratis, activa, pago pendiente, etc.) y el precio según cuántas sucursales tenés. Desde acá te suscribís cuando termina la prueba gratis y también podés cancelar la suscripción si hace falta.',
   },
   {
     id: 'sucursales',
@@ -97,7 +97,7 @@ const SECCIONES = [
     path: '/empleados',
     Icon: IconEmpleados,
     texto:
-      'Das de alta a tu equipo: nombre, puesto y sucursal. Cada empleado no necesita usuario ni contraseña propia — accede con un link y un PIN de 4 dígitos, que encontrás en Progreso. Si alguien deja de trabajar con vos, lo das de baja desde acá.',
+      'Das de alta a tu equipo: nombre, puesto y sucursal. Cada empleado no necesita usuario ni contraseña propia. Accede con un link y un PIN de 4 dígitos, que encontrás en Progreso. Si alguien deja de trabajar con vos, lo das de baja desde acá.',
   },
   {
     id: 'contenido',
@@ -121,7 +121,7 @@ const SECCIONES = [
     path: '/checklists',
     Icon: IconChecklist,
     texto:
-      'Es para tareas operativas que se repiten — apertura, cierre, limpieza, caja. Armás un checklist, elegís si es diario, semanal o mensual, y a qué puesto le aplica (por ejemplo, que "Cierre de caja" solo lo vea el cajero). Tu equipo lo completa desde el celular con el mismo link de siempre, y vos ves el historial y quién cumple.',
+      'Es para tareas operativas que se repiten, como apertura, cierre, limpieza o caja. Armás un checklist, elegís si es diario, semanal o mensual y a qué puesto le aplica (por ejemplo, que "Cierre de caja" solo lo vea el cajero). Tu equipo lo completa desde el celular con el mismo link de siempre y vos ves el historial y quién cumple.',
   },
   {
     id: 'progreso',
@@ -129,7 +129,7 @@ const SECCIONES = [
     path: '/progreso',
     Icon: IconProgreso,
     texto:
-      'Es el panel de seguimiento de tu equipo: ranking, qué cursos completó cada uno, certificados descargables, y si confirmaron el acuse de recibido de Seguridad e Higiene. Desde acá también conseguís el link, el PIN y el código QR de acceso de cada empleado.',
+      'Es el panel de seguimiento de tu equipo: ranking, qué cursos completó cada uno, certificados descargables y si confirmaron el acuse de recibido de Seguridad e Higiene. Desde acá también conseguís el link, el PIN y el código QR de acceso de cada empleado.',
   },
 ];
 
@@ -138,9 +138,9 @@ export default function Ayuda({ session }) {
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <h1 className="text-lg font-bold text-[#2C2C2A] mb-1">Cómo se usa Inductoria</h1>
-          <p className="text-sm text-[#6b6455]">
+        <div className="bg-[#DFF3EF] border border-[#BEE3D8] rounded-2xl p-6">
+          <h1 className="text-lg font-bold tracking-wide text-[#1B6E62] mb-1">Cómo se usa Inductoria</h1>
+          <p className="text-sm font-semibold tracking-wide text-[#1B6E62]">
             Una guía rápida de qué encontrás en cada sección del menú y para qué sirve.
           </p>
         </div>

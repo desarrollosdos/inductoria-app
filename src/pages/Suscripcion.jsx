@@ -17,10 +17,10 @@ function IconCard(props) {
 
 function IconAyuda(props) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9.2a2.5 2.5 0 0 1 4.8.9c0 1.7-2.3 2-2.3 3.4" />
-      <line x1="12" y1="16.8" x2="12" y2="16.9" />
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 2a6.5 6.5 0 0 0-3.8 11.8c.5.4.8 1 .8 1.7V17h6v-1.5c0-.7.3-1.3.8-1.7A6.5 6.5 0 0 0 12 2z" />
+      <path d="M9 19h6" fill="none" />
+      <path d="M10 21.5h4" fill="none" />
     </svg>
   );
 }
@@ -218,15 +218,6 @@ export default function Suscripcion({ session }) {
           </span>
         </div>
 
-        <a
-          href="/ayuda"
-          className="flex items-center justify-center gap-2 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
-          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-        >
-          <IconAyuda />
-          Cómo se usa Inductoria
-        </a>
-
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div
             className="font-semibold text-sm rounded-full px-4 py-2 inline-block mb-4"
@@ -287,6 +278,17 @@ export default function Suscripcion({ session }) {
               </button>
             </div>
           )}
+        </div>
+
+        <div className="flex justify-center">
+          <a
+            href="/ayuda"
+            className="inline-flex items-center justify-center gap-2 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            <IconAyuda />
+            Cómo se usa Inductoria
+          </a>
         </div>
       </PageShell>
 
