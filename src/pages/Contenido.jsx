@@ -1364,7 +1364,8 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C98A2E] border border-[#C98A2E] rounded-full px-4 py-2"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
@@ -1513,16 +1514,11 @@ export default function Contenido({ session }) {
                 const sinDefinir = puestosActuales.length === 0;
                 const paraTodos = puestosActuales.includes('TODOS');
                 return (
-                  <div key={m.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
+                  <div key={m.id} className="bg-[#FBF7EA] border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                            <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white flex-shrink-0">
-                              Disponible
-                            </span>
-                          </div>
+                          <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
                           <p className={`text-[10px] mt-0.5 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
                             {sinDefinir
                               ? '⚠ Sin puesto asignado, no visible para nadie'
@@ -1531,15 +1527,9 @@ export default function Contenido({ session }) {
                               : `Solo para: ${puestosActuales.join(', ')}`}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => abrirEdicionPublicado(m.id)}
-                          title="Regenerar el contenido de este curso con IA"
-                          className="flex-shrink-0 text-[9px] font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 whitespace-nowrap"
-                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                        >
-                          {editando ? 'Cancelar' : 'Cambiar versión'}
-                        </button>
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white flex-shrink-0">
+                          Disponible
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap mt-2">
                         <button
@@ -1559,6 +1549,15 @@ export default function Contenido({ session }) {
                           }
                         >
                           {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicionPublicado(m.id)}
+                          title="Regenerar el contenido de este curso con IA"
+                          className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                        >
+                          {editando ? 'Cancelar' : 'Cambiar versión'}
                         </button>
                         {gapsPorCurso[m.id]?.total > 0 && (
                           <button
