@@ -1364,7 +1364,7 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C98A2E] border border-[#C98A2E] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#3E6B6B] border border-[#3E6B6B] rounded-full px-4 py-2"
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
@@ -1627,7 +1627,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => handleActualizarPublicado(m.id)}
                           disabled={actualizandoId === m.id || !textoNuevoPublicado.trim()}
-                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
                           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           <IconVarita />
