@@ -71,8 +71,8 @@ function IconSpinner(props) {
 const DURACION_MAX_GRABACION_SEG = 5 * 60;
 
 const ESTADO_INFO = {
-  pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Pendiente' },
-  aprobado: { bg: '#eef9f4', color: '#1D9E75', label: 'Aprobado' },
+  pendiente: { bg: '#6B655A', color: '#ffffff', label: 'Pendiente', nitida: true },
+  aprobado: { bg: '#7C8B6F', color: '#ffffff', label: 'Aprobado', nitida: true },
   // "generando": la Edge Function ya devolvió la respuesta rápido y el
   // trabajo pesado (llamar a la IA, armar el curso) sigue en segundo
   // plano en el servidor. Ver procesar-contenido-index.ts.
@@ -1309,8 +1309,12 @@ export default function Contenido({ session }) {
                           {c.archivo_original || 'Sin título'}
                         </p>
                         <span
-                          className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2"
-                          style={{ background: estadoInfo.bg, color: estadoInfo.color }}
+                          className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2"
+                          style={{
+                            background: estadoInfo.bg,
+                            color: estadoInfo.color,
+                            textShadow: estadoInfo.nitida ? '0 1px 1px rgba(0,0,0,0.35)' : undefined,
+                          }}
                         >
                           {estadoInfo.label}
                         </span>
@@ -1364,7 +1368,11 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#3E6B6B] border border-[#3E6B6B] rounded-full px-4 py-2"
+                            className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 ${
+                              c.estado === 'aprobado'
+                                ? 'bg-[#A2432A] border border-[#A2432A]'
+                                : 'bg-[#3E6B6B] border border-[#3E6B6B]'
+                            }`}
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
@@ -1374,7 +1382,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
                               disabled={generandoId === c.id}
-                              className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#0055A4] border border-[#0055A4] rounded-full px-4 py-2 disabled:opacity-60"
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-full px-4 py-2 disabled:opacity-60"
                               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                             >
                               {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
@@ -1514,7 +1522,7 @@ export default function Contenido({ session }) {
                 const sinDefinir = puestosActuales.length === 0;
                 const paraTodos = puestosActuales.includes('TODOS');
                 return (
-                  <div key={m.id} className="bg-[#FBF7EA] border border-[#EDE0C8] rounded-xl overflow-hidden">
+                  <div key={m.id} className="bg-[#FBF3EC] border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">

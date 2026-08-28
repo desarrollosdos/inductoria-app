@@ -667,16 +667,12 @@ export default function Checklists({ session }) {
                           <p className="text-sm font-bold text-[#2C2C2A]">{checklist.titulo}</p>
                           {checklist.activo && (
                             <span
-                              className={
-                                runActual
-                                  ? 'text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full'
-                                  : 'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border'
-                              }
-                              style={
-                                runActual
-                                  ? { background: '#7C8B6F', color: '#FFFFFF' }
-                                  : { background: '#FFF3C4', color: '#C2670A', borderColor: '#E5DAB0' }
-                              }
+                              className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                              style={{
+                                background: runActual ? '#7C8B6F' : '#6B655A',
+                                color: '#FFFFFF',
+                                textShadow: '0 1px 1px rgba(0,0,0,0.35)',
+                              }}
                             >
                               {runActual ? `Completado ${ETIQUETA_PERIODO[periodicidad]}` : `Pendiente ${ETIQUETA_PERIODO[periodicidad]}`}
                             </span>
