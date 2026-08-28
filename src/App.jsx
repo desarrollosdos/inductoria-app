@@ -16,6 +16,7 @@ import Empleado from './pages/Empleado';
 import CursoDetalle from './pages/CursoDetalle';
 import Checklist from './pages/Checklist';
 import AdminPage from './pages/AdminPage';
+import Ayuda from './pages/Ayuda';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -194,6 +195,15 @@ export default function App() {
         <>
           <Header session={session} />
           <Progreso session={session} />
+        </>
+      );
+    }
+
+    if (path === '/ayuda') {
+      return (
+        <>
+          <Header session={session} />
+          <Ayuda session={session} />
         </>
       );
     }

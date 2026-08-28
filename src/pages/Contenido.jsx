@@ -1550,7 +1550,7 @@ export default function Contenido({ session }) {
                               ? 'text-white bg-[#C1502E] border-[#C1502E]'
                               : sinDefinir
                               ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-white bg-[#A26769] border-[#A26769]'
+                              : 'text-white bg-[#8B5E3C] border-[#8B5E3C]'
                           }`}
                           style={
                             editandoPuestos || !sinDefinir

@@ -15,6 +15,16 @@ function IconCard(props) {
   );
 }
 
+function IconAyuda(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.2a2.5 2.5 0 0 1 4.8.9c0 1.7-2.3 2-2.3 3.4" />
+      <line x1="12" y1="16.8" x2="12" y2="16.9" />
+    </svg>
+  );
+}
+
 // Mismos 4 estados y mismos colores que ya usás en Repunte. "inactive" es
 // propio de Inductoria (acá no hay trial), tratado con el mismo criterio
 // que "prueba vencida" en Repunte: fondo suave, no una pastilla sólida
@@ -207,6 +217,15 @@ export default function Suscripcion({ session }) {
             {estado.corto}
           </span>
         </div>
+
+        <a
+          href="/ayuda"
+          className="flex items-center justify-center gap-2 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
+          <IconAyuda />
+          Cómo se usa Inductoria
+        </a>
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <div
