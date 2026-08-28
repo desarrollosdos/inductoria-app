@@ -509,7 +509,7 @@ export default function Empleados({ session }) {
             <select
               value={editForm.puesto}
               onChange={(ev) => setEditForm({ ...editForm, puesto: ev.target.value })}
-              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none [&>option:checked]:text-[#2C2C2A] [&>option:checked]:[background:linear-gradient(#FBEAE3,#FBEAE3)]"
+              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             >
               <option value="">Elegí el puesto</option>
               {puestosDisponibles.map((p) => (
@@ -646,7 +646,7 @@ export default function Empleados({ session }) {
                 onInvalid={validarCampo}
                 onInput={limpiarValidacion}
                 required
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none [&>option:checked]:text-[#2C2C2A] [&>option:checked]:[background:linear-gradient(#FBEAE3,#FBEAE3)]"
+                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               >
                 <option value="">Elegí la sucursal</option>
                 {negocios.map((n) => (
@@ -671,7 +671,7 @@ export default function Empleados({ session }) {
                 onChange={(e) => setPuesto(e.target.value)}
                 onInvalid={validarCampo}
                 onInput={limpiarValidacion}
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none [&>option:checked]:text-[#2C2C2A] [&>option:checked]:[background:linear-gradient(#FBEAE3,#FBEAE3)]"
+                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               >
                 <option value="">Elegí el puesto</option>
                 {puestosDisponibles.map((p) => (
