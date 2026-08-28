@@ -118,6 +118,10 @@ export default function Empleados({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+  // ids de empleados con al menos un curso realizado (progreso_empleado.completado = true).
+  // Se usa para no contar como "dados de baja" a quienes fueron borrados sin ninguna
+  // actividad (por ejemplo, mientras se los daba de alta y hubo que borrarlos).
+  const [empleadosConCursoRealizado, setEmpleadosConCursoRealizado] = useState(new Set());
 
   const puestosBase = PUESTOS_CATALOGO.filter((p) => p !== 'Otro');
   const puestosPersonalizados = [...new Set(empleados.map((e) => e.puesto).filter(Boolean))].filter(
@@ -191,6 +195,18 @@ export default function Empleados({ session }) {
           .in('negocio_id', negocioIds)
           .order('nombre', { ascending: true });
         setEmpleados(empleadosData || []);
+
+        const empleadoIds = (empleadosData || []).map((e) => e.id);
+        if (empleadoIds.length > 0) {
+          const { data: progresoData } = await supabase
+            .from('progreso_empleado')
+            .select('empleado_id, completado')
+            .in('empleado_id', empleadoIds)
+            .eq('completado', true);
+          setEmpleadosConCursoRealizado(new Set((progresoData || []).map((p) => p.empleado_id)));
+        } else {
+          setEmpleadosConCursoRealizado(new Set());
+        }
       }
     }
 
@@ -403,7 +419,10 @@ export default function Empleados({ session }) {
 
   const hasAccess = tieneAccesoBase(cuenta, session.user.email);
   const activos = empleados.filter((e) => !e.fecha_baja);
-  const dadosDeBaja = empleados.filter((e) => e.fecha_baja);
+  // Solo cuentan como "dados de baja" quienes tienen al menos un curso realizado.
+  // Así se excluye a quienes se borraron sin ninguna actividad (p. ej. de baja
+  // durante el alta, por error, sin haber llegado a usar la app).
+  const dadosDeBaja = empleados.filter((e) => e.fecha_baja && empleadosConCursoRealizado.has(e.id));
 
   function FilaEmpleado({ e }) {
     const abierto = editandoId === e.id;
@@ -578,7 +597,7 @@ export default function Empleados({ session }) {
           label="Empleados"
           right={
             <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
-              {empleados.length}
+              {activos.length}
             </span>
           }
         />
@@ -794,7 +813,12 @@ export default function Empleados({ session }) {
 
         {dadosDeBaja.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-            <h2 className="font-semibold text-[#8a8471] mb-3">Dados de baja ({dadosDeBaja.length})</h2>
+            <h2 className="font-semibold text-[#8a8471] mb-3 flex items-center gap-2">
+              Dados de baja
+              <span className="w-6 h-6 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center">
+                {dadosDeBaja.length}
+              </span>
+            </h2>
             <div className="space-y-2">
               {dadosDeBaja.map((e) => (
                 <div key={e.id} className="flex items-center gap-3 border-b border-[#EDE0C8] pb-2 last:border-0">
