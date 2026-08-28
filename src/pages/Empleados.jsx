@@ -243,7 +243,7 @@ export default function Empleados({ session }) {
       .insert({
         negocio_id: negocioSeleccionado,
         nombre: capitalizarPalabras(nombreEmpleado.trim()),
-        puesto: (puesto === 'Otro' ? puestoCustom.trim() : puesto.trim()) || null,
+        puesto: (puesto === 'Otro' ? capitalizarPalabras(puestoCustom.trim()) : puesto.trim()) || null,
         telefono: telefonoEmpleado.trim() || null,
         mail: mailEmpleado.trim() || null,
         foto_url: fotoUrl,
@@ -348,7 +348,7 @@ export default function Empleados({ session }) {
       }
     }
 
-    const puestoFinal = editForm.puesto === 'Otro' ? editForm.puestoCustom.trim() : editForm.puesto.trim();
+    const puestoFinal = editForm.puesto === 'Otro' ? capitalizarPalabras(editForm.puestoCustom.trim()) : editForm.puesto.trim();
     const { data, error } = await supabase
       .from('empleados')
       .update({
