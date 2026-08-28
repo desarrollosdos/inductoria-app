@@ -1519,7 +1519,7 @@ export default function Contenido({ session }) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                            <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#1B2A3D] text-white flex-shrink-0">
+                            <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white flex-shrink-0">
                               Disponible
                             </span>
                           </div>
@@ -1535,7 +1535,7 @@ export default function Contenido({ session }) {
                           type="button"
                           onClick={() => abrirEdicionPublicado(m.id)}
                           title="Regenerar el contenido de este curso con IA"
-                          className="flex-shrink-0 text-[9px] font-bold tracking-wide text-white bg-[#0055A4] rounded-full px-2 py-0.5 whitespace-nowrap"
+                          className="flex-shrink-0 text-[9px] font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-2 py-0.5 whitespace-nowrap"
                           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
                           {editando ? 'Cancelar' : 'Cambiar versión'}
@@ -1550,9 +1550,13 @@ export default function Contenido({ session }) {
                               ? 'text-white bg-[#C1502E] border-[#C1502E]'
                               : sinDefinir
                               ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-[#6b6455] border-[#EDE0C8] bg-[#FBF7EA]'
+                              : 'text-white bg-[#A26769] border-[#A26769]'
                           }`}
-                          style={editandoPuestos ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
+                          style={
+                            editandoPuestos || !sinDefinir
+                              ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' }
+                              : undefined
+                          }
                         >
                           {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
                         </button>

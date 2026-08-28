@@ -583,13 +583,13 @@ export default function Checklists({ session }) {
           }
         />
 
-        <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
-          <h2 className="font-bold tracking-wide text-[#2C4A3A] mb-1">Checklists operativos</h2>
-          <p className="text-xs font-semibold tracking-wide text-[#2C4A3A] mb-3">
-            Esta es una funcionalidad adicional a la capacitación. Tu equipo puede tener tareas
-            que se repiten y vos ves desde acá quién las completó. Podés armar más de un checklist
-            por sucursal, elegir si es diario, semanal o mensual, y a qué puestos le aplica cada
-            uno — por ejemplo, que "Cierre de caja" solo lo vea el cajero.
+        <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
+          <p className="mb-3">
+            <strong>Checklists operativos</strong>: funcionalidad adicional a la capacitación. Tu
+            equipo puede tener tareas que se repiten y vos ves desde acá quién las completó. Podés
+            armar más de un checklist por sucursal, elegir si es diario, semanal o mensual, y a
+            qué puestos le aplica cada uno — por ejemplo, que "Cierre de caja" solo lo vea el
+            cajero.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
