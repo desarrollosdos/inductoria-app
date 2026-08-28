@@ -15,6 +15,22 @@ function etiquetaPlan(plan) {
   return plan;
 }
 
+// Orden pedido por Roberto para todo el panel de administración: activas
+// primero, después las de prueba gratis, y por último todo lo demás
+// (inactivas, pago pendiente, suspendidas, canceladas) — cualquier plan
+// que no sea 'active' ni 'trial' cae en ese último grupo.
+function rangoPlan(plan) {
+  if (plan === 'active') return 0;
+  if (plan === 'trial') return 1;
+  return 2;
+}
+
+// Devuelve una copia ordenada (no muta el array original) de una lista de
+// cuentas con ese mismo criterio.
+function ordenarPorPlan(cuentas) {
+  return [...cuentas].sort((a, b) => rangoPlan(a.plan) - rangoPlan(b.plan));
+}
+
 function formatUltimaConexion(fecha) {
   if (!fecha) return 'Nunca se conectó';
   const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (1000 * 60 * 60 * 24));
@@ -356,6 +372,16 @@ export default function AdminPage({ session }) {
   const { resumen, clientes, riesgos } = datos;
   const cuentasActivas = clientes.filter((c) => c.plan === 'active').length;
 
+  // Mismo criterio de orden (activas, luego prueba gratis, luego el
+  // resto) aplicado a las tres listas de cuentas del panel: el resumen de
+  // conteos por plan, las últimas cuentas creadas, y el listado completo
+  // de Clientes e historial.
+  const planCountsOrdenados = Object.entries(resumen.planCounts).sort(
+    ([planA], [planB]) => rangoPlan(planA) - rangoPlan(planB) || etiquetaPlan(planA).localeCompare(etiquetaPlan(planB))
+  );
+  const ultimasCuentasOrdenadas = ordenarPorPlan(resumen.ultimasCuentas);
+  const clientesOrdenados = ordenarPorPlan(clientes);
+
   return (
     <div>
       {/* Antes acá iba <DashboardNav userEmail={...} />, el mismo menú de
@@ -452,10 +478,10 @@ export default function AdminPage({ session }) {
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
               <h2 className="font-semibold text-[#2C2C2A] mb-4">Cuentas por plan</h2>
               <div className="flex gap-6 flex-wrap">
-                {Object.entries(resumen.planCounts).length === 0 && (
+                {planCountsOrdenados.length === 0 && (
                   <p className="text-sm text-[#6b6455]">Todavía no hay cuentas cargadas.</p>
                 )}
-                {Object.entries(resumen.planCounts).map(([plan, cantidad]) => (
+                {planCountsOrdenados.map(([plan, cantidad]) => (
                   <div key={plan}>
                     <p className="text-2xl font-bold text-[#2C2C2A]">{cantidad}</p>
                     <p className="text-xs text-[#8a8471] uppercase tracking-wide">{etiquetaPlan(plan)}</p>
@@ -466,11 +492,11 @@ export default function AdminPage({ session }) {
 
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
               <h2 className="font-semibold text-[#2C2C2A] mb-4">Últimas cuentas creadas</h2>
-              {resumen.ultimasCuentas.length === 0 ? (
+              {ultimasCuentasOrdenadas.length === 0 ? (
                 <p className="text-sm text-[#6b6455]">Todavía no hay cuentas cargadas.</p>
               ) : (
                 <div className="space-y-2">
-                  {resumen.ultimasCuentas.map((c) => (
+                  {ultimasCuentasOrdenadas.map((c) => (
                     <div key={c.id} className="flex items-center justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
                       <div>
                         <p className="text-sm font-semibold text-[#2C2C2A]">{c.nombre}</p>
@@ -488,11 +514,11 @@ export default function AdminPage({ session }) {
         {tab === 'clientes' && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Todas las cuentas ({clientes.length})</h2>
-            {clientes.length === 0 ? (
+            {clientesOrdenados.length === 0 ? (
               <p className="text-sm text-[#6b6455]">Todavía no hay cuentas cargadas.</p>
             ) : (
               <div className="space-y-3">
-                {clientes.map((c) => (
+                {clientesOrdenados.map((c) => (
                   <div key={c.id} className="border border-[#F5EFE3] rounded-xl p-4">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold text-[#2C2C2A]">{c.nombre}</p>
