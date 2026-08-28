@@ -93,7 +93,7 @@ function SelectorPuestos({ seleccionados, onChange, disabled }) {
       onChange={onChange}
       disabled={disabled}
       size={Math.min(PUESTOS_CATALOGO_BASE.length + 1, 6)}
-      className="w-full border border-[#EFDDCE] rounded-lg text-sm outline-none px-1 py-1 disabled:opacity-60"
+      className="w-full border border-[#EFDDCE] rounded-lg text-sm outline-none px-1 py-1 disabled:opacity-60 [&>option:checked]:text-[#C1502E] [&>option:checked]:[background:linear-gradient(#FBEAE3,#FBEAE3)]"
     >
       <option value="TODOS">Todos los puestos</option>
       {PUESTOS_CATALOGO_BASE.map((p) => (
