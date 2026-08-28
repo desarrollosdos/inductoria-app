@@ -7,7 +7,7 @@ import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase, puedeUsarIA } from '../lib/acceso';
 import { generarProcedimientoPDF } from '../lib/procedimiento';
-import { capitalizarPrimeraLetra } from '../lib/texto';
+import { capitalizarPalabras } from '../lib/texto';
 
 // Mismo ícono que ahora usa DashboardNav.jsx para esta sección (hoja con
 // la esquina doblada), para que la barra de arriba de esta página y la
@@ -294,7 +294,7 @@ export default function Procedimientos({ session }) {
     const { data, error } = await supabase
       .from('procedimientos')
       .update({
-        titulo: form.titulo.trim() ? capitalizarPrimeraLetra(form.titulo.trim()) : 'Sin título',
+        titulo: form.titulo.trim() ? capitalizarPalabras(form.titulo.trim()) : 'Sin título',
         area: form.area.trim() || null,
         responsable: form.responsable.trim() || null,
         objetivo: form.objetivo.trim() || null,

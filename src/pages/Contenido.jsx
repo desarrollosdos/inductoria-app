@@ -7,7 +7,7 @@ import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase, puedeUsarIA, trialActivo } from '../lib/acceso';
 import { TituloCursoInline } from '../components/Badges';
-import { capitalizarPrimeraLetra } from '../lib/texto';
+import { capitalizarPalabras } from '../lib/texto';
 
 // Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
 // duplica acá porque son archivos separados sin un módulo compartido
@@ -392,7 +392,7 @@ export default function Contenido({ session }) {
       .insert({
         cuenta_id: cuenta.id,
         tipo: 'texto',
-        archivo_original: capitalizarPrimeraLetra(titulo.trim()),
+        archivo_original: capitalizarPalabras(titulo.trim()),
         texto_procesado: texto.trim(),
         estado: 'pendiente',
       })
@@ -777,7 +777,7 @@ export default function Contenido({ session }) {
     setGuardandoEdit(true);
     const { data, error } = await supabase
       .from('contenidos')
-      .update({ archivo_original: capitalizarPrimeraLetra(tituloEdit.trim()), texto_procesado: textoEdit.trim() })
+      .update({ archivo_original: capitalizarPalabras(tituloEdit.trim()), texto_procesado: textoEdit.trim() })
       .eq('id', id)
       .select()
       .single();

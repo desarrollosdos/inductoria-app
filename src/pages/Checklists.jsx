@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
-import { capitalizarPrimeraLetra } from '../lib/texto';
+import { capitalizarPalabras } from '../lib/texto';
 
 // Mismo catálogo que usa Empleados.jsx / Contenido.jsx para el campo
 // "puesto" — se duplica acá porque son archivos separados sin un módulo
@@ -294,7 +294,7 @@ export default function Checklists({ session }) {
 
   function agregarItem() {
     if (!nuevoItem.trim()) return;
-    setItemsEdit([...itemsEdit, capitalizarPrimeraLetra(nuevoItem.trim())]);
+    setItemsEdit([...itemsEdit, capitalizarPalabras(nuevoItem.trim())]);
     setNuevoItem('');
   }
 
@@ -316,7 +316,7 @@ export default function Checklists({ session }) {
       await supabase
         .from('checklists')
         .update({
-          titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
+          titulo: capitalizarPalabras(tituloEdit.trim()),
           puestos_aplicables: puestosEdit,
           periodicidad: periodicidadEdit,
         })
@@ -328,7 +328,7 @@ export default function Checklists({ session }) {
         .insert({
           cuenta_id: cuenta.id,
           negocio_id: negocio.id,
-          titulo: capitalizarPrimeraLetra(tituloEdit.trim()),
+          titulo: capitalizarPalabras(tituloEdit.trim()),
           puestos_aplicables: puestosEdit,
           periodicidad: periodicidadEdit,
         })
