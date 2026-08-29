@@ -242,7 +242,12 @@ export default function Dashboard({ session }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [creandoNegocio, setCreandoNegocio] = useState(false);
   const [errorCupo, setErrorCupo] = useState(null);
-  const [confirmandoNuevaSucursal, setConfirmandoNuevaSucursal] = useState(false);
+  // Alta de sucursal (formulario simple, dentro del cupo ya contratado): 3 pasos
+  // con opción de cancelar en cualquiera de ellos. 'inicial' = cartel verde con el
+  // botón "Agregar sucursal"; 'confirmar' = "¿estás seguro?"; 'validar' = tipear
+  // una palabra para confirmar; 'formulario' = carga de datos de la sucursal.
+  const [pasoAltaSucursal, setPasoAltaSucursal] = useState('inicial');
+  const [textoValidacionAlta, setTextoValidacionAlta] = useState('');
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState(FORM_VACIO);
@@ -373,7 +378,14 @@ export default function Dashboard({ session }) {
     }
     setNegocios([...negocios, data]);
     setForm(FORM_VACIO);
-    setConfirmandoNuevaSucursal(false);
+    setPasoAltaSucursal('inicial');
+    setTextoValidacionAlta('');
+  }
+
+  function cancelarAltaSucursal() {
+    setPasoAltaSucursal('inicial');
+    setTextoValidacionAlta('');
+    setErrorCupo(null);
   }
 
   function abrirEdicion(n) {
@@ -613,21 +625,75 @@ export default function Dashboard({ session }) {
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
               necesitás sumar más.
             </div>
-          ) : !confirmandoNuevaSucursal ? (
+          ) : pasoAltaSucursal === 'inicial' ? (
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3">
+              <span className="font-semibold tracking-wide">
+                Podés cargar una sucursal más cuando lo necesites.
+              </span>
+              <button
+                type="button"
+                onClick={() => setPasoAltaSucursal('confirmar')}
+                className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                Agregar sucursal
+              </button>
+            </div>
+          ) : pasoAltaSucursal === 'confirmar' ? (
             <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
               {errorCupo && <p className="text-xs text-[#C1502E]">{errorCupo}</p>}
               <p>Agregar una sucursal nueva tiene un costo asociado a tu plan.</p>
               <p className="font-semibold text-[#2C2C2A]">
-                ¿Estás seguro que querés abrir una nueva sucursal?
+                ¿Estás seguro que querés dar de alta una sucursal más?
               </p>
-              <button
-                type="button"
-                onClick={() => setConfirmandoNuevaSucursal(true)}
-                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                Sí, agregar sucursal
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cancelarAltaSucursal}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPasoAltaSucursal('validar')}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  Sí, continuar
+                </button>
+              </div>
+            </div>
+          ) : pasoAltaSucursal === 'validar' ? (
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+              <p className="font-semibold text-[#2C2C2A]">
+                Para confirmar, escribí CONFIRMAR
+              </p>
+              <input
+                type="text"
+                value={textoValidacionAlta}
+                onChange={(e) => setTextoValidacionAlta(e.target.value)}
+                placeholder="CONFIRMAR"
+                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none bg-white"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cancelarAltaSucursal}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPasoAltaSucursal('formulario')}
+                  disabled={textoValidacionAlta.trim().toUpperCase() !== 'CONFIRMAR'}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  Confirmar
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleCrearNegocio} className="space-y-2">
@@ -637,9 +703,8 @@ export default function Dashboard({ session }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setConfirmandoNuevaSucursal(false);
+                    cancelarAltaSucursal();
                     setForm(FORM_VACIO);
-                    setErrorCupo(null);
                   }}
                   disabled={creandoNegocio}
                   className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
