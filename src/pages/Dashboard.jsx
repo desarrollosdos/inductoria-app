@@ -330,6 +330,14 @@ export default function Dashboard({ session }) {
     )
       return;
 
+    if (
+      !window.confirm(
+        '¿Estás seguro que querés agregar esta sucursal? Tiene un costo asociado a tu plan.'
+      )
+    ) {
+      return;
+    }
+
     setCreandoNegocio(true);
     const { data, error } = await supabase
       .from('negocios')

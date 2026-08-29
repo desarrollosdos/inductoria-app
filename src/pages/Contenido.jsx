@@ -1572,7 +1572,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => abrirAccionesPublicado(m.id)}
                               title="Modificar este curso"
-                              className="w-8 h-8 rounded-full bg-[#8B5E3C] text-white flex items-center justify-center mt-2"
+                              className="w-8 h-8 rounded-full bg-[#6B655A] text-white flex items-center justify-center mt-2"
                             >
                               <IconLapiz strokeWidth={2.4} />
                             </button>
