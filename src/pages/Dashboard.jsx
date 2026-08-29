@@ -360,6 +360,13 @@ export default function Dashboard({ session }) {
       setEditandoId(null);
       return;
     }
+    if (
+      !window.confirm(
+        '¿Estás seguro que querés modificar los datos de esta sucursal? Es un dato asociado a muchas cosas.'
+      )
+    ) {
+      return;
+    }
     setEditandoId(n.id);
     setFormEdit({
       nombre: n.nombre || '',

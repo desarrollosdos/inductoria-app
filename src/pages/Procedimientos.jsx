@@ -58,7 +58,7 @@ function IconBorrar(props) {
 }
 
 const ESTADO_INFO = {
-  pendiente: { bg: '#EDE0C8', color: '#8a8471', label: 'Borrador, a revisar' },
+  pendiente: { bg: '#A2432A', color: '#FFFFFF', label: 'Borrador, a revisar', nitida: true },
   // Mismo verde salvia que ya se usa en toda la app (chip del usuario logueado
   // en Header.jsx, pestaña Admin de DashboardNav, podio de Progreso.jsx).
   aprobado: { bg: '#7C8B6F', color: '#FFFFFF', label: 'Aprobado' },
@@ -486,7 +486,7 @@ export default function Procedimientos({ session }) {
                               type="button"
                               onClick={() => abrirItem(p)}
                               title="Editar"
-                              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+                              className="w-8 h-8 rounded-full bg-[#8B5E3C] text-white flex items-center justify-center"
                             >
                               <IconLapiz />
                             </button>
@@ -508,8 +508,12 @@ export default function Procedimientos({ session }) {
                             </button>
                           </div>
                           <span
-                            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                            style={{ background: estadoInfo.bg, color: estadoInfo.color }}
+                            className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                            style={{
+                              background: estadoInfo.bg,
+                              color: estadoInfo.color,
+                              textShadow: estadoInfo.nitida ? '0 1px 1px rgba(0,0,0,0.35)' : undefined,
+                            }}
                           >
                             {estadoInfo.label}
                           </span>

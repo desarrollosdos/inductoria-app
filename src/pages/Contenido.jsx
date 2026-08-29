@@ -1572,7 +1572,7 @@ export default function Contenido({ session }) {
                               type="button"
                               onClick={() => abrirAccionesPublicado(m.id)}
                               title="Modificar este curso"
-                              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+                              className="w-8 h-8 rounded-full bg-[#8B5E3C] text-white flex items-center justify-center mt-2"
                             >
                               <IconLapiz strokeWidth={2.4} />
                             </button>
@@ -1594,7 +1594,7 @@ export default function Contenido({ session }) {
                             style={
                               editandoPuestos || !sinDefinir
                                 ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' }
-                                : undefined
+                                : { textShadow: '0 1px 1px rgba(0,0,0,0.15)' }
                             }
                           >
                             {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}

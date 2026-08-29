@@ -740,7 +740,7 @@ export default function Checklists({ session }) {
                                 type="button"
                                 onClick={() => abrirEdicionExistente(checklist)}
                                 title="Editar"
-                                className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+                                className="w-8 h-8 rounded-full bg-[#8B5E3C] text-white flex items-center justify-center"
                               >
                                 <IconLapiz />
                               </button>
@@ -748,7 +748,7 @@ export default function Checklists({ session }) {
                                 type="button"
                                 onClick={() => setHistorialAbiertoId(historialAbierto ? null : checklist.id)}
                                 title={historialAbierto ? 'Ocultar historial' : 'Ver historial'}
-                                className="w-8 h-8 rounded-full bg-[#1B2A3D] text-white flex items-center justify-center"
+                                className="w-8 h-8 rounded-full bg-[#3C5A73] text-white flex items-center justify-center"
                               >
                                 <IconHistorial />
                               </button>

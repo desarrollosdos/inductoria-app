@@ -434,12 +434,15 @@ export default function Empleados({ session }) {
             <div>
               <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
               {e.puesto && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#EDE0C8] text-[#C1502E] px-2 py-0.5 rounded-full inline-block mt-0.5">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide bg-[#6B655A] text-white px-2 py-0.5 rounded-full inline-block mt-0.5"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
                   {e.puesto}
                 </span>
               )}
               <p className="text-xs text-[#8a8471] mt-0.5">
-                {nombreNegocio(e.negocio_id)} · alta {new Date(e.fecha_alta).toLocaleDateString('es-AR')}
+                <span className="font-semibold tracking-wide text-[#6b6455]">{nombreNegocio(e.negocio_id)}</span> · alta {new Date(e.fecha_alta).toLocaleDateString('es-AR')}
               </p>
             </div>
           </div>
@@ -447,7 +450,7 @@ export default function Empleados({ session }) {
             <button
               onClick={() => abrirEdicion(e)}
               title="Editar"
-              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+              className="w-8 h-8 rounded-full bg-[#8B5E3C] text-white flex items-center justify-center"
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
