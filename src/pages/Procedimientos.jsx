@@ -465,6 +465,8 @@ export default function Procedimientos({ session }) {
               {procedimientos.map((p) => {
                 const abierto = abiertoId === p.id;
                 const estadoInfo = ESTADO_INFO[p.estado] || ESTADO_INFO.pendiente;
+                const sinCambios =
+                  abierto && form ? textoCompletoDesdeProcedimiento(p) === textoCompletoDesdeForm(form) : false;
                 return (
                   <div key={p.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="p-4">
@@ -624,7 +626,7 @@ export default function Procedimientos({ session }) {
                           <button
                             type="button"
                             onClick={() => handleGuardar(p.id)}
-                            disabled={guardando}
+                            disabled={guardando || sinCambios}
                             className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
@@ -634,7 +636,12 @@ export default function Procedimientos({ session }) {
                             type="button"
                             onClick={() => handleCambiarEstado(p.id, p.estado)}
                             disabled={procesandoId === p.id}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
+                            className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 disabled:opacity-60 ${
+                              p.estado === 'aprobado'
+                                ? 'bg-[#A2734C] border border-[#A2734C]'
+                                : 'bg-[#3E6B6B] border border-[#3E6B6B]'
+                            }`}
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {procesandoId === p.id
                               ? 'Procesando...'

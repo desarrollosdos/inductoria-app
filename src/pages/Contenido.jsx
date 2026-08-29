@@ -7,7 +7,7 @@ import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase, puedeUsarIA, trialActivo } from '../lib/acceso';
 import { TituloCursoInline } from '../components/Badges';
-import { capitalizarPalabras } from '../lib/texto';
+import { capitalizarPrimeraLetra } from '../lib/texto';
 
 // Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
 // duplica acá porque son archivos separados sin un módulo compartido
@@ -415,7 +415,7 @@ export default function Contenido({ session }) {
       .insert({
         cuenta_id: cuenta.id,
         tipo: 'texto',
-        archivo_original: capitalizarPalabras(titulo.trim()),
+        archivo_original: capitalizarPrimeraLetra(titulo.trim()),
         texto_procesado: texto.trim(),
         estado: 'pendiente',
       })
@@ -800,7 +800,7 @@ export default function Contenido({ session }) {
     setGuardandoEdit(true);
     const { data, error } = await supabase
       .from('contenidos')
-      .update({ archivo_original: capitalizarPalabras(tituloEdit.trim()), texto_procesado: textoEdit.trim() })
+      .update({ archivo_original: capitalizarPrimeraLetra(tituloEdit.trim()), texto_procesado: textoEdit.trim() })
       .eq('id', id)
       .select()
       .single();
@@ -1223,7 +1223,7 @@ export default function Contenido({ session }) {
                   type="button"
                   onClick={iniciarGrabacion}
                   disabled={extrayendoArchivo}
-                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#7C8B6F] disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
                   style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                 >
                   <IconMicrofono />
@@ -1546,7 +1546,7 @@ export default function Contenido({ session }) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                          <p className={`text-[10px] mt-0.5 ${sinDefinir ? 'text-[#C1502E] font-semibold' : 'text-[#8a8471]'}`}>
+                          <p className={`text-[10px] mt-0.5 font-semibold ${sinDefinir ? 'text-[#C1502E]' : 'text-[#8a8471]'}`}>
                             {sinDefinir
                               ? '⚠ Sin puesto asignado, no visible para nadie'
                               : paraTodos
@@ -1554,18 +1554,29 @@ export default function Contenido({ session }) {
                               : `Solo para: ${puestosActuales.join(', ')}`}
                           </p>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
                           <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white">
                             Disponible
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => abrirAccionesPublicado(m.id)}
-                            title="Modificar este curso"
-                            className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
-                          >
-                            <IconLapiz />
-                          </button>
+                          {accionesVisiblesId === m.id ? (
+                            <button
+                              type="button"
+                              onClick={() => setAccionesVisiblesId(null)}
+                              className="text-[10px] font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-full px-3 py-1"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              Cancelar
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => abrirAccionesPublicado(m.id)}
+                              title="Modificar este curso"
+                              className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
+                            >
+                              <IconLapiz strokeWidth={2.4} />
+                            </button>
+                          )}
                         </div>
                       </div>
                       {accionesVisiblesId === m.id && (

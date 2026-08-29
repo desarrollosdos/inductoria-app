@@ -82,6 +82,52 @@ function IconQuitarChico(props) {
   );
 }
 
+// Mismo ícono de lápiz (path exacto) que ya usás en Empleados.jsx/Procedimientos.jsx para "Editar".
+function IconLapiz(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+    </svg>
+  );
+}
+
+function IconHistorial(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function IconPausa(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none" {...props}>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  );
+}
+
+function IconPlay(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none" {...props}>
+      <path d="M7 4.5v15l13-7.5z" />
+    </svg>
+  );
+}
+
+// Mismo ícono de tacho de basura (paths exactos) que ya usás en Empleados.jsx/Procedimientos.jsx.
+function IconBorrar(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
 const ETIQUETA_PERIODO = { diario: 'hoy', semanal: 'esta semana', mensual: 'este mes' };
 const NOMBRE_PERIODICIDAD = { diario: 'Diario', semanal: 'Semanal', mensual: 'Mensual' };
 // Cuántos períodos hacia atrás se miran para calcular el % de
@@ -689,36 +735,38 @@ export default function Checklists({ session }) {
                             <p className="text-xs font-medium text-[#8a8471] mb-3">
                               Para: {resumenPuestos(checklist.puestos_aplicables)}
                             </p>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => abrirEdicionExistente(checklist)}
-                                className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
+                                title="Editar"
+                                className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
                               >
-                                Editar
+                                <IconLapiz />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setHistorialAbiertoId(historialAbierto ? null : checklist.id)}
-                                className="text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] border border-[#D0C5B0] rounded-full px-4 py-2"
+                                title={historialAbierto ? 'Ocultar historial' : 'Ver historial'}
+                                className="w-8 h-8 rounded-full bg-[#1B2A3D] text-white flex items-center justify-center"
                               >
-                                {historialAbierto ? 'Ocultar historial' : 'Ver historial'}
+                                <IconHistorial />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => toggleActivo(checklist)}
-                                className="text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2"
-                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                title={checklist.activo ? 'Pausar' : 'Reactivar'}
+                                className="w-8 h-8 rounded-full bg-[#6B655A] text-white flex items-center justify-center"
                               >
-                                {checklist.activo ? 'Pausar' : 'Reactivar'}
+                                {checklist.activo ? <IconPausa /> : <IconPlay />}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => eliminarChecklist(checklist.id)}
-                                className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
-                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                title="Eliminar"
+                                className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
                               >
-                                Eliminar
+                                <IconBorrar />
                               </button>
                             </div>
                             {historialAbierto && <HistorialYMetricas checklist={checklist} />}
