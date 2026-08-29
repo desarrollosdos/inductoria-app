@@ -35,6 +35,14 @@ function IconContenidoMini(props) {
   );
 }
 
+function IconLapiz(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+    </svg>
+  );
+}
+
 function IconVarita(props) {
   return (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -204,6 +212,21 @@ export default function Contenido({ session }) {
   const [editandoPuestosId, setEditandoPuestosId] = useState(null);
   const [puestosSeleccionados, setPuestosSeleccionados] = useState([]);
   const [guardandoPuestos, setGuardandoPuestos] = useState(false);
+
+  // En "Cursos disponibles", los botones de acción quedan ocultos detrás
+  // de un lápiz hasta que el dueño confirma que quiere tocar un curso ya
+  // aprobado (para no dejarlos siempre a la vista).
+  const [accionesVisiblesId, setAccionesVisiblesId] = useState(null);
+
+  function abrirAccionesPublicado(microcursoId) {
+    if (
+      window.confirm(
+        '¿Seguro que querés modificar alguna característica de este curso que ya fue aprobado?'
+      )
+    ) {
+      setAccionesVisiblesId(microcursoId);
+    }
+  }
 
   useEffect(() => {
     cargarTodo();
@@ -1075,7 +1098,7 @@ export default function Contenido({ session }) {
           label="Contenido"
           right={
             <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
-              {contenidos.length}
+              {cursosPublicados.length}
             </span>
           }
         />
@@ -1368,14 +1391,10 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 ${
-                              c.estado === 'aprobado'
-                                ? 'bg-[#A2432A] border border-[#A2432A]'
-                                : 'bg-[#3E6B6B] border border-[#3E6B6B]'
-                            }`}
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A2734C] border border-[#A2734C] rounded-full px-4 py-2"
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
-                            {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
+                            {c.estado === 'aprobado' ? 'Marcar como PENDIENTE' : 'Marcar como APROBADO'}
                           </button>
                           {c.estado === 'aprobado' && (
                             <button
@@ -1535,49 +1554,61 @@ export default function Contenido({ session }) {
                               : `Solo para: ${puestosActuales.join(', ')}`}
                           </p>
                         </div>
-                        <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white flex-shrink-0">
-                          Disponible
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap mt-2">
-                        <button
-                          type="button"
-                          onClick={() => abrirEdicionPuestos(m)}
-                          className={`text-xs font-bold tracking-wide rounded-lg px-3 py-1.5 border ${
-                            editandoPuestos
-                              ? 'text-white bg-[#C1502E] border-[#C1502E]'
-                              : sinDefinir
-                              ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
-                              : 'text-white bg-[#8B5E3C] border-[#8B5E3C]'
-                          }`}
-                          style={
-                            editandoPuestos || !sinDefinir
-                              ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' }
-                              : undefined
-                          }
-                        >
-                          {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => abrirEdicionPublicado(m.id)}
-                          title="Regenerar el contenido de este curso con IA"
-                          className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
-                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                        >
-                          {editando ? 'Cancelar' : 'Cambiar versión'}
-                        </button>
-                        {gapsPorCurso[m.id]?.total > 0 && (
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white">
+                            Disponible
+                          </span>
                           <button
                             type="button"
-                            onClick={() => setGapAbiertoId(gapAbiertoId === m.id ? null : m.id)}
-                            className="text-xs font-bold tracking-wide text-[#D69A2D] border border-[#D69A2D] bg-[#FCF3DD] rounded-lg px-3 py-1.5"
+                            onClick={() => abrirAccionesPublicado(m.id)}
+                            title="Modificar este curso"
+                            className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center"
                           >
-                            {gapsPorCurso[m.id].total} pregunta{gapsPorCurso[m.id].total === 1 ? '' : 's'} frecuente
-                            {gapsPorCurso[m.id].total === 1 ? '' : 's'}
+                            <IconLapiz />
                           </button>
-                        )}
+                        </div>
                       </div>
+                      {accionesVisiblesId === m.id && (
+                        <div className="flex items-center gap-2 flex-wrap mt-2">
+                          <button
+                            type="button"
+                            onClick={() => abrirEdicionPuestos(m)}
+                            className={`text-xs font-bold tracking-wide rounded-lg px-3 py-1.5 border ${
+                              editandoPuestos
+                                ? 'text-white bg-[#C1502E] border-[#C1502E]'
+                                : sinDefinir
+                                ? 'text-[#C1502E] border-[#C1502E] bg-[#FBEAE3]'
+                                : 'text-white bg-[#8B5E3C] border-[#8B5E3C]'
+                            }`}
+                            style={
+                              editandoPuestos || !sinDefinir
+                                ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' }
+                                : undefined
+                            }
+                          >
+                            {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => abrirEdicionPublicado(m.id)}
+                            title="Regenerar el contenido de este curso con IA"
+                            className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                          >
+                            {editando ? 'Cancelar' : 'Cambiar versión'}
+                          </button>
+                          {gapsPorCurso[m.id]?.total > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setGapAbiertoId(gapAbiertoId === m.id ? null : m.id)}
+                              className="text-xs font-bold tracking-wide text-[#D69A2D] border border-[#D69A2D] bg-[#FCF3DD] rounded-lg px-3 py-1.5"
+                            >
+                              {gapsPorCurso[m.id].total} pregunta{gapsPorCurso[m.id].total === 1 ? '' : 's'} frecuente
+                              {gapsPorCurso[m.id].total === 1 ? '' : 's'}
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {gapAbiertoId === m.id && gapsPorCurso[m.id] && (
                         <div className="mt-2 bg-[#FCF3DD] rounded-lg p-3 space-y-1">
                           <p className="text-[10px] font-semibold text-[#8a6d1f] mb-1">

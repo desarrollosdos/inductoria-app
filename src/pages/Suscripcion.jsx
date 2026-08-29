@@ -280,10 +280,10 @@ export default function Suscripcion({ session }) {
           )}
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-16 pt-6">
           <a
             href="/ayuda"
-            className="inline-flex items-center justify-center gap-2 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
+            className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             <IconAyuda />
