@@ -120,6 +120,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
   const [confirmando, setConfirmando] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [textoConfirmacion, setTextoConfirmacion] = useState('');
 
   const cantidadActual = Math.max(negocios.length, cuenta.sucursales_contratadas || 1);
   const cantidadNueva = cantidadActual + 1;
@@ -152,6 +153,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
       }
       setLoading(false);
       setConfirmando(false);
+      setTextoConfirmacion('');
       onAgregada?.();
     } catch (err) {
       console.error(err);
@@ -159,6 +161,8 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
       setLoading(false);
     }
   }
+
+  const confirmacionEscritaOk = textoConfirmacion.trim().toUpperCase() === 'CONFIRMAR';
 
   if (!confirmando) {
     return (
@@ -187,11 +191,26 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
         <strong className="text-[#2C2C2A]">${precioNuevo.toLocaleString('es-AR')}/mes</strong>, desde
         tu próximo cobro.
       </p>
+      <div>
+        <label className="block text-xs font-semibold text-[#2C2C2A] mb-1">
+          Para confirmar, escribí CONFIRMAR
+        </label>
+        <input
+          type="text"
+          value={textoConfirmacion}
+          onChange={(e) => setTextoConfirmacion(e.target.value)}
+          placeholder="CONFIRMAR"
+          className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+        />
+      </div>
       {error && <p className="text-xs text-[#C1502E]">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setConfirmando(false)}
+          onClick={() => {
+            setConfirmando(false);
+            setTextoConfirmacion('');
+          }}
           disabled={loading}
           className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
         >
@@ -200,7 +219,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
         <button
           type="button"
           onClick={handleAgregar}
-          disabled={loading}
+          disabled={loading || !confirmacionEscritaOk}
           className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
@@ -223,6 +242,7 @@ export default function Dashboard({ session }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [creandoNegocio, setCreandoNegocio] = useState(false);
   const [errorCupo, setErrorCupo] = useState(null);
+  const [confirmandoNuevaSucursal, setConfirmandoNuevaSucursal] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState(FORM_VACIO);
@@ -330,14 +350,6 @@ export default function Dashboard({ session }) {
     )
       return;
 
-    if (
-      !window.confirm(
-        '¿Estás seguro que querés agregar esta sucursal? Tiene un costo asociado a tu plan.'
-      )
-    ) {
-      return;
-    }
-
     setCreandoNegocio(true);
     const { data, error } = await supabase
       .from('negocios')
@@ -361,6 +373,7 @@ export default function Dashboard({ session }) {
     }
     setNegocios([...negocios, data]);
     setForm(FORM_VACIO);
+    setConfirmandoNuevaSucursal(false);
   }
 
   function abrirEdicion(n) {
@@ -600,18 +613,48 @@ export default function Dashboard({ session }) {
               {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
               necesitás sumar más.
             </div>
+          ) : !confirmandoNuevaSucursal ? (
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+              {errorCupo && <p className="text-xs text-[#C1502E]">{errorCupo}</p>}
+              <p>Agregar una sucursal nueva tiene un costo asociado a tu plan.</p>
+              <p className="font-semibold text-[#2C2C2A]">
+                ¿Estás seguro que querés abrir una nueva sucursal?
+              </p>
+              <button
+                type="button"
+                onClick={() => setConfirmandoNuevaSucursal(true)}
+                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                Sí, agregar sucursal
+              </button>
+            </div>
           ) : (
             <form onSubmit={handleCrearNegocio} className="space-y-2">
               {errorCupo && <p className="text-xs text-[#C1502E]">{errorCupo}</p>}
               <CamposDireccion form={form} setForm={setForm} />
-              <button
-                type="submit"
-                disabled={creandoNegocio}
-                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {creandoNegocio ? 'Agregando...' : 'Agregar sucursal'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoNuevaSucursal(false);
+                    setForm(FORM_VACIO);
+                    setErrorCupo(null);
+                  }}
+                  disabled={creandoNegocio}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creandoNegocio}
+                  className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  {creandoNegocio ? 'Agregando...' : 'Agregar sucursal'}
+                </button>
+              </div>
             </form>
           )}
         </div>
