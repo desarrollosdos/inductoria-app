@@ -503,7 +503,7 @@ export default function Checklists({ session }) {
           <button
             type="button"
             onClick={agregarItem}
-            className="text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+            className="text-xs font-bold tracking-wide text-white bg-[#6B4226] border border-[#6B4226] rounded-full px-4 py-2"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             Agregar
@@ -515,7 +515,7 @@ export default function Checklists({ session }) {
             type="button"
             onClick={() => guardarChecklist(negocio, checklistExistente)}
             disabled={guardando || !tituloEdit.trim() || itemsEdit.length === 0 || puestosEdit.length === 0}
-            className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+            className="text-xs font-bold tracking-wide text-white bg-[#4A453D] rounded-full px-4 py-2 disabled:opacity-60"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             {guardando ? 'Guardando...' : 'Guardar checklist'}
@@ -523,7 +523,7 @@ export default function Checklists({ session }) {
           <button
             type="button"
             onClick={cerrarEdicion}
-            className="text-xs font-bold tracking-wide text-white bg-[#A26769] rounded-full px-4 py-2"
+            className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             Salir
@@ -683,6 +683,7 @@ export default function Checklists({ session }) {
           negocios.map((negocio) => {
             const checklistsDelNegocio = checklists.filter((c) => c.negocio_id === negocio.id);
             const agregandoAca = agregandoNegocioId === negocio.id;
+            const editandoAlgunoAca = checklistsDelNegocio.some((c) => c.id === editandoChecklistId);
 
             return (
               <div key={negocio.id} className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -779,7 +780,7 @@ export default function Checklists({ session }) {
                   })}
                 </div>
 
-                {!agregandoAca && (
+                {!agregandoAca && !editandoAlgunoAca && (
                   <button
                     type="button"
                     onClick={() => abrirNuevoChecklist(negocio.id)}

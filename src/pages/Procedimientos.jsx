@@ -441,7 +441,8 @@ export default function Procedimientos({ session }) {
                     type="button"
                     onClick={() => handleGenerar(c.id)}
                     disabled={generandoId === c.id}
-                    className="w-full sm:w-auto flex-shrink-0 text-xs font-semibold text-white bg-[#0055A4] rounded-full px-4 py-1.5 disabled:opacity-60"
+                    className="w-full sm:w-auto flex-shrink-0 text-xs font-bold tracking-wide text-white bg-[#4A453D] rounded-full px-4 py-1.5 disabled:opacity-60"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
                     {generandoId === c.id ? 'Generando...' : 'Generar procedimiento con IA'}
                   </button>
@@ -494,7 +495,7 @@ export default function Procedimientos({ session }) {
                               type="button"
                               onClick={() => handleDescargar(p)}
                               title="Descargar PDF"
-                              className="w-8 h-8 rounded-full bg-[#1B2A3D] text-white flex items-center justify-center"
+                              className="w-8 h-8 rounded-full bg-[#3E6B6B] text-white flex items-center justify-center"
                             >
                               <IconDescargar />
                             </button>

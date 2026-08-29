@@ -1391,7 +1391,11 @@ export default function Contenido({ session }) {
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A2734C] border border-[#A2734C] rounded-full px-4 py-2"
+                            className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 border ${
+                              c.estado === 'aprobado'
+                                ? 'bg-[#6B4226] border-[#6B4226]'
+                                : 'bg-[#A2734C] border-[#A2734C]'
+                            }`}
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             {c.estado === 'aprobado' ? 'Marcar como PENDIENTE' : 'Marcar como APROBADO'}
