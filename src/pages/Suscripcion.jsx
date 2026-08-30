@@ -200,7 +200,7 @@ export default function Suscripcion({ session }) {
   const precioMensual = precioTotalMensual(cantidadSucursales, precioBase);
 
   return (
-    <>
+    <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
         <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
@@ -281,7 +281,7 @@ export default function Suscripcion({ session }) {
         </div>
       </PageShell>
 
-      <div className="mt-auto pb-6 pt-6 flex justify-center px-4">
+      <div className="pb-6 pt-2 flex justify-center px-4">
         <a
           href="/ayuda"
           className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
@@ -301,6 +301,6 @@ export default function Suscripcion({ session }) {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
