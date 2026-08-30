@@ -503,7 +503,7 @@ export default function Checklists({ session }) {
           <button
             type="button"
             onClick={agregarItem}
-            className="text-xs font-bold tracking-wide text-white bg-[#6B4226] border border-[#6B4226] rounded-full px-4 py-2"
+            className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-full px-4 py-2"
             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
           >
             Agregar
@@ -749,7 +749,7 @@ export default function Checklists({ session }) {
                                 type="button"
                                 onClick={() => setHistorialAbiertoId(historialAbierto ? null : checklist.id)}
                                 title={historialAbierto ? 'Ocultar historial' : 'Ver historial'}
-                                className="w-8 h-8 rounded-full bg-[#96A588] text-white flex items-center justify-center"
+                                className="w-8 h-8 rounded-full bg-[#6E2A38] text-white flex items-center justify-center"
                               >
                                 <IconHistorial />
                               </button>

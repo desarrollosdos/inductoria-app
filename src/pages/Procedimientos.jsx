@@ -495,7 +495,7 @@ export default function Procedimientos({ session }) {
                               type="button"
                               onClick={() => handleDescargar(p)}
                               title="Descargar PDF"
-                              className="w-8 h-8 rounded-full bg-[#3E6B6B] text-white flex items-center justify-center"
+                              className="w-8 h-8 rounded-full bg-[#3F4536] text-white flex items-center justify-center"
                             >
                               <IconDescargar />
                             </button>

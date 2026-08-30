@@ -43,6 +43,16 @@ function IconLapiz(props) {
   );
 }
 
+function IconBorrar(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
 function IconVarita(props) {
   return (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -1326,24 +1336,38 @@ export default function Contenido({ session }) {
                 const estadoInfo = ESTADO_INFO[c.estado] || ESTADO_INFO.pendiente;
                 return (
                   <div key={c.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
-                    <button type="button" onClick={() => abrirItem(c)} className="w-full text-left p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-[#2C2C2A]">
-                          {c.archivo_original || 'Sin título'}
-                        </p>
-                        <span
-                          className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2"
-                          style={{
-                            background: estadoInfo.bg,
-                            color: estadoInfo.color,
-                            textShadow: estadoInfo.nitida ? '0 1px 1px rgba(0,0,0,0.35)' : undefined,
-                          }}
-                        >
-                          {estadoInfo.label}
-                        </span>
-                      </div>
-                      {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
-                    </button>
+                    <div className="p-4">
+                      <button type="button" onClick={() => abrirItem(c)} className="w-full text-left block">
+                        <div className="flex items-start justify-between mb-1 gap-2">
+                          <p className="text-sm font-semibold text-[#2C2C2A] min-w-0">
+                            {c.archivo_original || 'Sin título'}
+                          </p>
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{
+                              background: estadoInfo.bg,
+                              color: estadoInfo.color,
+                              textShadow: estadoInfo.nitida ? '0 1px 1px rgba(0,0,0,0.35)' : undefined,
+                            }}
+                          >
+                            {estadoInfo.label}
+                          </span>
+                        </div>
+                        {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
+                      </button>
+                      {!abierto && (c.estado === 'pendiente' || c.estado === 'aprobado') && (
+                        <div className="flex justify-end mt-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEliminar(c.id)}
+                            title="Eliminar"
+                            className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
+                          >
+                            <IconBorrar />
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     {abierto && c.estado === 'generando' && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
@@ -1374,27 +1398,29 @@ export default function Contenido({ session }) {
                         />
                         {errorGenerar && <p className="text-xs text-[#C1502E]">{errorGenerar}</p>}
                         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleGuardarEdit(c.id)}
-                            disabled={
-                              guardandoEdit ||
-                              !tituloEdit.trim() ||
-                              !textoEdit.trim() ||
-                              (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
-                            }
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                          >
-                            {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
-                          </button>
+                          {c.estado !== 'aprobado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleGuardarEdit(c.id)}
+                              disabled={
+                                guardandoEdit ||
+                                !tituloEdit.trim() ||
+                                !textoEdit.trim() ||
+                                (tituloEdit === (c.archivo_original || '') && textoEdit === (c.texto_procesado || ''))
+                              }
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(c.id, c.estado)}
                             className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 border ${
                               c.estado === 'aprobado'
-                                ? 'bg-[#6B4226] border-[#6B4226]'
-                                : 'bg-[#A2734C] border-[#A2734C]'
+                                ? 'bg-[#8B3A22] border-[#8B3A22]'
+                                : 'bg-[#4A5A6B] border-[#4A5A6B]'
                             }`}
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
@@ -1413,16 +1439,8 @@ export default function Contenido({ session }) {
                           )}
                           <button
                             type="button"
-                            onClick={() => handleEliminar(c.id)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2"
-                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                          >
-                            Eliminar
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setAbiertoId(null)}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#545C48] border border-[#545C48] rounded-full px-4 py-2"
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             Salir
@@ -1506,7 +1524,7 @@ export default function Contenido({ session }) {
                               <button
                                 type="button"
                                 onClick={() => setAbiertoId(null)}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#545C48] border border-[#545C48] rounded-full px-4 py-2"
                                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                               >
                                 Salir
