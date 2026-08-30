@@ -200,7 +200,7 @@ export default function Suscripcion({ session }) {
   const precioMensual = precioTotalMensual(cantidadSucursales, precioBase);
 
   return (
-    <div className="flex flex-col flex-1">
+    <>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
         <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
@@ -281,17 +281,15 @@ export default function Suscripcion({ session }) {
         </div>
       </PageShell>
 
-      <div className="flex-1 flex flex-col justify-end pb-6 pt-6">
-        <div className="w-full max-w-4xl mx-auto px-4 flex justify-center">
-          <a
-            href="/ayuda"
-            className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
-            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-          >
-            <IconAyuda />
-            Cómo se usa Inductoria
-          </a>
-        </div>
+      <div className="mt-auto pb-6 pt-6 flex justify-center px-4">
+        <a
+          href="/ayuda"
+          className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
+          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+        >
+          <IconAyuda />
+          Cómo se usa Inductoria
+        </a>
       </div>
 
       {mostrarCancelar && (
@@ -303,6 +301,6 @@ export default function Suscripcion({ session }) {
           }}
         />
       )}
-    </div>
+    </>
   );
 }
