@@ -628,23 +628,25 @@ export default function Procedimientos({ session }) {
                         )}
 
                         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleGuardar(p.id)}
-                            disabled={guardando || sinCambios}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
-                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                          >
-                            {guardando ? 'Guardando...' : 'Guardar cambios'}
-                          </button>
+                          {p.estado !== 'aprobado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleGuardar(p.id)}
+                              disabled={guardando || sinCambios}
+                              className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              {guardando ? 'Guardando...' : 'Guardar cambios'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleCambiarEstado(p.id, p.estado)}
                             disabled={procesandoId === p.id}
                             className={`w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white rounded-full px-4 py-2 disabled:opacity-60 ${
                               p.estado === 'aprobado'
-                                ? 'bg-[#A2734C] border border-[#A2734C]'
-                                : 'bg-[#3E6B6B] border border-[#3E6B6B]'
+                                ? 'bg-[#8B3A22] border border-[#8B3A22]'
+                                : 'bg-[#4A5A6B] border border-[#4A5A6B]'
                             }`}
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
@@ -660,7 +662,7 @@ export default function Procedimientos({ session }) {
                               setAbiertoId(null);
                               setForm(null);
                             }}
-                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#A1957D] border border-[#766B56] rounded-full px-4 py-2"
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#545C48] border border-[#545C48] rounded-full px-4 py-2"
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
                             Salir

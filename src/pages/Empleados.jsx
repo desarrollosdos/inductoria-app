@@ -739,7 +739,7 @@ export default function Empleados({ session }) {
                   !puesto ||
                   (puesto === 'Otro' && !puestoCustom.trim())
                 }
-                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                className="w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
                 {creando ? 'Creando...' : 'Dar de alta'}

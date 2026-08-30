@@ -1312,7 +1312,7 @@ export default function Contenido({ session }) {
             <button
               type="submit"
               disabled={subiendo || !titulo.trim() || !texto.trim()}
-              className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+              className="w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               {subiendo ? 'Guardando...' : 'Guardar contenido'}
