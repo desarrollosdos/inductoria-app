@@ -781,7 +781,7 @@ export default function Empleados({ session }) {
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#25D366] rounded-full px-3 py-1.5"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-3 py-1.5"
                 >
                   <IconWhatsApp />
                   Enviar por WhatsApp

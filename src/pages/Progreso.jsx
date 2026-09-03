@@ -211,7 +211,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Enviar por WhatsApp"
-                    className="w-6 h-6 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0"
+                    className="w-6 h-6 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
                   >
                     <IconWhatsApp />
                   </a>
