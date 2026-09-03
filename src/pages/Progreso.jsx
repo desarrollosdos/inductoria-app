@@ -529,9 +529,31 @@ export default function Progreso({ session }) {
   const hayEmpateActivo = maxPorcentajeAvance > 0 && empatadosEnMax.length > 1;
   const podio = [...filas]
     .filter((f) => f.completados > 0)
-    .sort((a, b) => b.completados - a.completados)
-    .slice(0, 3);
+    .sort((a, b) => b.completados - a.completados);
   const sinArrancar = filas.filter((f) => f.completados === 0);
+
+  // Estancados: arrancaron (tienen al menos 1 completado) pero no
+  // terminaron todo lo que les corresponde, y hace más de 10 días que no
+  // completan nada nuevo. Distinto de "sin arrancar" (nunca empezaron) y
+  // de estar simplemente al día (ya completaron todo lo que le toca).
+  // El corte de 10 días es un criterio razonable, no un dato que venga
+  // de ningún lado — ajustalo si te parece mucho o poco.
+  const DIAS_ESTANCADO = 10;
+  const ahora = Date.now();
+  const estancados = filas.filter((f) => {
+    if (f.completados === 0 || f.completados >= f.totalCursos) return false;
+    if (!f.ultimaActividad) return false;
+    const diasSinActividad = (ahora - new Date(f.ultimaActividad).getTime()) / 86400000;
+    return diasSinActividad > DIAS_ESTANCADO;
+  });
+
+  // Promedio de puntaje de evaluación de un empleado, sobre los cursos
+  // que ya completó (null si todavía no completó ninguno).
+  function promedioPuntaje(f) {
+    const conPuntaje = f.badges.filter((b) => typeof b.puntaje === 'number');
+    if (conPuntaje.length === 0) return null;
+    return Math.round(conPuntaje.reduce((acc, b) => acc + b.puntaje, 0) / conPuntaje.length);
+  }
 
   // Sección "Tu equipo": agrupada por sucursal (en vez de mostrar el
   // nombre de la sucursal repetido al lado de cada empleado), y
@@ -640,6 +662,7 @@ export default function Progreso({ session }) {
             <div className="grid grid-cols-3 gap-3">
               {podio.map((f) => {
                 const pct = f.totalCursos > 0 ? Math.round((f.completados / f.totalCursos) * 100) : 0;
+                const prom = promedioPuntaje(f);
                 return (
                   <div key={f.id} className="flex flex-col items-center gap-2 text-center">
                     <AnilloProgreso pct={pct}>{pct}%</AnilloProgreso>
@@ -647,6 +670,9 @@ export default function Progreso({ session }) {
                     <p className="text-[10.5px] font-bold tracking-wide text-[#8a8471]">
                       {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
                     </p>
+                    {prom !== null && (
+                      <p className="text-[10px] font-semibold text-[#7C8B6F]">Evaluación: {prom}%</p>
+                    )}
                   </div>
                 );
               })}
@@ -662,32 +688,58 @@ export default function Progreso({ session }) {
                 texto) — así todas las barras arrancan del mismo punto,
                 alineadas con el nombre más largo, y cada una respeta su
                 propio % desde ahí. */}
-            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'minmax(0,120px) 1fr' }}>
               {cursosRanking.map((c) => {
                 // % sobre el total de empleados (no sobre el curso más
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
                 // relativo al primero del ranking.
                 const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
-                // Nombre abreviado (hasta los ":", sin incluirlos) SIN
-                // truncar — el nombre se queda con el ancho que necesite.
+                // Nombre abreviado (hasta los ":", sin incluirlos), con
+                // tope de ancho fijo (la columna es minmax(0,120px)) y
+                // truncado con "..." si no entra, para que la barra
+                // siempre tenga espacio real donde mostrar el número.
                 const nombreCorto = c.titulo && c.titulo.includes(':') ? c.titulo.split(':')[0] : c.titulo;
                 return (
                   <Fragment key={c.microcurso_id}>
-                    <p className="text-[12.5px] font-semibold text-[#2C2C2A] whitespace-nowrap">
+                    <p
+                      title={nombreCorto}
+                      className="text-[12.5px] font-semibold text-[#2C2C2A] truncate"
+                    >
                       {nombreCorto}
                     </p>
-                    <div className="min-w-[40px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
+                    <div className="min-w-[80px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
                       <div
-                        className="h-full bg-[#7C8B6F] rounded-md"
-                        style={{ width: `${Math.max(porcentajeEquipo, 8)}%` }}
-                      />
+                        className="h-full bg-[#7C8B6F] rounded-md flex items-center justify-end px-2"
+                        style={{ width: `${Math.max(porcentajeEquipo, 20)}%` }}
+                      >
+                        <span className="text-[10px] font-bold text-white whitespace-nowrap">
+                          {c.cantidad}/{filas.length}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[10.5px] font-bold text-[#6b6455] whitespace-nowrap">
-                      {c.cantidad}/{filas.length}
-                    </span>
                   </Fragment>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {estancados.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-1">Estancados ({estancados.length})</h2>
+            <p className="text-xs text-[#8a8471] mb-3">
+              Arrancaron pero hace más de {DIAS_ESTANCADO} días que no completan nada nuevo.
+            </p>
+            <div className="space-y-2">
+              {estancados.map((f) => (
+                <div key={f.id} className="flex items-center gap-3">
+                  <Avatar e={f} size={26} />
+                  <p className="text-sm text-[#2C2C2A]">{f.nombre}</p>
+                  <p className="text-xs text-[#8a8471]">
+                    · {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         )}
