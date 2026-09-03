@@ -16,20 +16,14 @@ export default function RedirigirEmpleado() {
       setEstado('error');
       return;
     }
-    supabase
-      .from('empleados')
-      .select('token_acceso')
-      .ilike('token_acceso', `${codigo}%`)
+    supabase.functions
+      .invoke('redirigir-empleado', { method: 'POST', body: { codigo } })
       .then(({ data, error }) => {
-        // Si por algún motivo dos empleados comparten el mismo prefijo
-        // (extremadamente improbable con 10 caracteres), no adivinamos:
-        // se trata como link inválido en vez de mandar a cualquiera de
-        // los dos.
-        if (error || !data || data.length !== 1) {
+        if (error || !data?.token_acceso) {
           setEstado('error');
           return;
         }
-        window.location.replace(`/empleado?token=${data[0].token_acceso}`);
+        window.location.replace(`/empleado?token=${data.token_acceso}`);
       });
   }, []);
 
