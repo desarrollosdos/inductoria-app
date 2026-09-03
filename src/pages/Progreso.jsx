@@ -706,7 +706,7 @@ export default function Progreso({ session }) {
                       {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
                     </p>
                     {prom !== null && (
-                      <p className="text-[10px] font-semibold text-[#7C8B6F]">Evaluación: {prom}%</p>
+                      <p className="text-[10px] font-bold tracking-wide text-[#7C8B6F]">Prom. evaluación: {prom}%</p>
                     )}
                   </div>
                 );
@@ -755,8 +755,19 @@ export default function Progreso({ session }) {
                 las filas (en vez de que cada fila mida su propio ancho de
                 texto) — así todas las barras arrancan del mismo punto,
                 alineadas con el nombre más largo, y cada una respeta su
-                propio % desde ahí. */}
-            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr' }}>
+                propio % desde ahí.
+
+                El bug real de por qué el número seguía cortado: con
+                'auto 1fr', la columna del título crece para que el texto
+                entre en una sola línea SIN límite — un título largo como
+                "Manejo de Situaciones Difíciles con Clientes" empujaba esa
+                columna a ser enorme, dejándole a la barra (1fr) un
+                espacio real en píxeles muy chico, así que ni el 20% mínimo
+                alcanzaba para mostrar "0/8" completo. Ahora la columna del
+                título tiene un tope relativo al ancho disponible (45%, no
+                un número fijo de píxeles) y trunca con "..." si no entra,
+                así la barra siempre tiene al menos la mitad del espacio. */}
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'minmax(0,45%) 1fr' }}>
               {cursosRanking.map((c) => {
                 // % sobre el total de empleados (no sobre el curso más
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
@@ -764,11 +775,14 @@ export default function Progreso({ session }) {
                 const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
                 // Nombre abreviado (hasta los ":", sin incluirlos). Letra
                 // más chica que el resto de la pantalla para que entre más
-                // título sin necesidad de truncar ni ponerle un tope fijo.
+                // título antes de necesitar truncar.
                 const nombreCorto = c.titulo && c.titulo.includes(':') ? c.titulo.split(':')[0] : c.titulo;
                 return (
                   <Fragment key={c.microcurso_id}>
-                    <p className="text-[10.5px] font-semibold text-[#2C2C2A] leading-tight">
+                    <p
+                      title={nombreCorto}
+                      className="text-[10.5px] font-semibold text-[#2C2C2A] truncate"
+                    >
                       {nombreCorto}
                     </p>
                     <div className="min-w-[80px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
@@ -798,7 +812,7 @@ export default function Progreso({ session }) {
               {estancados.map((f) => (
                 <div key={f.id} className="flex items-center gap-3">
                   <Avatar e={f} size={26} />
-                  <p className="text-sm text-[#2C2C2A]">{f.nombre}</p>
+                  <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">{f.nombre}</p>
                   <p className="text-xs text-[#8a8471]">
                     · {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
                   </p>
@@ -816,8 +830,8 @@ export default function Progreso({ session }) {
               {sinArrancar.map((f) => (
                 <div key={f.id} className="flex items-center gap-3">
                   <Avatar e={f} size={26} />
-                  <p className="text-sm text-[#2C2C2A]">{f.nombre}</p>
-                  <p className="text-xs text-[#8a8471]">· {f.negocioNombre}</p>
+                  <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">{f.nombre}</p>
+                  <p className="text-xs font-semibold text-[#A2734C]">· {f.negocioNombre}</p>
                 </div>
               ))}
             </div>
