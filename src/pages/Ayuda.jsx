@@ -139,7 +139,7 @@ export default function Ayuda({ session }) {
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
-          <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">Cómo se usa Inductoria</h1>
+          <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">¿Cómo se usa Inductoria?</h1>
           <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">
             Una guía rápida de qué encontrás en cada sección del menú y para qué sirve.
           </p>

@@ -288,7 +288,7 @@ export default function Suscripcion({ session }) {
           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
           <IconAyuda />
-          Cómo se usa Inductoria
+          ¿Cómo se usa Inductoria?
         </a>
       </div>
 
