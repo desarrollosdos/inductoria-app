@@ -555,6 +555,41 @@ export default function Progreso({ session }) {
     return Math.round(conPuntaje.reduce((acc, b) => acc + b.puntaje, 0) / conPuntaje.length);
   }
 
+  // Comparación entre sucursales: % promedio de avance (mismo cálculo
+  // que porcentajeAvance por empleado) agrupado por negocio_id. Solo
+  // tiene sentido mostrarla si hay más de una sucursal.
+  const avancePorSucursal = (() => {
+    const mapa = {};
+    filas.forEach((f) => {
+      const clave = f.negocio_id || 'sin-sucursal';
+      if (!mapa[clave]) mapa[clave] = { nombre: f.negocioNombre, sumaAvance: 0, cantidad: 0 };
+      mapa[clave].sumaAvance += porcentajeAvance(f);
+      mapa[clave].cantidad += 1;
+    });
+    return Object.values(mapa)
+      .map((s) => ({
+        nombre: s.nombre,
+        porcentaje: s.cantidad > 0 ? Math.round((s.sumaAvance / s.cantidad) * 100) : 0,
+      }))
+      .sort((a, b) => b.porcentaje - a.porcentaje);
+  })();
+
+  // Tiempo promedio de capacitación: días entre el alta y la fecha en
+  // que terminaron TODO lo que les correspondía (su último curso
+  // completado), promediado solo entre quienes ya llegaron al 100%. Un
+  // empleado a mitad de camino no suma acá, porque todavía no tiene un
+  // "tiempo total" real, solo un tiempo parcial.
+  const tiempoOnboardingPromedio = (() => {
+    const completos = filas.filter(
+      (f) => f.totalCursos > 0 && f.completados >= f.totalCursos && f.ultimaActividad && f.fecha_alta
+    );
+    if (completos.length === 0) return null;
+    const dias = completos.map(
+      (f) => (new Date(f.ultimaActividad).getTime() - new Date(f.fecha_alta).getTime()) / 86400000
+    );
+    return Math.round(dias.reduce((a, b) => a + b, 0) / dias.length);
+  })();
+
   // Sección "Tu equipo": agrupada por sucursal (en vez de mostrar el
   // nombre de la sucursal repetido al lado de cada empleado), y
   // alfabético adentro de cada grupo para encontrar a alguien rápido.
@@ -680,6 +715,39 @@ export default function Progreso({ session }) {
           </div>
         )}
 
+        {avancePorSucursal.length > 1 && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+            <h2 className="font-semibold text-[#2C2C2A] mb-4">Avance por sucursal</h2>
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr' }}>
+              {avancePorSucursal.map((s) => (
+                <Fragment key={s.nombre}>
+                  <p className="text-[11.5px] font-semibold text-[#2C2C2A] leading-tight">{s.nombre}</p>
+                  <div className="min-w-[80px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
+                    <div
+                      className="h-full bg-[#7C8B6F] rounded-md flex items-center justify-end px-2"
+                      style={{ width: `${Math.max(s.porcentaje, 20)}%` }}
+                    >
+                      <span className="text-[10px] font-bold text-white whitespace-nowrap">{s.porcentaje}%</span>
+                    </div>
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tiempoOnboardingPromedio !== null && (
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-[#2C2C2A]">Tiempo promedio de capacitación</h2>
+              <p className="text-xs text-[#8a8471] mt-0.5">Desde el alta hasta completar todo lo que le corresponde</p>
+            </div>
+            <p className="text-2xl font-bold text-[#7C8B6F] flex-shrink-0">
+              {tiempoOnboardingPromedio} día{tiempoOnboardingPromedio === 1 ? '' : 's'}
+            </p>
+          </div>
+        )}
+
         {cursosRanking.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <h2 className="font-semibold text-[#2C2C2A] mb-4">Cursos más realizados</h2>
@@ -688,23 +756,19 @@ export default function Progreso({ session }) {
                 texto) — así todas las barras arrancan del mismo punto,
                 alineadas con el nombre más largo, y cada una respeta su
                 propio % desde ahí. */}
-            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'minmax(0,120px) 1fr' }}>
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr' }}>
               {cursosRanking.map((c) => {
                 // % sobre el total de empleados (no sobre el curso más
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
                 // relativo al primero del ranking.
                 const porcentajeEquipo = filas.length > 0 ? Math.round((c.cantidad / filas.length) * 100) : 0;
-                // Nombre abreviado (hasta los ":", sin incluirlos), con
-                // tope de ancho fijo (la columna es minmax(0,120px)) y
-                // truncado con "..." si no entra, para que la barra
-                // siempre tenga espacio real donde mostrar el número.
+                // Nombre abreviado (hasta los ":", sin incluirlos). Letra
+                // más chica que el resto de la pantalla para que entre más
+                // título sin necesidad de truncar ni ponerle un tope fijo.
                 const nombreCorto = c.titulo && c.titulo.includes(':') ? c.titulo.split(':')[0] : c.titulo;
                 return (
                   <Fragment key={c.microcurso_id}>
-                    <p
-                      title={nombreCorto}
-                      className="text-[12.5px] font-semibold text-[#2C2C2A] truncate"
-                    >
+                    <p className="text-[10.5px] font-semibold text-[#2C2C2A] leading-tight">
                       {nombreCorto}
                     </p>
                     <div className="min-w-[80px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
