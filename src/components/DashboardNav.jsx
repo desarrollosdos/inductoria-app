@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 function IconSucursales(props) {
@@ -143,6 +143,33 @@ export default function DashboardNav({ flags: flagsProp }) {
 
   const flags = flagsProp || flagsPropios;
 
+  // Cuando un tab pasa de false/undefined a true, lo guardamos acá por
+  // unos segundos para pintarlo distinto y que se note que "acaba de
+  // aparecer". Comparamos contra el flags anterior (prevFlagsRef), así
+  // que en la primera carga de la página (prev === null) no destaca
+  // nada, solo cuando de verdad cambia en vivo (por ejemplo, tocando la
+  // perilla en Configuracion.jsx sin salir de la página).
+  const [destacados, setDestacados] = useState([]);
+  const prevFlagsRef = useRef(null);
+
+  useEffect(() => {
+    if (!flags) return;
+    const prev = prevFlagsRef.current;
+    if (prev) {
+      const recienActivados = TABS.filter(
+        (tab) => tab.campo && prev[tab.campo] !== true && flags[tab.campo] === true
+      ).map((tab) => tab.id);
+
+      if (recienActivados.length > 0) {
+        setDestacados((actuales) => [...new Set([...actuales, ...recienActivados])]);
+        setTimeout(() => {
+          setDestacados((actuales) => actuales.filter((id) => !recienActivados.includes(id)));
+        }, 2500);
+      }
+    }
+    prevFlagsRef.current = flags;
+  }, [flags]);
+
   const tabsVisibles = TABS.filter((tab) => {
     if (!tab.campo) return true;
     if (!flags) return true;
@@ -162,6 +189,7 @@ export default function DashboardNav({ flags: flagsProp }) {
       <div className="flex justify-between gap-1 sm:justify-start sm:gap-4">
         {tabsVisibles.map((tab) => {
           const active = path === tab.path;
+          const destacado = destacados.includes(tab.id);
           return (
             <a
               key={tab.id}
@@ -169,8 +197,11 @@ export default function DashboardNav({ flags: flagsProp }) {
               className="flex-1 sm:flex-none flex flex-col items-center gap-2.5 text-center"
             >
               <span
-                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-                style={{ background: active ? '#C1502E' : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-1000 flex-shrink-0"
+                style={{
+                  background: destacado ? '#7C8B6F' : active ? '#C1502E' : '#EDE0C8',
+                  color: destacado || active ? '#fff' : '#8a8471',
+                }}
               >
                 <tab.Icon />
               </span>
