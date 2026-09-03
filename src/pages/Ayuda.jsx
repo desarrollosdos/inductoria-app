@@ -209,6 +209,13 @@ export default function Ayuda({ session }) {
             <p className="text-sm text-[#3d382c]">{texto}</p>
           </div>
         ))}
+
+        {/* Sin esto, la última tarjeta (Configuración) nunca llega a cruzar
+            la franja de detección: al no haber más contenido debajo, el
+            scroll se termina antes de que su parte de arriba suba lo
+            suficiente. Este espacio en blanco le da lugar de sobra para
+            "subir" hasta la franja aunque sea la última sección. */}
+        <div className="h-[60vh]" aria-hidden="true" />
       </PageShell>
     </div>
   );
