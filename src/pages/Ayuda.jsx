@@ -74,6 +74,15 @@ function IconSuscripcion(props) {
   );
 }
 
+function IconConfiguracion(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 const SECCIONES = [
   {
     id: 'suscripcion',
@@ -130,6 +139,14 @@ const SECCIONES = [
     Icon: IconProgreso,
     texto:
       'Es el panel de seguimiento de tu equipo: ranking, qué cursos completó cada uno, certificados descargables y si confirmaron el acuse de recibido de Seguridad e Higiene. Desde acá también conseguís el link, el PIN y el código QR de acceso de cada empleado.',
+  },
+  {
+    id: 'configuracion',
+    label: 'Configuración',
+    path: '/configuracion',
+    Icon: IconConfiguracion,
+    texto:
+      'Se accede con el ícono de engranaje al lado de tu mail, arriba a la derecha (no está en este menú). Ahí elegís qué funciones aparecen para tu equipo: si tu negocio no usa Procedimientos o Checklists, los podés sacar del menú y volver a activarlos cuando quieras.',
   },
 ];
 
