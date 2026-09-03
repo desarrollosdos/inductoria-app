@@ -210,6 +210,16 @@ export default function Ayuda({ session }) {
           </div>
         ))}
 
+        <div className="flex justify-center">
+          <a
+            href="/"
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            Salir de Ayuda
+          </a>
+        </div>
+
         {/* Sin esto, la última tarjeta (Configuración) nunca llega a cruzar
             la franja de detección: al no haber más contenido debajo, el
             scroll se termina antes de que su parte de arriba suba lo
