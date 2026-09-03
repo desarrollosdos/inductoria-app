@@ -18,6 +18,25 @@ function IconProgresoMini(props) {
   );
 }
 
+function IconWhatsApp(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" {...props}>
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.66-.6-2.92-1.26-4.83-4.2-4.98-4.4-.15-.19-1.2-1.59-1.2-3.03s.75-2.15 1.02-2.44c.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.81 2.01.88 2.15.07.15.11.32.02.51-.09.19-.13.31-.26.47-.13.16-.28.35-.4.47-.13.13-.27.27-.12.53.15.26.68 1.12 1.46 1.82 1 .89 1.85 1.17 2.11 1.3.26.13.41.11.56-.06.16-.18.65-.75.82-1.01.17-.26.34-.21.57-.13.24.09 1.5.71 1.76.84.26.13.43.19.5.3.06.11.06.63-.18 1.31z" />
+    </svg>
+  );
+}
+
+// Deja solo dígitos y, si el número no viene ya con el 54 de Argentina
+// adelante, se lo agrega junto con el 9 que WhatsApp espera para
+// celulares argentinos (formato wa.me: 549 + código de área + número,
+// sin el 0 ni el 15). No valida números de otros países: si en algún
+// momento hay empleados fuera de Argentina, esto va a necesitar ajustarse.
+function formatoWhatsApp(telefono) {
+  const soloDigitos = (telefono || '').replace(/\D/g, '');
+  if (!soloDigitos) return null;
+  return soloDigitos.startsWith('54') ? soloDigitos : `549${soloDigitos}`;
+}
+
 function IconQR(props) {
   return (
     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -184,6 +203,30 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                 >
                   <IconQR />
                 </button>
+                {formatoWhatsApp(f.telefono) ? (
+                  <a
+                    href={`https://wa.me/${formatoWhatsApp(f.telefono)}?text=${encodeURIComponent(
+                      `Hola ${f.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${linkAcceso} y usá el PIN ${f.pin}.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Enviar por WhatsApp"
+                    className="w-6 h-6 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <IconWhatsApp />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      alert(`${f.nombre} no tiene teléfono cargado. Agregalo desde Empleados para poder enviarle el link por WhatsApp.`)
+                    }
+                    title="Falta cargar el teléfono"
+                    className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#a89f8a] flex items-center justify-center flex-shrink-0"
+                  >
+                    <IconWhatsApp />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -350,7 +393,7 @@ export default function Progreso({ session }) {
 
     const { data: empleadosData } = await supabase
       .from('empleados')
-      .select('id, nombre, puesto, negocio_id, fecha_alta, foto_url, token_acceso, pin')
+      .select('id, nombre, puesto, negocio_id, fecha_alta, foto_url, token_acceso, pin, telefono')
       .in('negocio_id', negocioIds)
       .is('fecha_baja', null)
       .order('fecha_alta', { ascending: false });
