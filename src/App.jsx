@@ -15,6 +15,7 @@ import Suscripcion from './pages/Suscripcion';
 import Empleado from './pages/Empleado';
 import CursoDetalle from './pages/CursoDetalle';
 import Checklist from './pages/Checklist';
+import RedirigirEmpleado from './pages/RedirigirEmpleado';
 import AdminPage from './pages/AdminPage';
 import Ayuda from './pages/Ayuda';
 import Configuracion from './pages/Configuracion';
@@ -95,6 +96,12 @@ export default function App() {
           <Checklist />
         </>
       );
+    }
+
+    // Ruta pública, sin sesión: recibe el código corto (?c=) y redirige
+    // al link real (/empleado?token=...). Ver RedirigirEmpleado.jsx.
+    if (path === '/e') {
+      return <RedirigirEmpleado />;
     }
 
     if (loading) {
@@ -242,7 +249,7 @@ export default function App() {
       <Footer />
       {/* Solo para el dueño logueado (no en /empleado, /curso ni /checklist,
           que son públicas): ofrece instalar Inductoria como app de escritorio. */}
-      {session && path !== '/empleado' && path !== '/curso' && path !== '/checklist' && <InstalarAppPrompt />}
+      {session && path !== '/empleado' && path !== '/curso' && path !== '/checklist' && path !== '/e' && <InstalarAppPrompt />}
     </div>
   );
 }

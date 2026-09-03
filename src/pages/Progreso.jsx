@@ -164,7 +164,7 @@ function BarraSegmentada({ completados, total }) {
 // tanto en la vista agrupada por sucursal como en la vista por empleado
 // (alfabética, sin agrupar) — misma fila, distinto criterio de orden afuera.
 function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
-  const linkAcceso = `${window.location.origin}/empleado?token=${f.token_acceso}`;
+  const linkAcceso = `${window.location.origin}/e?c=${f.token_acceso.slice(0, 10)}`;
   const [acuseAbierto, setAcuseAbierto] = useState(null);
   return (
     <div className="px-6 py-2.5 border-t border-[#F3EEE1]">

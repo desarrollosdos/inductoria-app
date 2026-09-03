@@ -777,7 +777,7 @@ export default function Empleados({ session }) {
               {formatoWhatsApp(ultimoCreado.telefono) ? (
                 <a
                   href={`https://wa.me/${formatoWhatsApp(ultimoCreado.telefono)}?text=${encodeURIComponent(
-                    `Hola ${ultimoCreado.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${window.location.origin}/empleado?token=${ultimoCreado.token_acceso} y usá el PIN ${ultimoCreado.pin}.`
+                    `Hola ${ultimoCreado.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${window.location.origin}/e?c=${ultimoCreado.token_acceso.slice(0, 10)} y usá el PIN ${ultimoCreado.pin}.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
