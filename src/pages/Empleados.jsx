@@ -21,6 +21,23 @@ const PUESTOS_CATALOGO = [
   'Otro',
 ];
 
+function IconWhatsApp(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" {...props}>
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.8 14.02c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.66-.6-2.92-1.26-4.83-4.2-4.98-4.4-.15-.19-1.2-1.59-1.2-3.03s.75-2.15 1.02-2.44c.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.81 2.01.88 2.15.07.15.11.32.02.51-.09.19-.13.31-.26.47-.13.16-.28.35-.4.47-.13.13-.27.27-.12.53.15.26.68 1.12 1.46 1.82 1 .89 1.85 1.17 2.11 1.3.26.13.41.11.56-.06.16-.18.65-.75.82-1.01.17-.26.34-.21.57-.13.24.09 1.5.71 1.76.84.26.13.43.19.5.3.06.11.06.63-.18 1.31z" />
+    </svg>
+  );
+}
+
+// Mismo criterio que en Progreso.jsx: si el teléfono no viene ya con el
+// 54 de Argentina adelante, se le agrega junto con el 9 que WhatsApp
+// espera para celulares argentinos.
+function formatoWhatsApp(telefono) {
+  const soloDigitos = (telefono || '').replace(/\D/g, '');
+  if (!soloDigitos) return null;
+  return soloDigitos.startsWith('54') ? soloDigitos : `549${soloDigitos}`;
+}
+
 function IconEmpleadosMini(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -229,7 +246,7 @@ export default function Empleados({ session }) {
 
   async function handleCrearEmpleado(e) {
     e.preventDefault();
-    if (!nombreEmpleado.trim() || !negocioSeleccionado) return;
+    if (!nombreEmpleado.trim() || !negocioSeleccionado || !telefonoEmpleado.trim()) return;
 
     if (!hasAccess) {
       setMostrarSuscripcion(true);
@@ -273,7 +290,7 @@ export default function Empleados({ session }) {
       return;
     }
 
-    setUltimoCreado(data.nombre);
+    setUltimoCreado(data);
     setNombreEmpleado('');
     setPuesto('');
     setPuestoCustom('');
@@ -551,8 +568,11 @@ export default function Empleados({ session }) {
             )}
             <input
               type="tel"
+              required
               value={editForm.telefono}
               onChange={(ev) => setEditForm({ ...editForm, telefono: ev.target.value })}
+              onInvalid={validarCampo}
+              onInput={limpiarValidacion}
               placeholder="Teléfono"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
@@ -560,13 +580,13 @@ export default function Empleados({ session }) {
               type="email"
               value={editForm.mail}
               onChange={(ev) => setEditForm({ ...editForm, mail: ev.target.value })}
-              placeholder="Mail"
+              placeholder="Mail (opcional)"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => handleGuardarEdicion(e.id)}
-                disabled={guardandoEdit}
+                disabled={guardandoEdit || !editForm.telefono.trim()}
                 className="text-xs font-bold tracking-wide text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:opacity-60"
                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
@@ -716,8 +736,11 @@ export default function Empleados({ session }) {
               )}
               <input
                 type="tel"
+                required
                 value={telefonoEmpleado}
                 onChange={(e) => setTelefonoEmpleado(e.target.value)}
+                onInvalid={validarCampo}
+                onInput={limpiarValidacion}
                 placeholder="Teléfono"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
@@ -727,7 +750,7 @@ export default function Empleados({ session }) {
                 onChange={(e) => setMailEmpleado(e.target.value)}
                 onInvalid={validarCampo}
                 onInput={limpiarValidacion}
-                placeholder="Mail"
+                placeholder="Mail (opcional)"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
               <button
@@ -737,7 +760,8 @@ export default function Empleados({ session }) {
                   !negocioSeleccionado ||
                   !nombreEmpleado.trim() ||
                   !puesto ||
-                  (puesto === 'Otro' && !puestoCustom.trim())
+                  (puesto === 'Otro' && !puestoCustom.trim()) ||
+                  !telefonoEmpleado.trim()
                 }
                 className="w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
@@ -749,14 +773,28 @@ export default function Empleados({ session }) {
 
           {ultimoCreado && (
             <div className="mt-4 bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm">
-              <p className="text-[#2C2C2A] font-semibold">{ultimoCreado} fue dado de alta.</p>
-              <p className="text-[10px] text-[#8a8471] mt-1">
-                El link y el PIN de acceso los encontrás en{' '}
-                <a href="/progreso" className="underline text-[#C1502E]">
-                  Progreso
+              <p className="text-[#2C2C2A] font-semibold">{ultimoCreado.nombre} fue dado de alta.</p>
+              {formatoWhatsApp(ultimoCreado.telefono) ? (
+                <a
+                  href={`https://wa.me/${formatoWhatsApp(ultimoCreado.telefono)}?text=${encodeURIComponent(
+                    `Hola ${ultimoCreado.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${window.location.origin}/empleado?token=${ultimoCreado.token_acceso} y usá el PIN ${ultimoCreado.pin}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#25D366] rounded-full px-3 py-1.5"
+                >
+                  <IconWhatsApp />
+                  Enviar por WhatsApp
                 </a>
-                , mientras tenga cursos pendientes.
-              </p>
+              ) : (
+                <p className="text-[10px] text-[#8a8471] mt-1">
+                  El link y el PIN de acceso los encontrás en{' '}
+                  <a href="/progreso" className="underline text-[#C1502E]">
+                    Progreso
+                  </a>
+                  , mientras tenga cursos pendientes.
+                </p>
+              )}
             </div>
           )}
         </div>
