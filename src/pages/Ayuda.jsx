@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 
@@ -151,6 +152,32 @@ const SECCIONES = [
 ];
 
 export default function Ayuda({ session }) {
+  // Empieza con "suscripcion" marcado (primera sección) y va cambiando
+  // a medida que cada tarjeta cruza una franja angosta cerca del tope de
+  // la pantalla, para que se sienta como "voy leyendo y se va marcando",
+  // no como que salta recién cuando la tarjeta está totalmente arriba.
+  const [activo, setActivo] = useState(SECCIONES[0].id);
+  const refsSecciones = useRef({});
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActivo(entry.target.dataset.seccionId);
+          }
+        });
+      },
+      { rootMargin: '-15% 0px -75% 0px', threshold: 0 }
+    );
+
+    Object.values(refsSecciones.current).forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div>
       <DashboardNav userEmail={session.user.email} />
@@ -163,9 +190,18 @@ export default function Ayuda({ session }) {
         </div>
 
         {SECCIONES.map(({ id, label, path, Icon, texto }) => (
-          <div key={id} className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+          <div
+            key={id}
+            ref={(el) => (refsSecciones.current[id] = el)}
+            data-seccion-id={id}
+            className="bg-white rounded-2xl border border-[#EFDDCE] p-6"
+          >
             <a href={path} className="flex items-center gap-3 mb-2 w-fit">
-              <div className="w-9 h-9 rounded-full bg-[#EDE0C8] text-[#C1502E] flex items-center justify-center flex-shrink-0">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                  activo === id ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#C1502E]'
+                }`}
+              >
                 <Icon />
               </div>
               <h2 className="font-bold tracking-wide text-[#C1502E]">{label}</h2>
