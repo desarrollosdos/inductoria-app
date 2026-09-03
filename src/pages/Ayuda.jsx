@@ -206,7 +206,13 @@ export default function Ayuda({ session }) {
               </div>
               <h2 className="font-bold tracking-wide text-[#C1502E]">{label}</h2>
             </a>
-            <p className="text-sm font-semibold tracking-wide text-[#3d382c]">{texto}</p>
+            <p
+              className={`text-sm text-[#3d382c] transition-all ${
+                activo === id ? 'font-semibold tracking-wide' : 'font-normal'
+              }`}
+            >
+              {texto}
+            </p>
           </div>
         ))}
 

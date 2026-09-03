@@ -112,7 +112,7 @@ function AnilloProgreso({ pct, size = 68, grosor = 7, color = '#7C8B6F', childre
           strokeDashoffset={offset}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-[#2C2C2A]">
+      <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold tracking-wide text-[#2C2C2A]">
         {children}
       </div>
     </div>
@@ -610,7 +610,16 @@ export default function Progreso({ session }) {
 
   // Vista alternativa "por empleado": todos juntos, alfabético, sin
   // separar por sucursal.
-  const filasPorEmpleado = [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  // El campo `nombre` es el nombre completo en un solo string (no hay
+  // nombre/apellido separados en la base), así que para ordenar por
+  // apellido tomamos la ÚLTIMA palabra como aproximación. Funciona bien
+  // para "Nombre Apellido", pero si alguien tiene apellido compuesto
+  // (ej. "Antonio Pérez García") va a ordenar solo por "García".
+  function apellido(nombreCompleto) {
+    const partes = (nombreCompleto || '').trim().split(/\s+/);
+    return partes[partes.length - 1] || '';
+  }
+  const filasPorEmpleado = [...filas].sort((a, b) => apellido(a.nombre).localeCompare(apellido(b.nombre), 'es'));
 
   return (
     <div>
@@ -843,7 +852,7 @@ export default function Progreso({ session }) {
             <div className="w-[26px] h-[26px] rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
               <IconBirrete className="text-white" />
             </div>
-            <h2 className="font-bold text-[#2C2C2A] text-[14.5px]">Acá activás los cursos de cada empleado</h2>
+            <h2 className="font-bold text-[#2C2C2A] text-[14.5px]">Avance del entrenamiento de tu equipo</h2>
           </div>
 
           {gruposPorSucursal.length > 1 && (
@@ -877,7 +886,7 @@ export default function Progreso({ session }) {
             <div className="pb-2">
               {gruposPorSucursal.map((grupo) => (
                 <div key={grupo.nombre}>
-                  <p className="text-[11px] font-bold text-[#8a8471] uppercase tracking-wide px-6 pt-3 pb-1.5">
+                  <p className="text-[11px] font-bold text-[#C1502E] uppercase tracking-wide px-6 pt-3 pb-1.5">
                     {grupo.nombre}
                   </p>
                   {grupo.empleados.map((f) => (
