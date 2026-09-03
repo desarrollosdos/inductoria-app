@@ -10,6 +10,15 @@ function IconPersona(props) {
   );
 }
 
+function IconEngranaje(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 // Chip redondo con ícono de persona (antes la inicial del mail), solo visible en mobile (en
 // desktop el mail ya se ve entero al lado del botón de salir, así que
 // esto sobraría ahí). En mobile no entra el mail completo al lado del
@@ -84,6 +93,14 @@ export default function Header({ session, empleadoNombre }) {
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden sm:inline text-xs font-semibold text-[#FBF3EC]">{session.user.email}</span>
             <ChipEmailMobile email={session.user.email} />
+            <a
+              href="/configuracion"
+              title="Configuración"
+              aria-label="Configuración"
+              className="w-9 h-9 rounded-full bg-[#6B655A] text-white flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
+            >
+              <IconEngranaje />
+            </a>
             <button
               onClick={handleLogout}
               title="Salir"

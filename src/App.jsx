@@ -17,6 +17,7 @@ import CursoDetalle from './pages/CursoDetalle';
 import Checklist from './pages/Checklist';
 import AdminPage from './pages/AdminPage';
 import Ayuda from './pages/Ayuda';
+import Configuracion from './pages/Configuracion';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -204,6 +205,15 @@ export default function App() {
         <>
           <Header session={session} />
           <Ayuda session={session} />
+        </>
+      );
+    }
+
+    if (path === '/configuracion') {
+      return (
+        <>
+          <Header session={session} />
+          <Configuracion session={session} />
         </>
       );
     }

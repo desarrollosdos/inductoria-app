@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
+
 function IconSucursales(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -80,23 +83,65 @@ function IconChecklist(props) {
 // supabase.rpc('es_administrador')), esta barra volvió a ser simple: las
 // mismas pestañas para todo el mundo, sin comparar mails acá.
 //
-// "Checklists" queda siempre visible (no se oculta según la cuenta):
-// es una función opcional que cualquiera puede activar, y que se vea acá
-// es justamente lo que la hace descubrible. Si la cuenta no la activó
-// todavía, la propia página de Checklists.jsx muestra el cartel para
-// activarla en vez de escondérsela.
+// Procedimientos y Checklists son opcionales por cuenta (Configuracion.jsx,
+// campos procedimientos_habilitado/checklists_habilitado en `cuentas`).
+// Vienen activas por defecto; si el dueño las desactiva, el tab
+// directamente se oculta acá (antes Checklists siempre quedaba visible
+// y solo mostraba un cartel de "activar" adentro; ahora el control
+// central vive en Configuracion.jsx).
 const TABS = [
   { id: 'suscripcion', label: 'Suscripción', path: '/', Icon: IconSuscripcion },
   { id: 'sucursales', label: 'Sucursales', path: '/sucursales', Icon: IconSucursales },
   { id: 'empleados', label: 'Empleados', path: '/empleados', Icon: IconEmpleados },
   { id: 'contenido', label: 'Contenido', path: '/contenido', Icon: IconContenido },
-  { id: 'procedimientos', label: 'Procedimientos', path: '/procedimientos', Icon: IconProcedimientos },
-  { id: 'checklists', label: 'Checklists', path: '/checklists', Icon: IconChecklist },
+  {
+    id: 'procedimientos',
+    label: 'Procedimientos',
+    path: '/procedimientos',
+    Icon: IconProcedimientos,
+    campo: 'procedimientos_habilitado',
+  },
+  {
+    id: 'checklists',
+    label: 'Checklists',
+    path: '/checklists',
+    Icon: IconChecklist,
+    campo: 'checklists_habilitado',
+  },
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 
 export default function DashboardNav() {
   const path = window.location.pathname;
+  // null mientras carga: no ocultamos nada todavía, para no hacer
+  // parpadear el menú completo en cada página. Una vez que llega la
+  // cuenta, recién ahí se filtran los tabs opcionales.
+  const [flags, setFlags] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+    async function cargarFlags() {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+      const { data } = await supabase
+        .from('cuentas')
+        .select('procedimientos_habilitado, checklists_habilitado')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+      if (vigente) setFlags(data);
+    }
+    cargarFlags();
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
+  const tabsVisibles = TABS.filter((tab) => {
+    if (!tab.campo) return true;
+    if (!flags) return true;
+    return flags[tab.campo] !== false;
+  });
 
   return (
     <nav className="max-w-4xl mx-auto mt-4 px-4">
@@ -109,7 +154,7 @@ export default function DashboardNav() {
           sm: en adelante, donde ya hay más aire), cada etiqueta se queda
           dentro de su propio espacio en vez de invadir el vecino. */}
       <div className="flex justify-between gap-1 sm:justify-start sm:gap-4">
-        {TABS.map((tab) => {
+        {tabsVisibles.map((tab) => {
           const active = path === tab.path;
           return (
             <a
