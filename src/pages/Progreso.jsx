@@ -715,7 +715,7 @@ export default function Progreso({ session }) {
                       {f.completados} de {f.totalCursos} curso{f.totalCursos === 1 ? '' : 's'}
                     </p>
                     {prom !== null && (
-                      <p className="text-[10px] font-bold tracking-wide text-[#7C8B6F]">Prom. evaluación: {prom}%</p>
+                      <p className="text-[11px] font-bold tracking-wide text-[#2C2C2A]">Prom. evaluación: {prom}%</p>
                     )}
                   </div>
                 );
