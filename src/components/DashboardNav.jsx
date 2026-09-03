@@ -111,14 +111,18 @@ const TABS = [
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 
-export default function DashboardNav() {
+export default function DashboardNav({ flags: flagsProp }) {
   const path = window.location.pathname;
   // null mientras carga: no ocultamos nada todavía, para no hacer
   // parpadear el menú completo en cada página. Una vez que llega la
   // cuenta, recién ahí se filtran los tabs opcionales.
-  const [flags, setFlags] = useState(null);
+  const [flagsPropios, setFlagsPropios] = useState(null);
 
   useEffect(() => {
+    // Si nos pasaron los flags desde afuera (Configuracion.jsx, para que
+    // el menú reaccione al toque sin esperar una navegación), no hace
+    // falta pedirlos de nuevo acá.
+    if (flagsProp) return;
     let vigente = true;
     async function cargarFlags() {
       const { data: userData } = await supabase.auth.getUser();
@@ -129,13 +133,15 @@ export default function DashboardNav() {
         .select('procedimientos_habilitado, checklists_habilitado')
         .eq('owner_id', user.id)
         .maybeSingle();
-      if (vigente) setFlags(data);
+      if (vigente) setFlagsPropios(data);
     }
     cargarFlags();
     return () => {
       vigente = false;
     };
-  }, []);
+  }, [flagsProp]);
+
+  const flags = flagsProp || flagsPropios;
 
   const tabsVisibles = TABS.filter((tab) => {
     if (!tab.campo) return true;

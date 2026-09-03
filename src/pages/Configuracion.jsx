@@ -130,7 +130,13 @@ export default function Configuracion({ session }) {
 
   return (
     <div>
-      <DashboardNav userEmail={session.user.email} />
+      <DashboardNav
+        userEmail={session.user.email}
+        flags={{
+          procedimientos_habilitado: cuenta.procedimientos_habilitado,
+          checklists_habilitado: cuenta.checklists_habilitado,
+        }}
+      />
       <PageShell>
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
           <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">Configuración</h1>
@@ -161,6 +167,16 @@ export default function Configuracion({ session }) {
             />
           </div>
         ))}
+
+        <div className="flex justify-center">
+          <a
+            href="/"
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#545C48]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            Salir de Configuración
+          </a>
+        </div>
       </PageShell>
     </div>
   );
