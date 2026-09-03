@@ -176,27 +176,6 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
             {f.totalCursos > 0 && f.completados < f.totalCursos && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                  onClick={() => alert(`PIN de ${f.nombre}: ${f.pin}`)}
-                  title="Ver PIN de acceso"
-                  className="w-6 h-6 rounded-full bg-[#C1502E] text-white flex items-center justify-center text-[8px] font-bold tracking-wide flex-shrink-0"
-                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                >
-                  PIN
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(linkAcceso);
-                    alert('Link copiado');
-                  }}
-                  title="Copiar link de acceso"
-                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
-                >
-                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                </button>
-                <button
                   onClick={() => setQrAbierto(qrAbierto === f.id ? null : f.id)}
                   title="Ver código QR"
                   className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
@@ -683,7 +662,7 @@ export default function Progreso({ session }) {
                 texto) — así todas las barras arrancan del mismo punto,
                 alineadas con el nombre más largo, y cada una respeta su
                 propio % desde ahí. */}
-            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr' }}>
+            <div className="grid gap-x-3 gap-y-3 items-center" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
               {cursosRanking.map((c) => {
                 // % sobre el total de empleados (no sobre el curso más
                 // hecho): dice algo real ("le falta a la mayoría"), no solo
@@ -697,16 +676,15 @@ export default function Progreso({ session }) {
                     <p className="text-[12.5px] font-semibold text-[#2C2C2A] whitespace-nowrap">
                       {nombreCorto}
                     </p>
-                    <div className="min-w-[60px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
+                    <div className="min-w-[40px] h-5 bg-[#EDE0C8] rounded-md overflow-hidden">
                       <div
-                        className="h-full bg-[#7C8B6F] rounded-md flex items-center justify-end px-2"
-                        style={{ width: `${Math.max(porcentajeEquipo, 24)}%` }}
-                      >
-                        <span className="text-[10px] font-bold text-white whitespace-nowrap">
-                          {c.cantidad}/{filas.length}
-                        </span>
-                      </div>
+                        className="h-full bg-[#7C8B6F] rounded-md"
+                        style={{ width: `${Math.max(porcentajeEquipo, 8)}%` }}
+                      />
                     </div>
+                    <span className="text-[10.5px] font-bold text-[#6b6455] whitespace-nowrap">
+                      {c.cantidad}/{filas.length}
+                    </span>
                   </Fragment>
                 );
               })}
