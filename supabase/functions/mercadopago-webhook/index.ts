@@ -132,6 +132,35 @@ Deno.serve(async (req) => {
       const preapproval = await mpRes.json();
       const cuentaId = preapproval.external_reference;
 
+      // Guardia contra suscripciones duplicadas (por ejemplo, las que
+      // quedan sueltas de pruebas o de reintentos): si este aviso es
+      // sobre un preapproval que YA NO es el que la cuenta tiene
+      // guardado como el vigente, lo ignoramos. Sin esto, cancelar a
+      // mano una suscripción vieja/duplicada en MercadoPago terminaba
+      // marcando la cuenta real como "cancelación pendiente", aunque su
+      // suscripción de verdad siguiera activa y sin tocar.
+      //
+      // Excepción: si la cuenta todavía no tiene ningún
+      // mp_preapproval_id guardado, o el evento es 'authorized' (una
+      // suscripción que se autoriza de verdad, incluyendo el caso
+      // normal de la primera vez), sí lo procesamos.
+      const { data: cuentaActual } = await supabase
+        .from('cuentas')
+        .select('mp_preapproval_id')
+        .eq('id', cuentaId)
+        .maybeSingle();
+
+      if (
+        cuentaActual?.mp_preapproval_id &&
+        cuentaActual.mp_preapproval_id !== dataId &&
+        preapproval.status !== 'authorized'
+      ) {
+        console.warn(
+          `mercadopago-webhook: ignorando evento de preapproval ${dataId} (no es el vigente ${cuentaActual.mp_preapproval_id}) para cuenta ${cuentaId}`
+        );
+        return new Response('ok', { headers: corsHeaders });
+      }
+
       if (preapproval.status === 'cancelled') {
         // No cortamos el acceso al toque: el Cliente sigue con acceso
         // hasta next_payment_date (el período que ya pagó). Cubre tanto
