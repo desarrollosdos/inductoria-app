@@ -17,6 +17,17 @@
 // Esta función NO debe pedir JWT de usuario (la llama MercadoPago, no
 // alguien logueado), así que "Verify JWT" tiene que estar DESACTIVADO
 // para esta función en el dashboard de Supabase.
+//
+// Ajuste 2026-09-05: 'past_due' no tenia limite de tiempo — una cuenta
+// con el pago trabado se quedaba con acceso completo (incluida IA)
+// indefinidamente. Ahora, la primera vez que una cuenta entra en
+// 'past_due', guardamos en past_due_limite la fecha (ahora + 15 dias)
+// hasta la cual puede seguir asi. El cron expirar-trials (que ya corre
+// todos los dias) es el que, pasada esa fecha, la pasa a 'suspended'
+// (estado que ya existia, definido pero sin usar hasta ahora — ver
+// src/lib/acceso.js, 'suspended' ya corta todo el acceso).
+// Si la cuenta se recupera (vuelve a 'active', por preapproval
+// autorizado o por un pago aprobado), limpiamos past_due_limite.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -24,6 +35,14 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-signature, x-request-id',
 };
+
+// Dias de gracia en 'past_due' antes de pasar a 'suspended'. Numero de
+// negocio, no tecnico — Roberto puede cambiarlo libremente.
+const LIMITE_PAST_DUE_DIAS = 15;
+
+function calcularLimitePastDue(): string {
+  return new Date(Date.now() + LIMITE_PAST_DUE_DIAS * 24 * 60 * 60 * 1000).toISOString();
+}
 
 async function verificarFirma(req: Request, dataId: string): Promise<boolean> {
   const xSignature = req.headers.get('x-signature');
@@ -144,9 +163,13 @@ Deno.serve(async (req) => {
       // mp_preapproval_id guardado, o el evento es 'authorized' (una
       // suscripción que se autoriza de verdad, incluyendo el caso
       // normal de la primera vez), sí lo procesamos.
+      //
+      // Ahora tambien traemos 'plan' para saber si la cuenta YA estaba
+      // en 'past_due' (y no reiniciarle el plazo de gracia por un
+      // webhook repetido) o si recien esta entrando.
       const { data: cuentaActual } = await supabase
         .from('cuentas')
-        .select('mp_preapproval_id')
+        .select('plan, mp_preapproval_id')
         .eq('id', cuentaId)
         .maybeSingle();
 
@@ -182,15 +205,28 @@ Deno.serve(async (req) => {
           // nueva suscripción después de haber cancelado la anterior),
           // limpiamos cualquier cancelación pendiente que hubiera
           // quedado de antes.
-          await supabase
-            .from('cuentas')
-            .update({
-              plan: nuevoPlan,
-              mp_preapproval_id: dataId,
-              cancelacion_pendiente: false,
-              acceso_hasta: null,
-            })
-            .eq('id', cuentaId);
+          const updateData: Record<string, unknown> = {
+            plan: nuevoPlan,
+            mp_preapproval_id: dataId,
+            cancelacion_pendiente: false,
+            acceso_hasta: null,
+          };
+
+          if (nuevoPlan === 'past_due') {
+            // Solo arrancamos el plazo de gracia la primera vez que
+            // entra en past_due. Si ya estaba en past_due (MercadoPago
+            // reenvio el mismo evento, o encadeno varios 'paused'
+            // seguidos), no le reiniciamos el contador.
+            if (cuentaActual?.plan !== 'past_due') {
+              updateData.past_due_limite = calcularLimitePastDue();
+            }
+          } else {
+            // nuevoPlan === 'active': si venia de un past_due, se
+            // recupero — limpiamos el limite.
+            updateData.past_due_limite = null;
+          }
+
+          await supabase.from('cuentas').update(updateData).eq('id', cuentaId);
         } else {
           // Estado no reconocido (ej: 'pending'): igual guardamos el
           // mp_preapproval_id para no perderlo, pero sin tocar el plan.
@@ -217,7 +253,7 @@ Deno.serve(async (req) => {
       if (pago.status === 'approved') {
         await supabase
           .from('cuentas')
-          .update({ plan: 'active', cancelacion_pendiente: false, acceso_hasta: null })
+          .update({ plan: 'active', cancelacion_pendiente: false, acceso_hasta: null, past_due_limite: null })
           .eq('id', cuentaId);
       }
       // Si el pago rechaza, no tocamos el plan aca: el evento de
