@@ -363,7 +363,7 @@ export default function Dashboard({ session }) {
         nombre: capitalizarPalabras(form.nombre.trim()),
         direccion: form.direccion.trim(),
         localidad: capitalizarPalabras(form.localidad.trim()),
-        provincia: form.provincia.trim(),
+        provincia: capitalizarPalabras(form.provincia.trim()),
         codigo_postal: form.codigo_postal.trim() || null,
         telefono: form.telefono.trim(),
         mail: form.mail.trim(),
@@ -425,7 +425,7 @@ export default function Dashboard({ session }) {
         nombre: capitalizarPalabras(formEdit.nombre.trim()),
         direccion: formEdit.direccion.trim(),
         localidad: capitalizarPalabras(formEdit.localidad.trim()),
-        provincia: formEdit.provincia.trim(),
+        provincia: capitalizarPalabras(formEdit.provincia.trim()),
         codigo_postal: formEdit.codigo_postal.trim() || null,
         telefono: formEdit.telefono.trim(),
         mail: formEdit.mail.trim(),
@@ -554,6 +554,9 @@ export default function Dashboard({ session }) {
                           {n.codigo_postal && `(${n.codigo_postal}) `}
                           {n.localidad}
                         </p>
+                      )}
+                      {n.provincia && (
+                        <p className="text-xs font-medium text-[#3d382c]">{n.provincia}</p>
                       )}
                       <p className="text-xs font-medium text-[#3d382c]">Argentina</p>
                       <p className="text-xs text-[#6b6455] mt-1">
