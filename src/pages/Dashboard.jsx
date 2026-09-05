@@ -362,7 +362,7 @@ export default function Dashboard({ session }) {
         cuenta_id: cuenta.id,
         nombre: capitalizarPalabras(form.nombre.trim()),
         direccion: form.direccion.trim(),
-        localidad: form.localidad.trim(),
+        localidad: capitalizarPalabras(form.localidad.trim()),
         provincia: form.provincia.trim(),
         codigo_postal: form.codigo_postal.trim() || null,
         telefono: form.telefono.trim(),
@@ -424,7 +424,7 @@ export default function Dashboard({ session }) {
       .update({
         nombre: capitalizarPalabras(formEdit.nombre.trim()),
         direccion: formEdit.direccion.trim(),
-        localidad: formEdit.localidad.trim(),
+        localidad: capitalizarPalabras(formEdit.localidad.trim()),
         provincia: formEdit.provincia.trim(),
         codigo_postal: formEdit.codigo_postal.trim() || null,
         telefono: formEdit.telefono.trim(),
@@ -600,7 +600,14 @@ export default function Dashboard({ session }) {
               cuenta={cuenta}
               negocios={negocios}
               precioBase={precioBase}
-              onAgregada={cargarTodo}
+              onAgregada={async () => {
+                await cargarTodo();
+                // El pago/confirmación de la sucursal nueva ya cumplió el
+                // rol de "confirmá que querés agregar una sucursal": no
+                // tiene sentido pedirle a la persona que confirme nuevo
+                // (con otro CONFIRMAR) antes de dejarla cargar los datos.
+                setPasoAltaSucursal('formulario');
+              }}
             />
           ) : cupoLleno && esTrialConTope ? (
             <div className="bg-[#DCEEF7] border border-[#B8DCEC] rounded-lg p-3 text-sm text-[#1B6E8C] flex items-center justify-between gap-3">
