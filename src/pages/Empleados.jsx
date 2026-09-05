@@ -21,6 +21,26 @@ const PUESTOS_CATALOGO = [
   'Otro',
 ];
 
+// Tope de empleados activos, agregado 2026-09-05 a pedido de Roberto
+// para que no se pueda cargar una cantidad de empleados que no
+// corresponda a lo que la cuenta tiene contratado (algo que hasta
+// ahora no tenía ningún límite, a diferencia de sucursales que sí
+// respeta sucursales_contratadas). Igual que en Trainual/BambooHR, el
+// tope escala con el plan contratado en vez de ser un número fijo para
+// todos: 20 empleados activos por cada sucursal contratada. Para un
+// negocio chico (indumentaria, estética, kiosco, panadería, 2 a 10
+// empleados típico por local) esto nunca se llega a rozar; lo que
+// evita es que una cuenta de 1 sucursal cargue cientos de empleados
+// gratis. Aplica siempre (activa, trial, lo que sea), no solo cuando
+// falta pago — es un tope de uso apropiado, no una restricción de
+// suscripción. Ajustable acá si en la práctica el número queda corto o
+// largo.
+const EMPLEADOS_POR_SUCURSAL = 20;
+
+function limiteEmpleados(cuenta) {
+  return (cuenta?.sucursales_contratadas || 1) * EMPLEADOS_POR_SUCURSAL;
+}
+
 function IconWhatsApp(props) {
   return (
     <svg viewBox="0 0 448 512" width="14" height="14" fill="currentColor" {...props}>
@@ -162,6 +182,7 @@ export default function Empleados({ session }) {
 
   const [creando, setCreando] = useState(false);
   const [ultimoCreado, setUltimoCreado] = useState(null);
+  const [errorCupoEmpleados, setErrorCupoEmpleados] = useState(null);
 
   const [editandoId, setEditandoId] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -250,6 +271,19 @@ export default function Empleados({ session }) {
 
     if (!hasAccess) {
       setMostrarSuscripcion(true);
+      return;
+    }
+
+    // Tope de empleados activos según lo contratado (ver
+    // EMPLEADOS_POR_SUCURSAL arriba). Chequeo defensivo acá además del
+    // que oculta el formulario más abajo, por si hay dos pestañas
+    // abiertas a la vez.
+    setErrorCupoEmpleados(null);
+    const activosActuales = empleados.filter((emp) => !emp.fecha_baja).length;
+    if (activosActuales >= limiteEmpleados(cuenta)) {
+      setErrorCupoEmpleados(
+        `Llegaste al límite de ${limiteEmpleados(cuenta)} empleados activos incluido en tu plan actual. Comunicate con nosotros si necesitás sumar más.`
+      );
       return;
     }
 
@@ -440,6 +474,8 @@ export default function Empleados({ session }) {
   // Así se excluye a quienes se borraron sin ninguna actividad (p. ej. de baja
   // durante el alta, por error, sin haber llegado a usar la app).
   const dadosDeBaja = empleados.filter((e) => e.fecha_baja && empleadosConCursoRealizado.has(e.id));
+  const topeEmpleados = limiteEmpleados(cuenta);
+  const limiteEmpleadosAlcanzado = activos.length >= topeEmpleados;
 
   function FilaEmpleado({ e }) {
     const abierto = editandoId === e.id;
@@ -631,8 +667,14 @@ export default function Empleados({ session }) {
             <p className="text-sm text-[#6b6455]">
               Primero cargá al menos una sucursal, en la pantalla de Sucursales.
             </p>
+          ) : limiteEmpleadosAlcanzado ? (
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] font-semibold tracking-wide">
+              Llegaste al límite de {topeEmpleados} empleados activos incluido en tu plan actual.
+              Comunicate con nosotros si necesitás sumar más.
+            </div>
           ) : (
             <form onSubmit={handleCrearEmpleado} className="space-y-2">
+              {errorCupoEmpleados && <p className="text-xs text-[#C1502E]">{errorCupoEmpleados}</p>}
               <div className="flex items-center gap-3 mb-1">
                 <input
                   type="file"
