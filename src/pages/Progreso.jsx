@@ -830,7 +830,7 @@ export default function Progreso({ session }) {
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <div className="flex items-center gap-2 mb-1">
               <h2 className="font-semibold text-[#2C2C2A]">Estancados</h2>
-              <span className="w-5 h-5 rounded-full bg-[#6B655A] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 rounded-full bg-[#6B655A] text-white text-xs font-bold flex items-center justify-center flex-shrink-0" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}>
                 {estancados.length}
               </span>
             </div>
@@ -855,7 +855,7 @@ export default function Progreso({ session }) {
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
             <div className="flex items-center gap-2 mb-1">
               <h2 className="font-semibold text-[#2C2C2A]">Todavía no arrancaron</h2>
-              <span className="w-5 h-5 rounded-full bg-[#6B655A] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 rounded-full bg-[#6B655A] text-white text-xs font-bold flex items-center justify-center flex-shrink-0" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}>
                 {sinArrancar.length}
               </span>
             </div>
