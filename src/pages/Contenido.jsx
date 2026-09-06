@@ -1320,7 +1320,7 @@ export default function Contenido({ session }) {
           </form>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+        <div className="bg-white rounded-2xl border-[3px] border-[#C1502E] p-6">
           <div className="flex items-center gap-2 mb-3">
             <h2 className="font-semibold text-[#2C2C2A]">Contenido cargado</h2>
             <span className="w-6 h-6 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center">
@@ -1544,7 +1544,7 @@ export default function Contenido({ session }) {
         </div>
 
         {cursosPublicados.length > 0 && (
-          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
+          <div className="bg-white rounded-2xl border-[3px] border-[#7C8B6F] p-6">
             <div className="flex items-center gap-2 mb-1">
               <h2 className="font-semibold text-[#2C2C2A]">Cursos disponibles</h2>
               <span className="w-6 h-6 rounded-full bg-[#1B2A3D] text-white font-bold text-xs flex items-center justify-center">
