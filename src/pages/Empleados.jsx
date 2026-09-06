@@ -88,6 +88,77 @@ function IconGaleria(props) {
   );
 }
 
+function IconChevron(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+// Dropdown propio, mismo estilo que el resto de los inputs, para no
+// depender del <select> nativo del navegador (2026-09-06, a pedido de
+// Roberto: "elegí la sucursal" y "elegí el puesto" abrían el listado
+// con el estilo nativo del sistema operativo, distinto al resto de la
+// app). Cierra solo al elegir una opción o al tocar afuera.
+function SelectPersonalizado({ value, onChange, opciones, placeholder }) {
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function handleClickAfuera(ev) {
+      if (contenedorRef.current && !contenedorRef.current.contains(ev.target)) {
+        setAbierto(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickAfuera);
+    document.addEventListener('touchstart', handleClickAfuera);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAfuera);
+      document.removeEventListener('touchstart', handleClickAfuera);
+    };
+  }, [abierto]);
+
+  const seleccionado = opciones.find((o) => o.value === value);
+
+  return (
+    <div className="relative" ref={contenedorRef}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm bg-white text-left"
+      >
+        <span className={seleccionado ? 'text-[#2C2C2A]' : 'text-[#8a8471]'}>
+          {seleccionado ? seleccionado.label : placeholder}
+        </span>
+        <IconChevron
+          className={`text-[#8a8471] flex-shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {abierto && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#EFDDCE] rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {opciones.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => {
+                onChange(o.value);
+                setAbierto(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-[#FDF6ED] ${
+                o.value === value ? 'text-[#C1502E] font-semibold' : 'text-[#2C2C2A]'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Mensajes de validación de campos obligatorios en castellano (el
 // navegador muestra "Please fill out this field" en inglés por default).
 function validarCampo(e) {
@@ -609,18 +680,12 @@ export default function Empleados({ session }) {
               placeholder="Nombre"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
-            <select
+            <SelectPersonalizado
               value={editForm.puesto}
-              onChange={(ev) => setEditForm({ ...editForm, puesto: ev.target.value })}
-              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-            >
-              <option value="">Elegí el puesto</option>
-              {puestosDisponibles.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setEditForm({ ...editForm, puesto: val })}
+              placeholder="Elegí el puesto"
+              opciones={puestosDisponibles.map((p) => ({ value: p, label: p }))}
+            />
             {editForm.puesto === 'Otro' && (
               <input
                 type="text"
@@ -752,21 +817,12 @@ export default function Empleados({ session }) {
                   </span>
                 </div>
               </div>
-              <select
+              <SelectPersonalizado
                 value={negocioSeleccionado}
-                onChange={(e) => setNegocioSeleccionado(e.target.value)}
-                onInvalid={validarCampo}
-                onInput={limpiarValidacion}
-                required
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              >
-                <option value="">Elegí la sucursal</option>
-                {negocios.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={setNegocioSeleccionado}
+                placeholder="Elegí la sucursal"
+                opciones={negocios.map((n) => ({ value: n.id, label: n.nombre }))}
+              />
               <input
                 type="text"
                 required
@@ -777,21 +833,12 @@ export default function Empleados({ session }) {
                 placeholder="Nombre del empleado"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
-              <select
-                required
+              <SelectPersonalizado
                 value={puesto}
-                onChange={(e) => setPuesto(e.target.value)}
-                onInvalid={validarCampo}
-                onInput={limpiarValidacion}
-                className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-              >
-                <option value="">Elegí el puesto</option>
-                {puestosDisponibles.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+                onChange={setPuesto}
+                placeholder="Elegí el puesto"
+                opciones={puestosDisponibles.map((p) => ({ value: p, label: p }))}
+              />
               {puesto === 'Otro' && (
                 <input
                   type="text"
