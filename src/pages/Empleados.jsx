@@ -799,7 +799,7 @@ export default function Empleados({ session }) {
             <button
               type="button"
               onClick={() => setMostrandoFormAlta(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold tracking-wide text-white bg-[#C1502E]"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E]"
               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               <IconPersonaMas width="26" height="26" />
@@ -914,7 +914,8 @@ export default function Empleados({ session }) {
                 <button
                   type="button"
                   onClick={cancelarAlta}
-                  className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                  className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#6B655A]"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                 >
                   Cancelar
                 </button>
