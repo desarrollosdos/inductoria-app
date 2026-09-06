@@ -270,7 +270,22 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
           {f.badges.map((b) => (
             <div key={b.microcurso_id} className="relative">
               <div className="flex items-center justify-between gap-2">
-                <CursoCompletadoFila titulo={b.titulo} />
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <CursoCompletadoFila titulo={b.titulo} />
+                  {/* El contenido cambió después de que este empleado lo
+                      completó (ver version_completada en Contenido.jsx /
+                      handleActualizarPublicado) — le falta revalidar la
+                      versión nueva. */}
+                  {b.necesitaRevalidar && (
+                    <span
+                      title={`Completó la versión ${b.versionCompletada}, la versión actual es la ${b.versionActual}`}
+                      className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#C1502E] text-white flex-shrink-0"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                    >
+                      Revalidar
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     type="button"
@@ -397,11 +412,15 @@ export default function Progreso({ session }) {
 
     const { data: cursosData } = await supabase
       .from('microcursos')
-      .select('id, titulo, puestos_aplicables')
+      .select('id, titulo, puestos_aplicables, version')
       .eq('cuenta_id', cuentaData.id)
       .eq('estado', 'aprobado');
     const tituloPorCurso = {};
-    (cursosData || []).forEach((c) => (tituloPorCurso[c.id] = c.titulo));
+    const versionPorCurso = {};
+    (cursosData || []).forEach((c) => {
+      tituloPorCurso[c.id] = c.titulo;
+      versionPorCurso[c.id] = c.version || 1;
+    });
 
     // Total de cursos que le corresponden a CADA empleado según su puesto,
     // no el total global de la cuenta. Mismo criterio que empleado-info:
@@ -421,7 +440,9 @@ export default function Progreso({ session }) {
     if (empleadoIds.length > 0) {
       const { data: progresoData } = await supabase
         .from('progreso_empleado')
-        .select('empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at')
+        .select(
+          'empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at, version_completada'
+        )
         .in('empleado_id', empleadoIds);
 
       (progresoData || []).forEach((p) => {
@@ -438,6 +459,14 @@ export default function Progreso({ session }) {
             progresoPorEmpleado[p.empleado_id].ultimaActividad = p.fecha_completado;
           }
           const titulo = tituloPorCurso[p.microcurso_id] || 'Curso';
+          // Versión que completó el empleado vs. la versión actual del
+          // curso (ver Contenido.jsx, handleActualizarPublicado): si son
+          // distintas, el contenido cambió después de que lo completó y
+          // le hace falta revalidar. Cursos que ya no existen o de antes
+          // del versionado (version_completada null) no se marcan.
+          const versionActual = versionPorCurso[p.microcurso_id];
+          const necesitaRevalidar =
+            versionActual != null && p.version_completada != null && p.version_completada !== versionActual;
           progresoPorEmpleado[p.empleado_id].badges.push({
             microcurso_id: p.microcurso_id,
             titulo,
@@ -445,6 +474,9 @@ export default function Progreso({ session }) {
             puntaje: p.puntaje,
             fecha_completado: p.fecha_completado,
             acuse_confirmado_at: p.acuse_confirmado_at,
+            versionCompletada: p.version_completada,
+            versionActual,
+            necesitaRevalidar,
           });
           conteoPorCurso[p.microcurso_id] = (conteoPorCurso[p.microcurso_id] || 0) + 1;
         }

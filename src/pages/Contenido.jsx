@@ -6,7 +6,7 @@ import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import TrialBanner from '../components/TrialBanner';
 import { tieneAccesoBase, puedeUsarIA, trialActivo } from '../lib/acceso';
-import { TituloCursoInline } from '../components/Badges';
+import { TituloCursoInline, esCursoSeguridadEHigiene } from '../components/Badges';
 import { capitalizarPrimeraLetra } from '../lib/texto';
 
 // Mismo catálogo que usa Empleados.jsx para el campo "puesto" — se
@@ -196,6 +196,11 @@ export default function Contenido({ session }) {
   const [gapsPorCurso, setGapsPorCurso] = useState({});
   const [gapAbiertoId, setGapAbiertoId] = useState(null);
 
+  // Cursos propios en revisión por un cambio de contenido (2026-09-06,
+  // ver handleActualizarPublicado y handlePublicarRevision más abajo).
+  const [cursosEnRevision, setCursosEnRevision] = useState([]);
+  const [publicandoRevisionId, setPublicandoRevisionId] = useState(null);
+
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
   const [textoEdit, setTextoEdit] = useState('');
@@ -302,11 +307,24 @@ export default function Contenido({ session }) {
     if (cuentaData) {
       const { data: publicadosData } = await supabase
         .from('microcursos')
-        .select('id, titulo, created_at, puestos_aplicables')
+        .select('id, titulo, created_at, puestos_aplicables, origen_base_id, version')
         .eq('cuenta_id', cuentaData.id)
         .eq('estado', 'aprobado')
         .order('created_at', { ascending: false });
       setCursosPublicados(publicadosData || []);
+
+      // Cursos propios a los que se les cambió el contenido (ver
+      // handleActualizarPublicado): dejan de estar "aprobado" mientras se
+      // revisa la versión nueva, así que no aparecen en "Cursos
+      // disponibles" ni los ven los empleados hasta que el dueño confirma
+      // la publicación desde acá abajo.
+      const { data: revisionData } = await supabase
+        .from('microcursos')
+        .select('id, titulo, version')
+        .eq('cuenta_id', cuentaData.id)
+        .eq('estado', 'en_revision')
+        .order('created_at', { ascending: false });
+      setCursosEnRevision(revisionData || []);
 
       const idsPublicados = new Set((publicadosData || []).map((m) => m.id));
 
@@ -365,13 +383,24 @@ export default function Contenido({ session }) {
       setMostrarSuscripcion(true);
       return;
     }
-    if (puestosBiblioteca.length === 0) return;
+
+    // Seguridad e Higiene es obligatorio para todos los puestos siempre
+    // (a pedido de Roberto, 2026-09-06): se agrega directo con
+    // puestos_aplicables=['TODOS'], sin pasar por el selector de puestos
+    // ni permitir elegir otra cosa. Los demás cursos de biblioteca sí
+    // requieren elegir puesto antes de agregarse, como ya funcionaba.
+    const esSegHig = esCursoSeguridadEHigiene(curso.titulo);
+    const puestosAAsignar = esSegHig ? ['TODOS'] : puestosBiblioteca;
+    if (!esSegHig && puestosBiblioteca.length === 0) return;
 
     setAgregandoBaseId(curso.id);
 
     // Los cursos de biblioteca ya vienen armados (pasos y preguntas
     // redactados a mano), así que se publican directo, sin pasar por
     // texto→aprobar→generar con IA como el resto del contenido.
+    // origen_base_id queda guardado para saber que este curso viene de la
+    // biblioteca (2026-09-06): a estos el dueño no les puede tocar el
+    // contenido, solo (salvo Seguridad e Higiene) los puestos.
     const { data: microcurso, error } = await supabase
       .from('microcursos')
       .insert({
@@ -380,7 +409,8 @@ export default function Contenido({ session }) {
         duracion_min: curso.duracion_min || 14,
         estado: 'aprobado',
         preguntas: curso.preguntas || [],
-        puestos_aplicables: puestosBiblioteca,
+        puestos_aplicables: puestosAAsignar,
+        origen_base_id: curso.id,
       })
       .select()
       .single();
@@ -1062,15 +1092,48 @@ export default function Contenido({ session }) {
       body: { microcurso_id: microcursoId, texto_nuevo: textoNuevoPublicado.trim() },
     });
 
-    setActualizandoId(null);
-
     if (error || data?.error) {
+      setActualizandoId(null);
       setErrorActualizar(data?.error || 'No se pudo actualizar el curso. Probá de nuevo.');
       return;
     }
 
+    // 2026-09-06, a pedido de Roberto: cambiar el contenido de un curso ya
+    // publicado ya no lo deja disponible al toque. actualizar-curso-ia ya
+    // regeneró el contenido (pasos/preguntas) con la IA; acá lo sacamos de
+    // "aprobado" y le subimos el número de versión, así el curso deja de
+    // estar en "Cursos disponibles" (los empleados no lo ven más) hasta
+    // que el dueño confirme la nueva versión desde "Contenido cargado"
+    // con handlePublicarRevision. Esto también deja un número de versión
+    // real para comparar contra la que completó cada empleado (ver
+    // version_completada en Progreso.jsx).
+    const { data: microcursoActual } = await supabase
+      .from('microcursos')
+      .select('version')
+      .eq('id', microcursoId)
+      .maybeSingle();
+    const nuevaVersion = (microcursoActual?.version || 1) + 1;
+    await supabase
+      .from('microcursos')
+      .update({ estado: 'en_revision', version: nuevaVersion })
+      .eq('id', microcursoId);
+
+    setActualizandoId(null);
     setEditandoPublicadoId(null);
     setTextoNuevoPublicado('');
+    await cargarTodo();
+  }
+
+  // Confirma la nueva versión de un curso propio y lo vuelve a publicar
+  // (sale de "en revisión", vuelve a estar en "Cursos disponibles").
+  async function handlePublicarRevision(microcursoId) {
+    setPublicandoRevisionId(microcursoId);
+    const { error } = await supabase.from('microcursos').update({ estado: 'aprobado' }).eq('id', microcursoId);
+    setPublicandoRevisionId(null);
+    if (error) {
+      console.error(error);
+      return;
+    }
     await cargarTodo();
   }
 
@@ -1131,21 +1194,37 @@ export default function Contenido({ session }) {
               {cursosBase.map((curso) => {
                 const yaAgregado = cursosPublicados.some((m) => m.titulo === curso.titulo);
                 const seleccionando = seleccionandoBaseId === curso.id;
+                const esSegHig = esCursoSeguridadEHigiene(curso.titulo);
                 return (
                   <div key={curso.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-4 py-3">
-                      <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium break-words" />
+                      <div className="min-w-0">
+                        <TituloCursoInline titulo={curso.titulo} className="text-sm font-medium break-words" />
+                        {esSegHig && (
+                          <p className="text-[10px] font-semibold text-[#8a8471] mt-0.5">
+                            Aplica a todos los puestos, no se puede modificar
+                          </p>
+                        )}
+                      </div>
                       <button
                         type="button"
-                        onClick={() => abrirSeleccionBase(curso.id)}
-                        disabled={yaAgregado}
+                        onClick={() => (esSegHig ? handleAgregarBase(curso) : abrirSeleccionBase(curso.id))}
+                        disabled={yaAgregado || agregandoBaseId === curso.id}
                         className="w-full sm:w-auto text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-1.5 flex-shrink-0 disabled:bg-[#EDE0C8] disabled:text-[#8a8471]"
                         style={!yaAgregado ? { textShadow: '0 1px 1px rgba(0,0,0,0.35)' } : undefined}
                       >
-                        {yaAgregado ? 'Ya agregado' : seleccionando ? 'Cancelar' : 'Agregar a los cursos'}
+                        {yaAgregado
+                          ? 'Ya agregado'
+                          : agregandoBaseId === curso.id
+                          ? 'Agregando...'
+                          : esSegHig
+                          ? 'Agregar (todos los puestos)'
+                          : seleccionando
+                          ? 'Cancelar'
+                          : 'Agregar a los cursos'}
                       </button>
                     </div>
-                    {seleccionando && (
+                    {!esSegHig && seleccionando && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
                           ¿A qué puestos aplica? Elegí "Todos los puestos" o puestos puntuales
@@ -1327,6 +1406,32 @@ export default function Contenido({ session }) {
               {contenidos.length}
             </span>
           </div>
+          {cursosEnRevision.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {cursosEnRevision.map((m) => (
+                <div
+                  key={m.id}
+                  className="border border-[#F0DFC4] bg-[#FDF6ED] rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#2C2C2A]">{m.titulo}</p>
+                    <p className="text-[10px] font-semibold text-[#8a8471]">
+                      Versión {m.version} · en revisión, todavía no la ven tus empleados
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePublicarRevision(m.id)}
+                    disabled={publicandoRevisionId === m.id}
+                    className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60 flex-shrink-0"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    {publicandoRevisionId === m.id ? 'Publicando...' : `Publicar versión ${m.version}`}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {contenidos.length === 0 ? (
             <p className="text-sm text-[#6b6455]">Todavía no subiste nada.</p>
           ) : (
@@ -1562,6 +1667,13 @@ export default function Contenido({ session }) {
                 const puestosActuales = m.puestos_aplicables || [];
                 const sinDefinir = puestosActuales.length === 0;
                 const paraTodos = puestosActuales.includes('TODOS');
+                // Reglas de edición por origen del curso (2026-09-06, a
+                // pedido de Roberto): un curso propio se puede editar
+                // entero (puestos y contenido); uno de la biblioteca solo
+                // puestos; Seguridad e Higiene no se toca de ninguna
+                // forma, siempre aplica a todos los puestos.
+                const esDeBiblioteca = !!m.origen_base_id;
+                const esSegHig = esCursoSeguridadEHigiene(m.titulo);
                 return (
                   <div key={m.id} className="bg-[#FBF3EC] border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="px-4 py-3">
@@ -1574,13 +1686,14 @@ export default function Contenido({ session }) {
                               : paraTodos
                               ? 'Para todos los puestos'
                               : `Solo para: ${puestosActuales.join(', ')}`}
+                            {!esDeBiblioteca && ` · Versión ${m.version || 1}`}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
                           <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#7C8B6F] text-white">
                             Disponible
                           </span>
-                          {accionesVisiblesId === m.id ? (
+                          {esSegHig ? null : accionesVisiblesId === m.id ? (
                             <button
                               type="button"
                               onClick={() => setAccionesVisiblesId(null)}
@@ -1601,7 +1714,12 @@ export default function Contenido({ session }) {
                           )}
                         </div>
                       </div>
-                      {accionesVisiblesId === m.id && (
+                      {esSegHig && (
+                        <p className="text-[10px] font-semibold text-[#8a8471] mt-1">
+                          Obligatorio para todos los puestos, no se puede modificar.
+                        </p>
+                      )}
+                      {!esSegHig && accionesVisiblesId === m.id && (
                         <div className="flex items-center gap-2 flex-wrap mt-2">
                           <button
                             type="button"
@@ -1621,15 +1739,17 @@ export default function Contenido({ session }) {
                           >
                             {editandoPuestos ? 'Cancelar' : sinDefinir ? 'Asignar puestos' : 'Cambiar puestos'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => abrirEdicionPublicado(m.id)}
-                            title="Regenerar el contenido de este curso con IA"
-                            className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
-                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                          >
-                            {editando ? 'Cancelar' : 'Cambiar versión'}
-                          </button>
+                          {!esDeBiblioteca && (
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicionPublicado(m.id)}
+                              title="Regenerar el contenido de este curso con IA (pasa a revisión antes de volver a publicarse)"
+                              className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              {editando ? 'Cancelar' : 'Cambiar versión'}
+                            </button>
+                          )}
                           {gapsPorCurso[m.id]?.total > 0 && (
                             <button
                               type="button"
@@ -1684,8 +1804,9 @@ export default function Contenido({ session }) {
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
                           Sumá el material nuevo acá abajo. La IA va a regenerar el curso completo
-                          combinando lo que ya tenía con esto, y se publica solo, sin pasar por
-                          aprobación de nuevo.
+                          combinando lo que ya tenía con esto. Esto sube la versión del curso y lo
+                          saca de "Disponible" hasta que confirmes la nueva versión desde
+                          "Contenido cargado" — mientras tanto tus empleados no lo ven.
                         </p>
                         <textarea
                           value={textoNuevoPublicado}
