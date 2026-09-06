@@ -73,6 +73,7 @@ export default function Configuracion({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(null);
+  const [errorCampo, setErrorCampo] = useState(null);
 
   useEffect(() => {
     cargar();
@@ -93,6 +94,7 @@ export default function Configuracion({ session }) {
   async function handleToggle(campo) {
     const valorNuevo = !cuenta[campo];
     setGuardando(campo);
+    setErrorCampo(null);
     const { error } = await supabase
       .from('cuentas')
       .update({ [campo]: valorNuevo })
@@ -100,7 +102,7 @@ export default function Configuracion({ session }) {
     setGuardando(null);
     if (error) {
       console.error(error);
-      alert('No se pudo guardar el cambio. Probá de nuevo.');
+      setErrorCampo({ campo, mensaje: 'No se pudo guardar el cambio. Probá de nuevo.' });
       return;
     }
     setCuenta({ ...cuenta, [campo]: valorNuevo });
@@ -160,11 +162,18 @@ export default function Configuracion({ session }) {
                 <p className="text-sm text-[#3d382c]">{texto}</p>
               </div>
             </div>
-            <Toggle
-              checked={!!cuenta[campo]}
-              onChange={() => handleToggle(campo)}
-              disabled={guardando === campo}
-            />
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <Toggle
+                checked={!!cuenta[campo]}
+                onChange={() => handleToggle(campo)}
+                disabled={guardando === campo}
+              />
+              {errorCampo?.campo === campo && (
+                <p className="text-xs font-semibold text-[#C1502E] text-right max-w-[140px]">
+                  {errorCampo.mensaje}
+                </p>
+              )}
+            </div>
           </div>
         ))}
 
