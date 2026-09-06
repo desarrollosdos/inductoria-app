@@ -663,7 +663,7 @@ export default function Progreso({ session }) {
               >
                 {totalCursos}
               </span>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#3d382c]">CURSOS APROBADOS</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-[#3d382c]">CURSOS DISPONIBLES</p>
             </div>
           )}
         </div>
@@ -865,7 +865,7 @@ export default function Progreso({ session }) {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] border-t-[3px] border-t-[#C1502E] overflow-hidden">
+        <div className="bg-white rounded-2xl border-[3px] border-[#C1502E] overflow-hidden">
           <div className="flex items-center gap-2.5 px-6 pt-4 pb-2">
             <div className="w-[26px] h-[26px] rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
               <IconBirrete className="text-white" />
