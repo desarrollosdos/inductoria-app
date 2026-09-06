@@ -65,8 +65,31 @@ function ChipEmailMobile({ email }) {
 }
 
 export default function Header({ session, empleadoNombre }) {
-  async function handleLogout() {
-    if (!window.confirm('¿Seguro que querés salir?')) return;
+  // Antes handleLogout llamaba a window.confirm(...) directo: un cartel
+  // negro del navegador, distinto a todo el resto de la app. Ahora el
+  // botón solo abre este popover propio (mismo estilo crema que usamos
+  // en el resto de los cartelitos de confirmación), y el logout real
+  // pasa a confirmarLogout, que se dispara con el botón "Sí, salir".
+  const [confirmandoSalir, setConfirmandoSalir] = useState(false);
+  const salirRef = useRef(null);
+
+  useEffect(() => {
+    if (!confirmandoSalir) return;
+    function handleClickAfuera(e) {
+      if (salirRef.current && !salirRef.current.contains(e.target)) {
+        setConfirmandoSalir(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickAfuera);
+    document.addEventListener('touchstart', handleClickAfuera);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAfuera);
+      document.removeEventListener('touchstart', handleClickAfuera);
+    };
+  }, [confirmandoSalir]);
+
+  async function confirmarLogout() {
+    setConfirmandoSalir(false);
     await supabase.auth.signOut();
     window.location.href = '/';
   }
@@ -101,14 +124,38 @@ export default function Header({ session, empleadoNombre }) {
             >
               <IconEngranaje />
             </a>
-            <button
-              onClick={handleLogout}
-              title="Salir"
-              className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-bold tracking-wide flex items-center justify-center hover:opacity-90 transition-opacity"
-              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-            >
-              Salir
-            </button>
+            <div className="relative" ref={salirRef}>
+              <button
+                onClick={() => setConfirmandoSalir(true)}
+                title="Salir"
+                className="h-9 px-4 rounded-full bg-[#C1502E] text-white text-xs font-bold tracking-wide flex items-center justify-center hover:opacity-90 transition-opacity"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                Salir
+              </button>
+              {confirmandoSalir && (
+                <div className="absolute right-0 top-11 z-50 bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 w-52 shadow-lg">
+                  <p className="font-semibold text-[#2C2C2A]">¿Seguro que querés salir?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoSalir(false)}
+                      className="flex-1 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] text-xs font-bold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmarLogout}
+                      className="flex-1 h-8 rounded-full bg-[#C1502E] text-white text-xs font-bold"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                    >
+                      Sí, salir
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
