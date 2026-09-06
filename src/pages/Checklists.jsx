@@ -202,6 +202,12 @@ export default function Checklists({ session }) {
   const [cambiandoActivacion, setCambiandoActivacion] = useState(false);
   const [historialAbiertoId, setHistorialAbiertoId] = useState(null);
 
+  // Confirmaciones propias (mismo look que Dashboard.jsx al agregar una
+  // sucursal) en vez de window.confirm nativo, que sale con letra negra
+  // estándar del navegador (2026-09-06, a pedido de Roberto).
+  const [confirmandoDesactivar, setConfirmandoDesactivar] = useState(false);
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null);
+
   // Solo uno de los dos puede estar abierto a la vez: o se está editando
   // un checklist que ya existe, o se está creando uno nuevo para una
   // sucursal puntual.
@@ -297,12 +303,7 @@ export default function Checklists({ session }) {
   }
 
   async function handleDesactivar() {
-    if (
-      !confirm(
-        '¿Desactivar los checklists operativos? Los que ya armaste no se borran, solo dejan de verse hasta que los actives de nuevo.'
-      )
-    )
-      return;
+    setConfirmandoDesactivar(false);
     setCambiandoActivacion(true);
     const { error } = await supabase
       .from('cuentas')
@@ -410,10 +411,7 @@ export default function Checklists({ session }) {
   }
 
   async function eliminarChecklist(checklistId) {
-    if (
-      !confirm('¿Eliminar este checklist? También se borra el historial de días completados. No se puede deshacer.')
-    )
-      return;
+    setConfirmandoEliminarId(null);
     const { error } = await supabase.from('checklists').delete().eq('id', checklistId);
     if (error) {
       console.error(error);
@@ -682,17 +680,44 @@ export default function Checklists({ session }) {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex">
+            <div className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex flex-col gap-2">
               {cuenta.checklists_habilitado ? (
-                <button
-                  type="button"
-                  onClick={handleDesactivar}
-                  disabled={cambiandoActivacion}
-                  className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
-                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                >
-                  Desactivar
-                </button>
+                confirmandoDesactivar ? (
+                  <div className="w-full bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+                    <p className="font-semibold text-[#2C2C2A]">
+                      ¿Desactivar los checklists operativos? Los que ya armaste no se borran, solo
+                      dejan de verse hasta que los actives de nuevo.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoDesactivar(false)}
+                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDesactivar}
+                        disabled={cambiandoActivacion}
+                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                      >
+                        {cambiandoActivacion ? 'Desactivando...' : 'Sí, desactivar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoDesactivar(true)}
+                    disabled={cambiandoActivacion}
+                    className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60 self-start"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    Desactivar
+                  </button>
+                )
               ) : (
                 <button
                   type="button"
@@ -796,13 +821,38 @@ export default function Checklists({ session }) {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => eliminarChecklist(checklist.id)}
+                                    onClick={() => setConfirmandoEliminarId(checklist.id)}
                                     title="Eliminar"
                                     className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
                                   >
                                     <IconBorrar />
                                   </button>
                                 </div>
+                                {confirmandoEliminarId === checklist.id && (
+                                  <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+                                    <p className="font-semibold text-[#2C2C2A]">
+                                      ¿Eliminar este checklist? También se borra el historial de
+                                      días completados. No se puede deshacer.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmandoEliminarId(null)}
+                                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => eliminarChecklist(checklist.id)}
+                                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                      >
+                                        Sí, eliminar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                                 {historialAbierto && <HistorialYMetricas checklist={checklist} />}
                               </>
                             )}

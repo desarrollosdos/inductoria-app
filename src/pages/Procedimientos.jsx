@@ -154,6 +154,11 @@ export default function Procedimientos({ session }) {
   const [generandoId, setGenerandoId] = useState(null);
   const [errorGenerar, setErrorGenerar] = useState(null);
 
+  // Confirmación propia (mismo look que Dashboard.jsx al agregar una
+  // sucursal) en vez de window.confirm nativo, que sale con letra negra
+  // estándar del navegador (2026-09-06, a pedido de Roberto).
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null);
+
   const [abiertoId, setAbiertoId] = useState(null);
   const [form, setForm] = useState(null);
   const [guardando, setGuardando] = useState(false);
@@ -352,7 +357,7 @@ export default function Procedimientos({ session }) {
   }
 
   async function handleEliminar(id) {
-    if (!confirm('¿Eliminar este procedimiento? No se puede deshacer.')) return;
+    setConfirmandoEliminarId(null);
     const { error } = await supabase.from('procedimientos').delete().eq('id', id);
     if (error) {
       console.error(error);
@@ -501,7 +506,7 @@ export default function Procedimientos({ session }) {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleEliminar(p.id)}
+                              onClick={() => setConfirmandoEliminarId(p.id)}
                               title="Eliminar"
                               className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
                             >
@@ -520,6 +525,30 @@ export default function Procedimientos({ session }) {
                           </span>
                         </div>
                       </div>
+                      {confirmandoEliminarId === p.id && (
+                        <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+                          <p className="font-semibold text-[#2C2C2A]">
+                            ¿Eliminar este procedimiento? No se puede deshacer.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmandoEliminarId(null)}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminar(p.id)}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              Sí, eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {abierto && form && (

@@ -182,6 +182,10 @@ function BarraSegmentada({ completados, total }) {
 function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
   const linkAcceso = `${window.location.origin}/e?c=${f.token_acceso.slice(0, 10)}`;
   const [acuseAbierto, setAcuseAbierto] = useState(null);
+  // Aviso propio (mismo cartel color crema que el resto de la app) en vez
+  // de window.alert nativo, que sale con letra negra estándar del
+  // navegador (2026-09-06, a pedido de Roberto).
+  const [avisoTelefono, setAvisoTelefono] = useState(false);
   return (
     <div className="px-6 py-2.5 border-t border-[#F3EEE1]">
       <div className="flex items-center gap-3 mb-1">
@@ -211,16 +215,26 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                     <IconWhatsApp />
                   </a>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      alert(`${f.nombre} no tiene teléfono cargado. Agregalo desde Empleados para poder enviarle el link por WhatsApp.`)
-                    }
-                    title="Falta cargar el teléfono"
-                    className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#a89f8a] flex items-center justify-center flex-shrink-0"
-                  >
-                    <IconWhatsApp />
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAvisoTelefono(!avisoTelefono)}
+                      title="Falta cargar el teléfono"
+                      className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#a89f8a] flex items-center justify-center flex-shrink-0"
+                    >
+                      <IconWhatsApp />
+                    </button>
+                    {avisoTelefono && (
+                      <div
+                        className="absolute right-0 top-full mt-1.5 z-10 bg-[#FDF6ED] border border-[#F0DFC4] text-[#6b6455] text-[11px] font-semibold px-3 py-2 rounded-lg whitespace-nowrap text-right"
+                        style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
+                      >
+                        {f.nombre} no tiene teléfono cargado.
+                        <br />
+                        Agregalo desde Empleados para poder enviarle el link.
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}

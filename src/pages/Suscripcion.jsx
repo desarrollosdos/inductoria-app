@@ -81,6 +81,9 @@ export default function Suscripcion({ session }) {
   const [precioBase, setPrecioBase] = useState(12000);
   const [loading, setLoading] = useState(true);
   const [iniciandoPago, setIniciandoPago] = useState(false);
+  // Aviso propio en vez de window.alert nativo, que sale con letra negra
+  // estándar del navegador (2026-09-06, a pedido de Roberto).
+  const [errorPago, setErrorPago] = useState(null);
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
 
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function Suscripcion({ session }) {
 
   async function handleSuscribirme() {
     setIniciandoPago(true);
+    setErrorPago(null);
     const { data, error } = await supabase.functions.invoke('crear-suscripcion', {
       method: 'POST',
       body: { cuenta_id: cuenta.id },
@@ -166,7 +170,7 @@ export default function Suscripcion({ session }) {
     setIniciandoPago(false);
 
     if (error || !data?.init_point) {
-      alert('No se pudo iniciar el pago. Probá de nuevo en un momento.');
+      setErrorPago('No se pudo iniciar el pago. Probá de nuevo en un momento.');
       return;
     }
     sessionStorage.setItem('inductoria_pago_pendiente', '5');
@@ -254,6 +258,9 @@ export default function Suscripcion({ session }) {
               >
                 {iniciandoPago ? 'Redirigiendo...' : `Suscribirme por $${precioMensual.toLocaleString('es-AR')}/mes`}
               </button>
+              {errorPago && (
+                <p className="text-xs font-semibold text-[#C1502E] mt-2">{errorPago}</p>
+              )}
             </>
           )}
 

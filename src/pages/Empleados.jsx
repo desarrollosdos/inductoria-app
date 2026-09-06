@@ -184,6 +184,11 @@ export default function Empleados({ session }) {
   const [ultimoCreado, setUltimoCreado] = useState(null);
   const [errorCupoEmpleados, setErrorCupoEmpleados] = useState(null);
 
+  // Confirmación propia (mismo look que Dashboard.jsx al agregar una
+  // sucursal) en vez de window.confirm nativo, que sale con letra negra
+  // estándar del navegador (2026-09-06, a pedido de Roberto).
+  const [confirmandoBajaId, setConfirmandoBajaId] = useState(null);
+
   const [editandoId, setEditandoId] = useState(null);
   const [editForm, setEditForm] = useState({
     nombre: '',
@@ -336,10 +341,7 @@ export default function Empleados({ session }) {
   }
 
   async function handleBaja(empleadoId) {
-    const confirmado = confirm(
-      'Vas a dar de baja a este empleado. Se pierde el acceso a su información (progreso, cursos, historial). ¿Confirmás?'
-    );
-    if (!confirmado) return;
+    setConfirmandoBajaId(null);
 
     const { error } = await supabase
       .from('empleados')
@@ -510,7 +512,7 @@ export default function Empleados({ session }) {
               </svg>
             </button>
             <button
-              onClick={() => handleBaja(e.id)}
+              onClick={() => setConfirmandoBajaId(e.id)}
               title="Dar de baja"
               className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
             >
@@ -522,6 +524,32 @@ export default function Empleados({ session }) {
             </button>
           </div>
         </div>
+
+        {confirmandoBajaId === e.id && (
+          <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+            <p className="font-semibold text-[#2C2C2A]">
+              Vas a dar de baja a este empleado. Se pierde el acceso a su información (progreso,
+              cursos, historial). ¿Confirmás?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmandoBajaId(null)}
+                className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBaja(e.id)}
+                className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+              >
+                Sí, dar de baja
+              </button>
+            </div>
+          </div>
+        )}
 
         {abierto && (
           <div className="mt-3 space-y-2 bg-[#EDE0C8] rounded-lg p-3">

@@ -233,14 +233,20 @@ export default function Contenido({ session }) {
   // aprobado (para no dejarlos siempre a la vista).
   const [accionesVisiblesId, setAccionesVisiblesId] = useState(null);
 
+  // Confirmaciones propias, con el mismo look que ya usás en Dashboard.jsx
+  // para agregar una sucursal (cartel color crema, botones Cancelar/Sí
+  // continuar), en vez del cuadro de diálogo nativo del navegador
+  // (`window.confirm`/`confirm`), que sale con letra negra estándar del
+  // sistema operativo y no se puede pintar con los colores de la app.
+  // 2026-09-06, a pedido de Roberto: reemplaza los 4 confirm() que tenía
+  // esta pantalla.
+  const [confirmandoAccionesId, setConfirmandoAccionesId] = useState(null);
+  const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null);
+  const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
+  const [confirmandoVersionId, setConfirmandoVersionId] = useState(null);
+
   function abrirAccionesPublicado(microcursoId) {
-    if (
-      window.confirm(
-        '¿Seguro que querés modificar alguna característica de este curso que ya fue aprobado?'
-      )
-    ) {
-      setAccionesVisiblesId(microcursoId);
-    }
+    setConfirmandoAccionesId(microcursoId);
   }
 
   useEffect(() => {
@@ -871,8 +877,7 @@ export default function Contenido({ session }) {
   }
 
   async function handleEliminar(id) {
-    if (!confirm('¿Eliminar este contenido? No se puede deshacer.')) return;
-
+    setConfirmandoEliminarId(null);
     const { error } = await supabase.from('contenidos').delete().eq('id', id);
     if (error) {
       console.error(error);
@@ -1014,8 +1019,7 @@ export default function Contenido({ session }) {
 
   async function handleDescartarCurso() {
     if (!borrador) return;
-    if (!confirm('¿Descartar este curso generado? El contenido vuelve a quedar disponible para generar de nuevo.'))
-      return;
+    setConfirmandoDescartar(false);
 
     setProcesandoAccion(true);
     await supabase.from('microcursos').delete().eq('id', borrador.microcurso.id);
@@ -1036,10 +1040,11 @@ export default function Contenido({ session }) {
       setErrorActualizar(null);
       return;
     }
-    const confirmado = confirm(
-      'Esto regenera el curso completo con IA (sumando el contenido nuevo al que ya tenía). Los empleados que ya lo completaron van a ver un aviso para volver a hacerlo. ¿Querés continuar?'
-    );
-    if (!confirmado) return;
+    setConfirmandoVersionId(microcursoId);
+  }
+
+  function confirmarEdicionPublicado(microcursoId) {
+    setConfirmandoVersionId(null);
     setEditandoPublicadoId(microcursoId);
     setTextoNuevoPublicado('');
     setErrorActualizar(null);
@@ -1460,18 +1465,43 @@ export default function Contenido({ session }) {
                         </div>
                         {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
                       </button>
-                      {!abierto && (c.estado === 'pendiente' || c.estado === 'aprobado') && (
-                        <div className="flex justify-end mt-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEliminar(c.id)}
-                            title="Eliminar"
-                            className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
-                          >
-                            <IconBorrar />
-                          </button>
-                        </div>
-                      )}
+                      {!abierto &&
+                        (c.estado === 'pendiente' || c.estado === 'aprobado') &&
+                        (confirmandoEliminarId === c.id ? (
+                          <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+                            <p className="font-semibold text-[#2C2C2A]">
+                              ¿Eliminar este contenido? No se puede deshacer.
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setConfirmandoEliminarId(null)}
+                                className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEliminar(c.id)}
+                                className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                              >
+                                Sí, eliminar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmandoEliminarId(c.id)}
+                              title="Eliminar"
+                              className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
+                            >
+                              <IconBorrar />
+                            </button>
+                          </div>
+                        ))}
                     </div>
 
                     {abierto && c.estado === 'generando' && (
@@ -1608,6 +1638,32 @@ export default function Contenido({ session }) {
                                 </p>
                               )}
                             </div>
+                            {confirmandoDescartar && (
+                              <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+                                <p className="font-semibold text-[#2C2C2A]">
+                                  ¿Descartar este curso generado? El contenido vuelve a quedar
+                                  disponible para generar de nuevo.
+                                </p>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmandoDescartar(false)}
+                                    className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleDescartarCurso}
+                                    disabled={procesandoAccion}
+                                    className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                  >
+                                    {procesandoAccion ? 'Descartando...' : 'Sí, descartar'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                               <button
                                 type="button"
@@ -1619,7 +1675,7 @@ export default function Contenido({ session }) {
                               </button>
                               <button
                                 type="button"
-                                onClick={handleDescartarCurso}
+                                onClick={() => setConfirmandoDescartar(true)}
                                 disabled={procesandoAccion}
                                 className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
                                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
@@ -1680,7 +1736,7 @@ export default function Contenido({ session }) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <TituloCursoInline titulo={m.titulo} className="text-sm font-medium break-words" />
-                          <p className={`text-[10px] mt-0.5 font-semibold ${sinDefinir ? 'text-[#C1502E]' : 'text-[#8a8471]'}`}>
+                          <p className={`text-xs mt-0.5 font-semibold ${sinDefinir ? 'text-[#C1502E]' : 'text-[#8a8471]'}`}>
                             {sinDefinir
                               ? '⚠ Sin puesto asignado, no visible para nadie'
                               : paraTodos
@@ -1718,6 +1774,34 @@ export default function Contenido({ session }) {
                         <p className="text-[10px] font-semibold text-[#8a8471] mt-1">
                           Obligatorio para todos los puestos, no se puede modificar.
                         </p>
+                      )}
+                      {confirmandoAccionesId === m.id && (
+                        <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+                          <p className="font-semibold text-[#2C2C2A]">
+                            ¿Seguro que querés modificar alguna característica de este curso que
+                            ya fue aprobado?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmandoAccionesId(null)}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmandoAccionesId(null);
+                                setAccionesVisiblesId(m.id);
+                              }}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              Sí, continuar
+                            </button>
+                          </div>
+                        </div>
                       )}
                       {!esSegHig && accionesVisiblesId === m.id && (
                         <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -1760,6 +1844,32 @@ export default function Contenido({ session }) {
                               {gapsPorCurso[m.id].total === 1 ? '' : 's'}
                             </button>
                           )}
+                        </div>
+                      )}
+                      {confirmandoVersionId === m.id && (
+                        <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
+                          <p className="font-semibold text-[#2C2C2A]">
+                            Esto regenera el curso completo con IA (sumando el contenido nuevo al
+                            que ya tenía). Los empleados que ya lo completaron van a ver un aviso
+                            para volver a hacerlo. ¿Querés continuar?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmandoVersionId(null)}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => confirmarEdicionPublicado(m.id)}
+                              className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              Sí, continuar
+                            </button>
+                          </div>
                         </div>
                       )}
                       {gapAbiertoId === m.id && gapsPorCurso[m.id] && (

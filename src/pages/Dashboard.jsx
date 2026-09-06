@@ -249,6 +249,12 @@ export default function Dashboard({ session }) {
   const [pasoAltaSucursal, setPasoAltaSucursal] = useState('inicial');
   const [textoValidacionAlta, setTextoValidacionAlta] = useState('');
 
+  // Confirmación propia (mismo cartel color crema que ya usás acá mismo
+  // para agregar una sucursal) en vez de window.confirm nativo, que sale
+  // con letra negra estándar del navegador (2026-09-06, a pedido de
+  // Roberto).
+  const [confirmandoEdicionId, setConfirmandoEdicionId] = useState(null);
+
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState(FORM_VACIO);
   const [guardandoEdit, setGuardandoEdit] = useState(false);
@@ -393,13 +399,11 @@ export default function Dashboard({ session }) {
       setEditandoId(null);
       return;
     }
-    if (
-      !window.confirm(
-        '¿Estás seguro que querés modificar los datos de esta sucursal? Es un dato asociado a muchas cosas.'
-      )
-    ) {
-      return;
-    }
+    setConfirmandoEdicionId(n.id);
+  }
+
+  function confirmarEdicion(n) {
+    setConfirmandoEdicionId(null);
     setEditandoId(n.id);
     setFormEdit({
       nombre: n.nombre || '',
@@ -567,6 +571,34 @@ export default function Dashboard({ session }) {
                     <p className="text-xs text-[#C1502E]">Todavía no cargaste la dirección de esta sucursal.</p>
                   )}
                 </button>
+
+                {confirmandoEdicionId === n.id && (
+                  <div className="px-4 pb-4">
+                    <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+                      <p className="font-semibold text-[#2C2C2A]">
+                        ¿Estás seguro que querés modificar los datos de esta sucursal? Es un dato
+                        asociado a muchas cosas.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmandoEdicionId(null)}
+                          className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => confirmarEdicion(n)}
+                          className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                        >
+                          Sí, continuar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {editandoId === n.id && (
                   <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
