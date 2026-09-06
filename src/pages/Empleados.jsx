@@ -69,6 +69,19 @@ function IconEmpleadosMini(props) {
   );
 }
 
+// Persona con un "+": botón para desplegar el alta (2026-09-06, a
+// pedido de Roberto, para no mostrar siempre todo el formulario).
+function IconPersonaMas(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+      <line x1="17.5" y1="7" x2="17.5" y2="13" />
+      <line x1="14.5" y1="10" x2="20.5" y2="10" />
+    </svg>
+  );
+}
+
 function IconCamara(props) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -239,6 +252,11 @@ export default function Empleados({ session }) {
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState('alfabetico'); // 'alfabetico' | 'sucursal'
 
+  // Formulario de alta colapsado detrás de un botón (2026-09-06, a
+  // pedido de Roberto: antes el formulario completo estaba siempre
+  // abierto arriba de la lista de activos).
+  const [mostrandoFormAlta, setMostrandoFormAlta] = useState(false);
+
   const [negocioSeleccionado, setNegocioSeleccionado] = useState('');
   const [nombreEmpleado, setNombreEmpleado] = useState('');
   const [puesto, setPuesto] = useState('');
@@ -341,6 +359,19 @@ export default function Empleados({ session }) {
     setProcesandoFoto(false);
   }
 
+  function cancelarAlta() {
+    setMostrandoFormAlta(false);
+    setNegocioSeleccionado('');
+    setNombreEmpleado('');
+    setPuesto('');
+    setPuestoCustom('');
+    setTelefonoEmpleado('');
+    setMailEmpleado('');
+    setFotoBlob(null);
+    setFotoPreview(null);
+    setErrorCupoEmpleados(null);
+  }
+
   async function handleCrearEmpleado(e) {
     e.preventDefault();
     if (!nombreEmpleado.trim() || !negocioSeleccionado || !telefonoEmpleado.trim()) return;
@@ -408,6 +439,7 @@ export default function Empleados({ session }) {
     setMailEmpleado('');
     setFotoBlob(null);
     setFotoPreview(null);
+    setMostrandoFormAlta(false);
     setEmpleados([...empleados, data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
   }
 
@@ -754,7 +786,7 @@ export default function Empleados({ session }) {
           }
         />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>
+          {!mostrandoFormAlta && <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>}
 
           {negocios.length === 0 ? (
             <p className="text-sm text-[#6b6455]">
@@ -765,6 +797,16 @@ export default function Empleados({ session }) {
               Llegaste al límite de {topeEmpleados} empleados activos incluido en tu plan actual.
               Comunicate con nosotros si necesitás sumar más.
             </div>
+          ) : !mostrandoFormAlta ? (
+            <button
+              type="button"
+              onClick={() => setMostrandoFormAlta(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E]"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+            >
+              <IconPersonaMas />
+              Empleado nuevo
+            </button>
           ) : (
             <form onSubmit={handleCrearEmpleado} className="space-y-2">
               {errorCupoEmpleados && <p className="text-xs text-[#C1502E]">{errorCupoEmpleados}</p>}
@@ -870,21 +912,30 @@ export default function Empleados({ session }) {
                 placeholder="Mail (opcional)"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
-              <button
-                type="submit"
-                disabled={
-                  creando ||
-                  !negocioSeleccionado ||
-                  !nombreEmpleado.trim() ||
-                  !puesto ||
-                  (puesto === 'Otro' && !puestoCustom.trim()) ||
-                  !telefonoEmpleado.trim()
-                }
-                className="w-full py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {creando ? 'Creando...' : 'Dar de alta'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cancelarAlta}
+                  className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    creando ||
+                    !negocioSeleccionado ||
+                    !nombreEmpleado.trim() ||
+                    !puesto ||
+                    (puesto === 'Otro' && !puestoCustom.trim()) ||
+                    !telefonoEmpleado.trim()
+                  }
+                  className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E] disabled:bg-[#EFDDCE] disabled:text-[#8a8471]"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  {creando ? 'Creando...' : 'Dar de alta'}
+                </button>
+              </div>
             </form>
           )}
 
