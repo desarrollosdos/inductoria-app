@@ -651,29 +651,10 @@ export default function Progreso({ session }) {
             </div>
           }
         />
-        <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <h2 className="font-semibold text-[#2C2C2A] mb-3">Progreso del equipo</h2>
-          {totalCursos === 0 ? (
-            <p className="text-sm text-[#6b6455]">Todavía no tenés cursos aprobados cargados.</p>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span
-                className="w-8 h-8 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center flex-shrink-0"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {totalCursos}
-              </span>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#3d382c]">CURSOS DISPONIBLES</p>
-            </div>
-          )}
-        </div>
-
         {filas.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">
-                Ya arrancaron
-              </p>
+              <h2 className="font-semibold text-[#2C2C2A] mb-2">Comenzaron</h2>
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-[#C1502E] flex items-center justify-center flex-shrink-0">
                   <span
@@ -831,7 +812,12 @@ export default function Progreso({ session }) {
 
         {estancados.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-            <h2 className="font-semibold text-[#2C2C2A] mb-1">Estancados ({estancados.length})</h2>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="font-semibold text-[#2C2C2A]">Estancados</h2>
+              <span className="w-5 h-5 rounded-full bg-[#6B655A] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                {estancados.length}
+              </span>
+            </div>
             <p className="text-xs text-[#8a8471] mb-3">
               Arrancaron pero hace más de {DIAS_ESTANCADO} días que no completan nada nuevo.
             </p>
@@ -851,7 +837,12 @@ export default function Progreso({ session }) {
 
         {sinArrancar.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-            <h2 className="font-semibold text-[#2C2C2A] mb-1">Todavía no arrancaron ({sinArrancar.length})</h2>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="font-semibold text-[#2C2C2A]">Todavía no arrancaron</h2>
+              <span className="w-5 h-5 rounded-full bg-[#6B655A] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                {sinArrancar.length}
+              </span>
+            </div>
             <p className="text-xs text-[#8a8471] mb-3">Puede que necesiten un empujón para empezar.</p>
             <div className="space-y-2">
               {sinArrancar.map((f) => (
