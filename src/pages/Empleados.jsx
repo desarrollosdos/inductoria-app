@@ -786,8 +786,6 @@ export default function Empleados({ session }) {
           }
         />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          {!mostrandoFormAlta && <h2 className="font-semibold text-[#2C2C2A] mb-3">Dar de alta un empleado</h2>}
-
           {negocios.length === 0 ? (
             <p className="text-sm text-[#6b6455]">
               Primero cargá al menos una sucursal, en la pantalla de Sucursales.
@@ -801,11 +799,11 @@ export default function Empleados({ session }) {
             <button
               type="button"
               onClick={() => setMostrandoFormAlta(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold tracking-wide text-white bg-[#C1502E]"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold tracking-wide text-white bg-[#C1502E]"
               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
-              <IconPersonaMas />
-              Empleado nuevo
+              <IconPersonaMas width="26" height="26" />
+              ALTA EMPLEADO NUEVO
             </button>
           ) : (
             <form onSubmit={handleCrearEmpleado} className="space-y-2">
