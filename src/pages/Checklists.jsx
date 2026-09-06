@@ -643,6 +643,31 @@ export default function Checklists({ session }) {
           }
         />
 
+        {/* Este cartel verde explicativo se muestra siempre, tenga o no
+            acceso la cuenta: no cuesta nada mostrarlo y así el dueño
+            entiende para qué sirve la función antes de decidir
+            suscribirse. Lo que se tapa cuando no hay acceso es todo lo
+            que sigue (activar/desactivar, armar y ver checklists). */}
+        <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
+          <p className="mb-3">
+            <strong>Checklists operativos</strong>: funcionalidad adicional a la capacitación. Tu
+            equipo puede tener tareas que se repiten y vos ves desde acá quién las completó. Podés
+            armar más de un checklist por sucursal, elegir si es diario, semanal o mensual, y a
+            qué puestos le aplica cada uno — por ejemplo, que "Cierre de caja" solo lo vea el
+            cajero.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
+              <span
+                key={ejemplo}
+                className="text-[11px] font-semibold text-[#8a8471] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full px-2.5 py-0.5"
+              >
+                {ejemplo}
+              </span>
+            ))}
+          </div>
+        </div>
+
         {!hasAccess ? (
           <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-4 text-sm text-[#6b6455] flex items-center justify-between gap-3 flex-wrap">
             <span>Necesitás una suscripción activa para usar los checklists operativos.</span>
@@ -657,26 +682,6 @@ export default function Checklists({ session }) {
           </div>
         ) : (
           <>
-            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
-              <p className="mb-3">
-                <strong>Checklists operativos</strong>: funcionalidad adicional a la capacitación. Tu
-                equipo puede tener tareas que se repiten y vos ves desde acá quién las completó. Podés
-                armar más de un checklist por sucursal, elegir si es diario, semanal o mensual, y a
-                qué puestos le aplica cada uno — por ejemplo, que "Cierre de caja" solo lo vea el
-                cajero.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
-                  <span
-                    key={ejemplo}
-                    className="text-[11px] font-semibold text-[#8a8471] bg-[#FBF7EA] border border-[#EDE0C8] rounded-full px-2.5 py-0.5"
-                  >
-                    {ejemplo}
-                  </span>
-                ))}
-              </div>
-            </div>
-
             <div className="bg-white rounded-2xl border border-[#EFDDCE] p-4 flex">
               {cuenta.checklists_habilitado ? (
                 <button

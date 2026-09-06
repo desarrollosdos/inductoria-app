@@ -281,10 +281,18 @@ export default function Suscripcion({ session }) {
         </div>
       </PageShell>
 
+      {/* Antes bg-[#C1502E] (terracota, el mismo color que "Suscribirme").
+          A pedido de Roberto (2026-09-06), pasa a usar el mismo gris oscuro
+          #2C2C2A que ya usás para el ícono circular de "Suscripción" arriba
+          en esta misma página: es el tono neutro que la app usa para íconos
+          que no son un llamado a la acción de pago. No tengo DashboardNav.jsx
+          a mano para confirmar que el engranaje de arriba sea exactamente
+          este mismo hex — si es otro gris, pasame el código y lo cambio en
+          una sola pasada. */}
       <div className="pb-6 pt-2 flex justify-center px-4">
         <a
           href="/ayuda"
-          className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#C1502E] rounded-xl px-4 py-2.5"
+          className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide text-white bg-[#2C2C2A] rounded-xl px-4 py-2.5"
           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
         >
           <IconAyuda />
