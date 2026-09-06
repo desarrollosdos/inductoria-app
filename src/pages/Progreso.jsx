@@ -37,6 +37,22 @@ function formatoWhatsApp(telefono) {
   return soloDigitos.startsWith('54') ? soloDigitos : `549${soloDigitos}`;
 }
 
+// Hora del acuse de recibido en formato 12hs con AM/PM en mayúscula
+// (pedido explícito de Roberto, 2026-09-06). Antes se armaba con
+// `toLocaleTimeString('es-AR', {...})` + " hs" pegado a mano, y esa
+// combinación terminaba mostrando algo ilegible tipo "10:58 a.n.hs."
+// en vez de un a.m./p.m. claro. Esto arma el string directo, sin
+// depender del formato que el navegador le dé a la locale.
+function formatearHora(fecha) {
+  const d = new Date(fecha);
+  let horas = d.getHours();
+  const minutos = String(d.getMinutes()).padStart(2, '0');
+  const sufijo = horas < 12 ? 'AM' : 'PM';
+  horas = horas % 12;
+  if (horas === 0) horas = 12;
+  return `${horas}:${minutos} ${sufijo}`;
+}
+
 function IconQR(props) {
   return (
     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -304,7 +320,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                         month: 'long',
                         year: 'numeric',
                       })}
-                      , {new Date(b.acuse_confirmado_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                      , {formatearHora(b.acuse_confirmado_at)}
                     </>
                   ) : (
                     'Acuse de recibido pendiente'
