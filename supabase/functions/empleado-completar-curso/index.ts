@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     const { data: microcurso, error: microcursoError } = await supabase
       .from('microcursos')
-      .select('id, preguntas, cuenta_id')
+      .select('id, preguntas, cuenta_id, version')
       .eq('id', microcurso_id)
       .single();
 
@@ -91,6 +91,10 @@ Deno.serve(async (req) => {
     // hubiera aprobado (por ejemplo, si el contenido se actualizó y lo
     // rehace). `fecha_completado` solo se toca cuando aprueba, para no
     // pisar la fecha real del último aprobado con la de un intento fallido.
+    // `version_completada` (2026-09-06, ver Contenido.jsx/Progreso.jsx)
+    // se guarda con el mismo criterio: solo cuando aprueba, así queda
+    // registrado en qué versión del curso pasó la evaluación, para poder
+    // detectar más adelante si el contenido cambió y necesita revalidar.
     const { data: existente } = await supabase
       .from('progreso_empleado')
       .select('id')
@@ -100,8 +104,12 @@ Deno.serve(async (req) => {
 
     const camposProgreso = {
       puntaje,
+      correctas,
+      total: preguntas.length,
       completado: aprobado,
-      ...(aprobado ? { fecha_completado: new Date().toISOString() } : {}),
+      ...(aprobado
+        ? { fecha_completado: new Date().toISOString(), version_completada: microcurso.version || 1 }
+        : {}),
     };
 
     if (existente) {
