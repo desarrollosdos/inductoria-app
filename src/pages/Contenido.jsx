@@ -1631,9 +1631,9 @@ export default function Contenido({ session }) {
                                 </div>
                               ))}
                             </div>
-                            <p className="text-xs text-[#8a8471]">
-                              Contale a la IA puntualmente qué necesitás modificar o agregar sobre
-                              el contenido de arriba. Va a regenerar el curso completo combinando
+                            <p className="text-xs font-semibold text-[#2C2C2A]">
+                              Indicá puntualmente qué necesitás modificar o agregar sobre el
+                              contenido de arriba: se va a regenerar el curso completo combinando
                               lo que ya tenía con esto.
                             </p>
                             <textarea
