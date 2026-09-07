@@ -256,6 +256,12 @@ export default function Contenido({ session }) {
   // esta pantalla.
   const [confirmandoAccionesId, setConfirmandoAccionesId] = useState(null);
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null);
+  // 2026-09-07, a pedido de Roberto: si borrar un contenido falla (RLS,
+  // alguna referencia que lo bloquea, conexión), antes esto quedaba en
+  // silencio — el cartel de confirmación se cerraba igual y el contenido
+  // parecía "borrado" aunque seguía ahí, reapareciendo en la próxima
+  // recarga como si nunca se hubiera tocado.
+  const [errorEliminar, setErrorEliminar] = useState(null);
   const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
   const [confirmandoVersionId, setConfirmandoVersionId] = useState(null);
   // Si el cambio de estado a "en_revision" falla (permisos, conexión,
@@ -896,12 +902,18 @@ export default function Contenido({ session }) {
   }
 
   async function handleEliminar(id) {
-    setConfirmandoEliminarId(null);
+    setErrorEliminar(null);
     const { error } = await supabase.from('contenidos').delete().eq('id', id);
     if (error) {
+      // No cerramos el cartel de confirmación: si esto fallara en
+      // silencio (como pasaba antes), el contenido "borrado" en realidad
+      // seguía ahí, y volvía a aparecer en la próxima recarga sin ningún
+      // aviso de que el borrado nunca se hizo.
       console.error(error);
+      setErrorEliminar(error.message || 'No se pudo eliminar. Probá de nuevo.');
       return;
     }
+    setConfirmandoEliminarId(null);
     setContenidos(contenidos.filter((c) => c.id !== id));
     setAbiertoId(null);
   }
@@ -1630,10 +1642,16 @@ export default function Contenido({ session }) {
                             <p className="font-semibold text-[#2C2C2A]">
                               ¿Eliminar este contenido? No se puede deshacer.
                             </p>
+                            {errorEliminar && (
+                              <p className="text-xs font-semibold text-[#C1502E]">{errorEliminar}</p>
+                            )}
                             <div className="flex gap-2">
                               <button
                                 type="button"
-                                onClick={() => setConfirmandoEliminarId(null)}
+                                onClick={() => {
+                                  setConfirmandoEliminarId(null);
+                                  setErrorEliminar(null);
+                                }}
                                 className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
                               >
                                 Cancelar
@@ -1652,7 +1670,10 @@ export default function Contenido({ session }) {
                           <div className="flex justify-end mt-2">
                             <button
                               type="button"
-                              onClick={() => setConfirmandoEliminarId(c.id)}
+                              onClick={() => {
+                                setErrorEliminar(null);
+                                setConfirmandoEliminarId(c.id);
+                              }}
                               title="Eliminar"
                               className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
                             >
