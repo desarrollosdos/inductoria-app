@@ -95,7 +95,13 @@ const ESTADO_INFO = {
   // trabajo pesado (llamar a la IA, armar el curso) sigue en segundo
   // plano en el servidor. Ver procesar-contenido-index.ts.
   generando: { bg: '#DCEAF7', color: '#0055A4', label: 'Generando...' },
-  procesado: { bg: '#F0EAFB', color: '#7F5FD1', label: 'Curso generado' },
+  // 2026-09-07, a pedido de Roberto: el violeta no pega con el resto de
+  // la paleta (terracota, verde salvia, marrón oliva, crema). Usamos el
+  // mismo dorado/crema que ya usa "preguntas frecuentes" (#FCF3DD /
+  // #8a6d1f), con el mismo peso visual que "Generando..." — bg clarito
+  // + texto de color, sin fondo sólido, porque los dos son estados de
+  // "todavía no es definitivo", a diferencia de Pendiente/Aprobado.
+  procesado: { bg: '#FCF3DD', color: '#8a6d1f', label: 'Curso generado' },
 };
 
 // Lista desplegable de selección múltiple para "¿a qué puestos aplica
@@ -1441,13 +1447,13 @@ export default function Contenido({ session }) {
             </div>
 
             {extrayendoArchivo && (
-              <div className="flex items-start gap-3 bg-[#F0EAFB] border border-[#D9C7F5] rounded-lg px-4 py-3">
-                <IconSpinner className="animate-spin text-[#7F5FD1] flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 bg-[#FCF3DD] border border-[#F0DFC4] rounded-lg px-4 py-3">
+                <IconSpinner className="animate-spin text-[#8a6d1f] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-[#5B3FA6]">
+                  <p className="text-sm font-semibold text-[#8a6d1f]">
                     {tipoProcesando === 'audio' ? 'Transcribiendo tu nota de voz...' : 'Extrayendo el texto de tu archivo...'}
                   </p>
-                  <p className="text-xs text-[#7F5FD1] mt-0.5">
+                  <p className="text-xs text-[#8a6d1f] mt-0.5">
                     Puede tardar más si tu conexión es lenta{tipoProcesando === 'audio' ? ' o el audio es largo' : ''}.
                     No cierres ni recargues esta pantalla, el texto va a aparecer acá abajo apenas termine.
                   </p>
@@ -1748,7 +1754,7 @@ export default function Contenido({ session }) {
                           <p className="text-sm text-[#6b6455]">Cargando el curso generado...</p>
                         ) : borrador ? (
                           <div className="space-y-3">
-                            <div className="bg-[#F0EAFB] rounded-lg p-3">
+                            <div className="bg-[#FCF3DD] rounded-lg p-3">
                               <p className="text-sm font-semibold text-[#2C2C2A]">{borrador.microcurso.titulo}</p>
                               <p className="text-xs text-[#6b6455]">
                                 {borrador.pasos.length} paso{borrador.pasos.length === 1 ? '' : 's'} ·{' '}
