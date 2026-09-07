@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import DashboardNav from '../components/DashboardNav';
+import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 
 // Mismos íconos que usa DashboardNav.jsx (duplicados acá porque esos
@@ -80,6 +81,19 @@ function IconConfiguracion(props) {
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+// Signo de pregunta, para el encabezado de esta pantalla (misma franja
+// EstadoBar que usan el resto de las secciones: ícono en círculo oscuro
+// + título, 2026-09-07 a pedido de Roberto).
+function IconAyuda(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.2 9a2.8 2.8 0 1 1 3.9 2.6c-.9.4-1.4 1-1.4 2" />
+      <line x1="12" y1="16.5" x2="12" y2="16.6" />
     </svg>
   );
 }
@@ -182,6 +196,8 @@ export default function Ayuda({ session }) {
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <EstadoBar icon={IconAyuda} label="Ayuda" />
+
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
           <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">¿Cómo se usa Inductoria?</h1>
           <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">
