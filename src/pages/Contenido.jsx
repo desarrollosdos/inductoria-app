@@ -1041,7 +1041,33 @@ export default function Contenido({ session }) {
     cargarTodo();
   }
 
+  // Desde "Cursos disponibles" solo pide confirmación. El curso todavía
+  // está publicado en este momento, así que acá no hay nada para
+  // mostrar u ocultar — eso pasa recién al confirmar.
   function abrirEdicionPublicado(microcursoId) {
+    setConfirmandoVersionId(microcursoId);
+  }
+
+  // 2026-09-07, a pedido de Roberto: al confirmar "Cambiar versión", el
+  // curso sale de "Cursos disponibles" AL TOQUE (pasa a estado
+  // 'en_revision', el mismo que ya usaba "Contenido cargado" para
+  // cursos con la versión nueva lista) y se gestiona desde ahí como uno
+  // más de los contenidos — no hace falta esperar a escribir nada ni a
+  // que la IA regenere el curso para que deje de estar "Disponible".
+  async function confirmarEdicionPublicado(microcursoId) {
+    setConfirmandoVersionId(null);
+    await supabase.from('microcursos').update({ estado: 'en_revision' }).eq('id', microcursoId);
+    await cargarTodo();
+    await abrirEdicionEnRevision(microcursoId);
+  }
+
+  // Abre (o cierra) el panel de edición de un curso que ya está en
+  // revisión, trayendo su contenido actual (pasos + preguntas) para que
+  // el dueño lo vea antes de indicar qué modificar o agregar. También
+  // sirve para RETOMAR la edición si el dueño salió de la pantalla a
+  // mitad de camino (el curso se mantiene en "Contenido cargado" hasta
+  // que se publique una versión, tenga o no cambios todavía).
+  async function abrirEdicionEnRevision(microcursoId) {
     if (editandoPublicadoId === microcursoId) {
       setEditandoPublicadoId(null);
       setTextoNuevoPublicado('');
@@ -1049,15 +1075,6 @@ export default function Contenido({ session }) {
       setContenidoActualEditando(null);
       return;
     }
-    setConfirmandoVersionId(microcursoId);
-  }
-
-  // Trae el contenido actual del curso (pasos + preguntas) para mostrarlo
-  // en el panel de edición, que vive en "Contenido cargado" — así el
-  // dueño ve de entrada qué tiene el curso hoy y puede indicar puntualmente
-  // qué modificar o agregar, en vez de escribir a ciegas.
-  async function confirmarEdicionPublicado(microcursoId) {
-    setConfirmandoVersionId(null);
     setEditandoPublicadoId(microcursoId);
     setTextoNuevoPublicado('');
     setErrorActualizar(null);
@@ -1445,111 +1462,109 @@ export default function Contenido({ session }) {
           </div>
           {cursosEnRevision.length > 0 && (
             <div className="space-y-2 mb-3">
-              {cursosEnRevision.map((m) => (
-                <div
-                  key={m.id}
-                  className="border border-[#F0DFC4] bg-[#FDF6ED] rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#2C2C2A]">{m.titulo}</p>
-                    <p className="text-[10px] font-semibold text-[#8a8471]">
-                      Versión {m.version} · en revisión, todavía no la ven tus empleados
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePublicarRevision(m.id)}
-                    disabled={publicandoRevisionId === m.id}
-                    className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60 flex-shrink-0"
-                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                  >
-                    {publicandoRevisionId === m.id ? 'Publicando...' : `Publicar versión ${m.version}`}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Panel de "Cambiar versión": se abre desde el botón del mismo
-              nombre en "Cursos disponibles", pero el panel en sí vive acá
-              (2026-09-07, a pedido de Roberto), y muestra el contenido
-              actual del curso para que el dueño sepa sobre qué está
-              escribiendo, en vez de un cuadro de texto vacío. */}
-          {editandoPublicadoId && (
-            <div className="border-[3px] border-[#6B655A] bg-white rounded-xl p-4 mb-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-[#2C2C2A]">
-                  Cambiando versión: {contenidoActualEditando?.microcurso?.titulo || 'cargando...'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditandoPublicadoId(null);
-                    setTextoNuevoPublicado('');
-                    setErrorActualizar(null);
-                    setContenidoActualEditando(null);
-                  }}
-                  className="text-xs font-bold tracking-wide text-[#8a8471] underline flex-shrink-0"
-                >
-                  Cancelar
-                </button>
-              </div>
-
-              {cargandoContenidoActual ? (
-                <p className="text-sm text-[#6b6455]">Cargando el contenido actual...</p>
-              ) : contenidoActualEditando ? (
-                <>
-                  <div className="bg-[#F5F1E6] rounded-lg p-3 space-y-2 max-h-72 overflow-y-auto">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#8a8471]">
-                      Contenido actual (versión {contenidoActualEditando.microcurso.version || 1})
-                    </p>
-                    {contenidoActualEditando.pasos.map((p) => (
-                      <div key={p.id} className="border border-[#EDE0C8] bg-white rounded-lg p-2.5">
-                        <p className="text-xs font-semibold text-[#2C2C2A] mb-0.5">{p.titulo}</p>
-                        <p className="text-[11px] text-[#6b6455]">{p.contenido}</p>
+              {/* Cursos que salieron de "Cursos disponibles" al confirmar
+                  "Cambiar versión" (2026-09-07, a pedido de Roberto: esto
+                  pasa al toque al confirmar, no hace falta escribir nada
+                  todavía). Desde acá se gestionan como un contenido más:
+                  "Modificar con IA" abre el panel con el contenido actual
+                  y el cuadro para indicar qué cambiar; "Publicar versión"
+                  lo vuelve a poner en "Disponible" (con los cambios que
+                  se hayan hecho, o tal cual estaba si el dueño se
+                  arrepintió y no cambió nada). */}
+              {cursosEnRevision.map((m) => {
+                const editando = editandoPublicadoId === m.id;
+                return (
+                  <div key={m.id} className="border border-[#F0DFC4] bg-[#FDF6ED] rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#2C2C2A]">{m.titulo}</p>
+                        <p className="text-[10px] font-semibold text-[#8a8471]">
+                          Versión {m.version} · en revisión, todavía no la ven tus empleados
+                        </p>
                       </div>
-                    ))}
-                    {(contenidoActualEditando.microcurso.preguntas || []).map((preg, i) => (
-                      <div key={i} className="border border-[#EDE0C8] bg-white rounded-lg p-2.5">
-                        <p className="text-[11px] font-semibold text-[#2C2C2A] mb-0.5">{preg.pregunta}</p>
-                        <ul className="text-[11px] text-[#6b6455] space-y-0.5">
-                          {preg.opciones.map((op, j) => (
-                            <li key={j} className={j === preg.correcta ? 'text-[#1D9E75] font-semibold' : ''}>
-                              {j === preg.correcta ? '✓ ' : '· '}
-                              {op}
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicionEnRevision(m.id)}
+                          className="text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                        >
+                          {editando ? 'Cerrar' : 'Modificar con IA'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePublicarRevision(m.id)}
+                          disabled={publicandoRevisionId === m.id}
+                          className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                          style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                        >
+                          {publicandoRevisionId === m.id ? 'Publicando...' : `Publicar versión ${m.version}`}
+                        </button>
                       </div>
-                    ))}
+                    </div>
+
+                    {editando && (
+                      <div className="border-t border-[#F0DFC4] pt-3 space-y-3">
+                        {cargandoContenidoActual ? (
+                          <p className="text-sm text-[#6b6455]">Cargando el contenido actual...</p>
+                        ) : contenidoActualEditando ? (
+                          <>
+                            <div className="bg-[#F5F1E6] rounded-lg p-3 space-y-2 max-h-72 overflow-y-auto">
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-[#8a8471]">
+                                Contenido actual (versión {contenidoActualEditando.microcurso.version || 1})
+                              </p>
+                              {contenidoActualEditando.pasos.map((p) => (
+                                <div key={p.id} className="border border-[#EDE0C8] bg-white rounded-lg p-2.5">
+                                  <p className="text-xs font-semibold text-[#2C2C2A] mb-0.5">{p.titulo}</p>
+                                  <p className="text-[11px] text-[#6b6455]">{p.contenido}</p>
+                                </div>
+                              ))}
+                              {(contenidoActualEditando.microcurso.preguntas || []).map((preg, i) => (
+                                <div key={i} className="border border-[#EDE0C8] bg-white rounded-lg p-2.5">
+                                  <p className="text-[11px] font-semibold text-[#2C2C2A] mb-0.5">{preg.pregunta}</p>
+                                  <ul className="text-[11px] text-[#6b6455] space-y-0.5">
+                                    {preg.opciones.map((op, j) => (
+                                      <li key={j} className={j === preg.correcta ? 'text-[#1D9E75] font-semibold' : ''}>
+                                        {j === preg.correcta ? '✓ ' : '· '}
+                                        {op}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-[#8a8471]">
+                              Contale a la IA puntualmente qué necesitás modificar o agregar sobre
+                              el contenido de arriba. Va a regenerar el curso completo combinando
+                              lo que ya tenía con esto.
+                            </p>
+                            <textarea
+                              value={textoNuevoPublicado}
+                              onChange={(e) => setTextoNuevoPublicado(e.target.value)}
+                              rows={5}
+                              placeholder="Ej: agregar un paso sobre el cierre de caja los fines de semana, o corregir el horario del paso 2..."
+                              className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                            />
+                            {errorActualizar && <p className="text-xs text-[#C1502E]">{errorActualizar}</p>}
+                            <button
+                              type="button"
+                              onClick={() => handleActualizarPublicado(m.id)}
+                              disabled={actualizandoId === m.id || !textoNuevoPublicado.trim()}
+                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
+                              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                            >
+                              <IconVarita />
+                              {actualizandoId === m.id ? 'Actualizando...' : 'Actualizar con IA'}
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-xs text-[#C1502E]">No se pudo cargar el contenido actual.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-[#8a8471]">
-                    Contale a la IA puntualmente qué necesitás modificar o agregar sobre el
-                    contenido de arriba. Va a regenerar el curso completo combinando lo que ya
-                    tenía con esto.
-                  </p>
-                  <textarea
-                    value={textoNuevoPublicado}
-                    onChange={(e) => setTextoNuevoPublicado(e.target.value)}
-                    rows={5}
-                    placeholder="Ej: agregar un paso sobre el cierre de caja los fines de semana, o corregir el horario del paso 2..."
-                    className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
-                  />
-                  {errorActualizar && <p className="text-xs text-[#C1502E]">{errorActualizar}</p>}
-                  <button
-                    type="button"
-                    onClick={() => handleActualizarPublicado(editandoPublicadoId)}
-                    disabled={actualizandoId === editandoPublicadoId || !textoNuevoPublicado.trim()}
-                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
-                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-                  >
-                    <IconVarita />
-                    {actualizandoId === editandoPublicadoId ? 'Actualizando...' : 'Actualizar con IA'}
-                  </button>
-                </>
-              ) : (
-                <p className="text-xs text-[#C1502E]">No se pudo cargar el contenido actual.</p>
-              )}
+                );
+              })}
             </div>
           )}
 
@@ -1834,7 +1849,6 @@ export default function Contenido({ session }) {
             </p>
             <div className="space-y-2">
               {cursosPublicados.map((m) => {
-                const editando = editandoPublicadoId === m.id;
                 const editandoPuestos = editandoPuestosId === m.id;
                 const puestosActuales = m.puestos_aplicables || [];
                 const sinDefinir = puestosActuales.length === 0;
@@ -1943,11 +1957,11 @@ export default function Contenido({ session }) {
                             <button
                               type="button"
                               onClick={() => abrirEdicionPublicado(m.id)}
-                              title="Regenerar el contenido de este curso con IA (pasa a revisión antes de volver a publicarse)"
+                              title="Sacarlo de Disponible y gestionar el cambio de contenido con IA desde Contenido cargado"
                               className="text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-lg px-3 py-1.5"
                               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                             >
-                              {editando ? 'Cancelar' : 'Cambiar versión'}
+                              Cambiar versión
                             </button>
                           )}
                           {gapsPorCurso[m.id]?.total > 0 && (
@@ -1965,9 +1979,11 @@ export default function Contenido({ session }) {
                       {confirmandoVersionId === m.id && (
                         <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
                           <p className="font-semibold text-[#2C2C2A]">
-                            Esto regenera el curso completo con IA (sumando el contenido nuevo al
-                            que ya tenía). Los empleados que ya lo completaron van a ver un aviso
-                            para volver a hacerlo. ¿Querés continuar?
+                            Este curso sale de "Disponible" ahora mismo y pasa a gestionarse desde
+                            "Contenido cargado", donde vas a poder ver el contenido actual e
+                            indicarle a la IA qué modificar o agregar. Los empleados que ya lo
+                            completaron van a ver un aviso para volver a hacerlo recién cuando
+                            publiques la versión nueva. ¿Querés continuar?
                           </p>
                           <div className="flex gap-2">
                             <button
@@ -2023,15 +2039,6 @@ export default function Contenido({ session }) {
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>
-                      </div>
-                    )}
-
-                    {editando && (
-                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
-                        <p className="text-xs text-[#8a8471]">
-                          Estás cambiando la versión de este curso más arriba, en "Contenido
-                          cargado".
-                        </p>
                       </div>
                     )}
                   </div>
