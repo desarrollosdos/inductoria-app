@@ -439,11 +439,20 @@ export default function Progreso({ session }) {
 
     const empleadoIds = (empleadosData || []).map((e) => e.id);
 
+    // 2026-09-07: acá NO filtramos solo por 'aprobado'. Este mapa se usa
+    // para ponerle nombre y versión a lo que cada empleado ya completó
+    // (los badges de abajo), y eso no puede depender de que el curso
+    // siga publicado en este momento — si el dueño está en medio de un
+    // "Cambiar versión" (estado 'en_revision'), el curso sigue teniendo
+    // historial real de empleados, solo que temporalmente no está
+    // "Disponible". Sin esto, mientras dura la edición, todo lo que la
+    // gente ya completó de ese curso pasaba a mostrarse como "Curso" a
+    // secas, como si se hubiera perdido el registro.
     const { data: cursosData } = await supabase
       .from('microcursos')
-      .select('id, titulo, puestos_aplicables, version')
+      .select('id, titulo, puestos_aplicables, version, estado')
       .eq('cuenta_id', cuentaData.id)
-      .eq('estado', 'aprobado');
+      .in('estado', ['aprobado', 'en_revision']);
     const tituloPorCurso = {};
     const versionPorCurso = {};
     (cursosData || []).forEach((c) => {
@@ -455,8 +464,13 @@ export default function Progreso({ session }) {
     // no el total global de la cuenta. Mismo criterio que empleado-info:
     // sin puestos_aplicables = todavía no publicado (no cuenta); 'TODOS'
     // explícito = aplica a cualquiera; puestos puntuales = solo esos.
+    // Ojo: esto SÍ se queda solo con 'aprobado' (a diferencia de
+    // cursosData de arriba) — mientras un curso está "en_revision" los
+    // empleados no lo pueden ver ni hacer, así que no debe contar en lo
+    // que "le falta" a cada uno en este momento.
+    const cursosVigentes = (cursosData || []).filter((c) => c.estado === 'aprobado');
     function totalCursosParaPuesto(puesto) {
-      return (cursosData || []).filter((c) => {
+      return cursosVigentes.filter((c) => {
         const puestos = c.puestos_aplicables;
         if (!puestos || puestos.length === 0) return false;
         if (puestos.includes('TODOS')) return true;
