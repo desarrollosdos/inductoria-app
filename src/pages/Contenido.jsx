@@ -272,6 +272,15 @@ export default function Contenido({ session }) {
   // enlazado ya está publicado (ver handleDescartarCurso), esto explica
   // por qué en vez de fallar en silencio o borrar igual.
   const [errorDescartar, setErrorDescartar] = useState(null);
+  // 2026-09-07: cuando "Descartar" queda bloqueado porque el curso
+  // enlazado ya está publicado o en revisión (ver handleDescartarCurso),
+  // el contenido de texto original (como "Caja") quedaba de todos modos
+  // atascado para siempre en "Contenido cargado", sin ninguna acción
+  // posible. Esto agrega una salida distinta: borra SOLO la fila de
+  // "contenidos" (el texto que se subió originalmente), nunca el
+  // microcurso ni sus pasos/preguntas, así que el curso publicado y el
+  // historial de empleados no se tocan.
+  const [confirmandoQuitarVinculado, setConfirmandoQuitarVinculado] = useState(false);
   const [confirmandoVersionId, setConfirmandoVersionId] = useState(null);
   // Si el cambio de estado a "en_revision" falla (permisos, conexión,
   // etc.), lo mostramos acá en vez de fallar en silencio — antes, si
@@ -853,6 +862,7 @@ export default function Contenido({ session }) {
     setTextoEdit(c.texto_procesado || '');
     setErrorGenerar(null);
     setErrorDescartar(null);
+    setConfirmandoQuitarVinculado(false);
     setBorrador(null);
     setPuestosNuevoCurso([]);
 
@@ -1085,6 +1095,29 @@ export default function Contenido({ session }) {
       .update({ estado: 'aprobado', microcurso_id: null })
       .eq('id', abiertoId);
     setProcesandoAccion(false);
+    setAbiertoId(null);
+    setBorrador(null);
+    cargarTodo();
+  }
+
+  // Borra ÚNICAMENTE la fila de "contenidos" (el texto original que se
+  // subió), sin tocar para nada el microcurso al que está enlazado. Es la
+  // salida para el caso en que "Descartar" queda bloqueado (arriba): el
+  // curso real, sus pasos/preguntas y el historial de empleados
+  // (progreso_empleado, que referencia microcurso_id, no contenido_id)
+  // quedan intactos, solo desaparece este contenido de "Contenido
+  // cargado".
+  async function handleQuitarContenidoVinculado() {
+    if (!abiertoId) return;
+    setConfirmandoQuitarVinculado(false);
+    setProcesandoAccion(true);
+    const { error } = await supabase.from('contenidos').delete().eq('id', abiertoId);
+    setProcesandoAccion(false);
+    if (error) {
+      console.error(error);
+      setErrorDescartar(error.message || 'No se pudo quitar. Probá de nuevo.');
+      return;
+    }
     setAbiertoId(null);
     setBorrador(null);
     cargarTodo();
@@ -1844,7 +1877,44 @@ export default function Contenido({ session }) {
                               )}
                             </div>
                             {errorDescartar && (
-                              <p className="text-xs font-semibold text-[#C1502E]">{errorDescartar}</p>
+                              <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 space-y-2">
+                                <p className="text-xs font-semibold text-[#C1502E]">{errorDescartar}</p>
+                                {!confirmandoQuitarVinculado ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmandoQuitarVinculado(true)}
+                                    className="text-xs font-bold tracking-wide text-[#6b6455] underline"
+                                  >
+                                    Igual quiero sacar este contenido de la lista (no toca el curso publicado)
+                                  </button>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <p className="text-xs text-[#6b6455]">
+                                      Esto borra solo el texto original que subiste para este
+                                      contenido. El curso publicado, sus pasos/preguntas y el
+                                      historial de tus empleados NO se tocan.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmandoQuitarVinculado(false)}
+                                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleQuitarContenidoVinculado}
+                                        disabled={procesandoAccion}
+                                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                      >
+                                        {procesandoAccion ? 'Quitando...' : 'Sí, quitar solo este contenido'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             )}
                             {confirmandoDescartar && (
                               <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
@@ -1886,6 +1956,7 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={() => {
                                   setErrorDescartar(null);
+                                  setConfirmandoQuitarVinculado(false);
                                   setConfirmandoDescartar(true);
                                 }}
                                 disabled={procesandoAccion}
