@@ -282,10 +282,25 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
       {f.badges.length > 0 && (
         <div className="flex flex-col gap-1.5 mt-2">
           {f.badges.map((b) => (
-            <div key={b.microcurso_id} className="relative">
+            <div key={b.id} className={`relative ${b.esHistorial ? 'opacity-60' : ''}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <CursoCompletadoFila titulo={b.titulo} />
+                  {/* Numerito de versión: solo aparece cuando el empleado
+                      completó más de una versión de este curso, para
+                      distinguir "Gestión de caja v1" de "v2" en vez de
+                      que se vea como si lo hubiera hecho dos veces sin
+                      motivo (2026-09-07, a pedido de Roberto). */}
+                  {b.mostrarVersion && (
+                    <span className="text-[9px] font-bold text-[#8a8471] flex-shrink-0">
+                      v{b.versionCompletada ?? '?'}
+                    </span>
+                  )}
+                  {b.esHistorial && (
+                    <span className="text-[9px] font-semibold text-[#8a8471] flex-shrink-0">
+                      · versión anterior
+                    </span>
+                  )}
                   {/* El contenido cambió después de que este empleado lo
                       completó (ver version_completada en Contenido.jsx /
                       handleActualizarPublicado) — le falta revalidar la
@@ -324,7 +339,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                   {b.especial && (
                     <button
                       type="button"
-                      onClick={() => setAcuseAbierto(acuseAbierto === b.microcurso_id ? null : b.microcurso_id)}
+                      onClick={() => setAcuseAbierto(acuseAbierto === b.id ? null : b.id)}
                       title="Ver acuse de recibido"
                       className={`w-6 h-6 rounded-full text-white flex items-center justify-center flex-shrink-0 ${
                         b.acuse_confirmado_at ? 'bg-[#7C8B6F]' : 'bg-[#C1502E]'
@@ -335,7 +350,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                   )}
                 </div>
               </div>
-              {b.especial && acuseAbierto === b.microcurso_id && (
+              {b.especial && acuseAbierto === b.id && (
                 <div
                   className="absolute right-0 top-full mt-1.5 z-10 bg-[#2C2C2A] text-white text-[11px] font-semibold px-3 py-2 rounded-lg whitespace-nowrap text-right"
                   style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
@@ -449,51 +464,101 @@ export default function Progreso({ session }) {
       }).length;
     }
 
+    // Historial por versión (2026-09-07, a pedido de Roberto): antes cada
+    // empleado tenía UNA fila en progreso_empleado por curso, que se
+    // pisaba al completar una versión nueva. Ahora empleado-completar-curso
+    // guarda una fila nueva por cada versión distinta que el empleado
+    // completa (ver ese archivo), así que acá puede haber varias filas
+    // completado=true para el mismo empleado+curso — una por versión. Las
+    // agrupamos por curso para: (a) mostrar cada versión completada como
+    // su propia entrada ("Gestión de caja v1", "Gestión de caja v2"), y
+    // (b) contar cada curso UNA sola vez para el % de avance y el ranking,
+    // sin importar cuántas versiones completó.
     let progresoPorEmpleado = {};
     const conteoPorCurso = {};
     if (empleadoIds.length > 0) {
       const { data: progresoData } = await supabase
         .from('progreso_empleado')
         .select(
-          'empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at, version_completada'
+          'id, empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at, version_completada'
         )
         .in('empleado_id', empleadoIds);
 
+      const filasCompletadasPorEmpleado = {};
       (progresoData || []).forEach((p) => {
-        if (!progresoPorEmpleado[p.empleado_id]) {
-          progresoPorEmpleado[p.empleado_id] = { completados: 0, ultimaActividad: null, badges: [] };
-        }
-        if (p.completado) {
-          progresoPorEmpleado[p.empleado_id].completados++;
-          if (
-            p.fecha_completado &&
-            (!progresoPorEmpleado[p.empleado_id].ultimaActividad ||
-              p.fecha_completado > progresoPorEmpleado[p.empleado_id].ultimaActividad)
-          ) {
-            progresoPorEmpleado[p.empleado_id].ultimaActividad = p.fecha_completado;
-          }
-          const titulo = tituloPorCurso[p.microcurso_id] || 'Curso';
-          // Versión que completó el empleado vs. la versión actual del
-          // curso (ver Contenido.jsx, handleActualizarPublicado): si son
-          // distintas, el contenido cambió después de que lo completó y
-          // le hace falta revalidar. Cursos que ya no existen o de antes
-          // del versionado (version_completada null) no se marcan.
-          const versionActual = versionPorCurso[p.microcurso_id];
-          const necesitaRevalidar =
-            versionActual != null && p.version_completada != null && p.version_completada !== versionActual;
-          progresoPorEmpleado[p.empleado_id].badges.push({
-            microcurso_id: p.microcurso_id,
-            titulo,
-            especial: esCursoSeguridadEHigiene(titulo),
-            puntaje: p.puntaje,
-            fecha_completado: p.fecha_completado,
-            acuse_confirmado_at: p.acuse_confirmado_at,
-            versionCompletada: p.version_completada,
-            versionActual,
-            necesitaRevalidar,
+        if (!p.completado) return;
+        if (!filasCompletadasPorEmpleado[p.empleado_id]) filasCompletadasPorEmpleado[p.empleado_id] = [];
+        filasCompletadasPorEmpleado[p.empleado_id].push(p);
+      });
+
+      Object.entries(filasCompletadasPorEmpleado).forEach(([empleadoId, filas]) => {
+        const porCurso = {};
+        filas.forEach((p) => {
+          if (!porCurso[p.microcurso_id]) porCurso[p.microcurso_id] = [];
+          porCurso[p.microcurso_id].push(p);
+        });
+
+        const badges = [];
+        let ultimaActividad = null;
+
+        Object.entries(porCurso).forEach(([microcursoId, filasCurso]) => {
+          // Más vieja primero, para que el historial se lea en orden
+          // (v1 antes que v2). Las filas de antes de este cambio no
+          // tienen version_completada — quedan primeras (tratadas como 0).
+          const ordenadas = [...filasCurso].sort(
+            (a, b) => (a.version_completada || 0) - (b.version_completada || 0)
+          );
+          const titulo = tituloPorCurso[microcursoId] || 'Curso';
+          // Versión completada vs. la versión actual del curso (ver
+          // Contenido.jsx, handleActualizarPublicado): si son distintas
+          // en la ÚLTIMA que completó, el contenido cambió después y le
+          // hace falta revalidar. Las versiones anteriores del historial
+          // no llevan este aviso, son un registro de lo ya hecho.
+          const versionActual = versionPorCurso[microcursoId];
+
+          ordenadas.forEach((p, i) => {
+            const esLaMasReciente = i === ordenadas.length - 1;
+            const necesitaRevalidar =
+              esLaMasReciente &&
+              versionActual != null &&
+              p.version_completada != null &&
+              p.version_completada !== versionActual;
+            badges.push({
+              id: p.id,
+              microcurso_id: microcursoId,
+              titulo,
+              especial: esCursoSeguridadEHigiene(titulo),
+              puntaje: p.puntaje,
+              fecha_completado: p.fecha_completado,
+              acuse_confirmado_at: p.acuse_confirmado_at,
+              versionCompletada: p.version_completada,
+              versionActual,
+              necesitaRevalidar,
+              // Solo mostramos el numerito de versión si de verdad hay
+              // más de una completada — para no ensuciar la vista de la
+              // gran mayoría de cursos que nunca cambiaron de versión.
+              mostrarVersion: ordenadas.length > 1,
+              esHistorial: ordenadas.length > 1 && !esLaMasReciente,
+            });
+            if (
+              p.fecha_completado &&
+              (!ultimaActividad || p.fecha_completado > ultimaActividad)
+            ) {
+              ultimaActividad = p.fecha_completado;
+            }
           });
-          conteoPorCurso[p.microcurso_id] = (conteoPorCurso[p.microcurso_id] || 0) + 1;
-        }
+
+          // Para el % de avance y "Cursos más realizados": este curso
+          // cuenta una sola vez por empleado, sin importar cuántas
+          // versiones completó.
+          conteoPorCurso[microcursoId] = (conteoPorCurso[microcursoId] || 0) + 1;
+        });
+
+        progresoPorEmpleado[empleadoId] = {
+          completados: Object.keys(porCurso).length,
+          ultimaActividad,
+          badges,
+        };
       });
     }
 
