@@ -9,6 +9,17 @@
 // se marca completado si llega al UMBRAL_APROBACION, y cada intento
 // (apruebe o no) queda guardado en la tabla `intentos_evaluacion` para
 // que el dueño pueda ver el historial en Progreso.
+//
+// 2026-09-07, a pedido de Roberto: antes había UNA sola fila de progreso
+// por empleado+curso, así que completar una versión nueva pisaba el
+// registro de la versión anterior (se perdía que había hecho "Gestión
+// de caja v1" antes de hacer "v2"). Ahora cada fila de progreso queda
+// atada a la versión del curso en la que se hizo (columna `version`,
+// nueva — ver migración). Si el empleado repite la MISMA versión
+// (reintenta después de reprobar, o vuelve a rendir aunque ya haya
+// aprobado), se actualiza esa fila. Si el curso cambió de versión desde
+// la última vez, se crea una fila NUEVA para la versión nueva, y la
+// fila de la versión anterior queda intacta como historial.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -83,23 +94,24 @@ Deno.serve(async (req) => {
     });
     const puntaje = preguntas.length > 0 ? Math.round((correctas / preguntas.length) * 100) : 100;
     const aprobado = puntaje >= UMBRAL_APROBACION;
+    const versionCurso = microcurso.version || 1;
 
-    // ¿Ya existe un progreso previo para este empleado + curso? Si sí,
-    // lo actualizamos (por si repite el curso), si no, lo creamos.
-    // `completado` ahora refleja el resultado de este ÚLTIMO intento: si
-    // no aprueba, el curso vuelve a quedar pendiente aunque antes lo
-    // hubiera aprobado (por ejemplo, si el contenido se actualizó y lo
-    // rehace). `fecha_completado` solo se toca cuando aprueba, para no
-    // pisar la fecha real del último aprobado con la de un intento fallido.
-    // `version_completada` (2026-09-06, ver Contenido.jsx/Progreso.jsx)
-    // se guarda con el mismo criterio: solo cuando aprueba, así queda
-    // registrado en qué versión del curso pasó la evaluación, para poder
-    // detectar más adelante si el contenido cambió y necesita revalidar.
+    // ¿Ya existe progreso previo para este empleado + curso + ESTA versión?
+    // Si sí, lo actualizamos (reintento sobre la misma versión). Si no
+    // (primera vez, o el curso cambió de versión desde el último intento),
+    // se crea una fila nueva — la de la versión anterior queda como
+    // historial, sin tocarse.
+    // `completado` refleja el resultado de este ÚLTIMO intento sobre esta
+    // versión: si no aprueba, esta fila vuelve a quedar pendiente aunque
+    // antes la hubiera aprobado. `fecha_completado` y `version_completada`
+    // solo se tocan cuando aprueba, para no pisar el registro real de
+    // cuándo y en qué versión aprobó con el de un intento fallido.
     const { data: existente } = await supabase
       .from('progreso_empleado')
       .select('id')
       .eq('empleado_id', empleado.id)
       .eq('microcurso_id', microcurso_id)
+      .eq('version', versionCurso)
       .maybeSingle();
 
     const camposProgreso = {
@@ -107,8 +119,9 @@ Deno.serve(async (req) => {
       correctas,
       total: preguntas.length,
       completado: aprobado,
+      version: versionCurso,
       ...(aprobado
-        ? { fecha_completado: new Date().toISOString(), version_completada: microcurso.version || 1 }
+        ? { fecha_completado: new Date().toISOString(), version_completada: versionCurso }
         : {}),
     };
 
@@ -124,8 +137,9 @@ Deno.serve(async (req) => {
 
     // Historial completo de intentos (apruebe o no), para que el dueño
     // pueda ver en Progreso quién reprobó y cuántas veces. A diferencia de
-    // progreso_empleado (una fila por empleado+curso, se pisa), acá se
-    // inserta una fila nueva por cada envío.
+    // progreso_empleado (una fila por empleado+curso+versión, se pisa
+    // dentro de la misma versión), acá se inserta una fila nueva por cada
+    // envío.
     const { error: intentoError } = await supabase.from('intentos_evaluacion').insert({
       empleado_id: empleado.id,
       microcurso_id,
