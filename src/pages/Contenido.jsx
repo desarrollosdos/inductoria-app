@@ -1322,9 +1322,19 @@ export default function Contenido({ session }) {
           icon={IconContenidoMini}
           label="Contenido"
           right={
-            <span className="w-7 h-7 rounded-full bg-[#C1502E] text-white font-bold text-sm flex items-center justify-center">
-              {cursosPublicados.length}
-            </span>
+            // 2026-09-07, a pedido de Roberto: acá solo se mostraba
+            // cursosPublicados.length (los cursos ya disponibles), sin decir
+            // nada de lo que hay pendiente en "Contenido cargado" — dos
+            // pills en vez de un solo número, para que se entienda cada
+            // cantidad a qué corresponde.
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              <span className="flex items-center gap-1 text-xs font-bold text-white bg-[#C1502E] rounded-full px-2.5 py-1 whitespace-nowrap">
+                Contenido cargado {contenidos.length + cursosEnRevision.length}
+              </span>
+              <span className="flex items-center gap-1 text-xs font-bold text-white bg-[#7C8B6F] rounded-full px-2.5 py-1 whitespace-nowrap">
+                Cursos disponibles {cursosPublicados.length}
+              </span>
+            </div>
           }
         />
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
@@ -1555,7 +1565,12 @@ export default function Contenido({ session }) {
           <div className="flex items-center gap-2 mb-3">
             <h2 className="font-semibold text-[#2C2C2A]">Contenido cargado</h2>
             <span className="w-6 h-6 rounded-full bg-[#C1502E] text-white font-bold text-xs flex items-center justify-center">
-              {contenidos.length}
+              {/* 2026-09-07: esto contaba solo contenidos.length, sin sumar
+                  los cursos en revisión (cursosEnRevision) que se muestran
+                  arriba, en esta misma caja — por eso el número quedaba
+                  corto: un curso "Cambiar versión" en revisión se ve acá
+                  pero no se contaba. */}
+              {contenidos.length + cursosEnRevision.length}
             </span>
           </div>
           {cursosEnRevision.length > 0 && (
