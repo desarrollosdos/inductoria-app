@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
@@ -85,15 +86,15 @@ function IconConfiguracion(props) {
   );
 }
 
-// Signo de pregunta, para el encabezado de esta pantalla (misma franja
-// EstadoBar que usan el resto de las secciones: ícono en círculo oscuro
-// + título, 2026-09-07 a pedido de Roberto).
+// Misma lámpara que el botón "¿Cómo se usa Inductoria?" en Suscripcion.jsx
+// (copiada de ahí tal cual, para que sea el mismo ícono en los dos
+// lugares). Usada en la franja EstadoBar de esta pantalla, 2026-09-07.
 function IconAyuda(props) {
   return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.2 9a2.8 2.8 0 1 1 3.9 2.6c-.9.4-1.4 1-1.4 2" />
-      <line x1="12" y1="16.5" x2="12" y2="16.6" />
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 2a6.5 6.5 0 0 0-3.8 11.8c.5.4.8 1 .8 1.7V17h6v-1.5c0-.7.3-1.3.8-1.7A6.5 6.5 0 0 0 12 2z" />
+      <path d="M9 19h6" fill="none" />
+      <path d="M10 21.5h4" fill="none" />
     </svg>
   );
 }
@@ -173,6 +174,29 @@ export default function Ayuda({ session }) {
   const [activo, setActivo] = useState(SECCIONES[0].id);
   const refsSecciones = useRef({});
 
+  // Flags de la cuenta (procedimientos_habilitado / checklists_habilitado),
+  // solo para que el menú de arriba (DashboardNav) sepa qué pestañas
+  // mostrar acá también: si el dueño las desactivó en Configuración, no
+  // deben aparecer en este menú, igual que en el resto de las pantallas
+  // (2026-09-07, a pedido de Roberto).
+  const [cuenta, setCuenta] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+    async function cargarCuenta() {
+      const { data } = await supabase
+        .from('cuentas')
+        .select('procedimientos_habilitado, checklists_habilitado')
+        .eq('owner_id', session.user.id)
+        .maybeSingle();
+      if (vigente) setCuenta(data);
+    }
+    cargarCuenta();
+    return () => {
+      vigente = false;
+    };
+  }, [session.user.id]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -194,12 +218,22 @@ export default function Ayuda({ session }) {
 
   return (
     <div>
-      <DashboardNav userEmail={session.user.email} />
+      <DashboardNav
+        userEmail={session.user.email}
+        flags={
+          cuenta
+            ? {
+                procedimientos_habilitado: cuenta.procedimientos_habilitado,
+                checklists_habilitado: cuenta.checklists_habilitado,
+              }
+            : undefined
+        }
+        seccionActiva={activo}
+      />
       <PageShell>
-        <EstadoBar icon={IconAyuda} label="Ayuda" />
+        <EstadoBar icon={IconAyuda} label="¿Cómo se usa Inductoria?" />
 
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
-          <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">¿Cómo se usa Inductoria?</h1>
           <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">
             Una guía rápida de qué encontrás en cada sección del menú y para qué sirve.
           </p>

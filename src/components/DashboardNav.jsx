@@ -111,7 +111,15 @@ const TABS = [
   { id: 'progreso', label: 'Progreso', path: '/progreso', Icon: IconProgreso },
 ];
 
-export default function DashboardNav({ flags: flagsProp }) {
+// seccionActiva (opcional): id de TABS a marcar en terracota en vez de
+// usar la URL actual. Lo usa Ayuda.jsx para que, a medida que se
+// scrollea por cada sección de la guía, la pestaña correspondiente se
+// vaya marcando acá arriba también — pero solo si esa pestaña está
+// visible (si la cuenta la tiene desactivada, ya no está en tabsVisibles
+// y no hay nada que marcar). El resto de las pantallas no pasa esta
+// prop, así que siguen marcando por URL como siempre (2026-09-07, a
+// pedido de Roberto).
+export default function DashboardNav({ flags: flagsProp, seccionActiva }) {
   const path = window.location.pathname;
   // null mientras carga: no ocultamos nada todavía, para no hacer
   // parpadear el menú completo en cada página. Una vez que llega la
@@ -188,7 +196,7 @@ export default function DashboardNav({ flags: flagsProp }) {
           dentro de su propio espacio en vez de invadir el vecino. */}
       <div className="flex justify-between gap-1 sm:justify-start sm:gap-4">
         {tabsVisibles.map((tab) => {
-          const active = path === tab.path;
+          const active = seccionActiva ? tab.id === seccionActiva : path === tab.path;
           const destacado = destacados.includes(tab.id);
           return (
             <a
