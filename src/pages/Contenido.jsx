@@ -94,7 +94,12 @@ const ESTADO_INFO = {
   // "generando": la Edge Function ya devolvió la respuesta rápido y el
   // trabajo pesado (llamar a la IA, armar el curso) sigue en segundo
   // plano en el servidor. Ver procesar-contenido-index.ts.
-  generando: { bg: '#DCEAF7', color: '#0055A4', label: 'Generando...' },
+  // 2026-09-07, a pedido de Roberto: el azul tampoco pegaba con el resto
+  // de la paleta. Mismo dorado/crema que "Curso generado" (#FCF3DD /
+  // #8a6d1f): tiene sentido que compartan color, ya que "Generando..." es
+  // sencillamente el paso previo a "Curso generado" para el mismo
+  // contenido.
+  generando: { bg: '#FCF3DD', color: '#8a6d1f', label: 'Generando...' },
   // 2026-09-07, a pedido de Roberto: el violeta no pega con el resto de
   // la paleta (terracota, verde salvia, marrón oliva, crema). Usamos el
   // mismo dorado/crema que ya usa "preguntas frecuentes" (#FCF3DD /
@@ -263,6 +268,10 @@ export default function Contenido({ session }) {
   // recarga como si nunca se hubiera tocado.
   const [errorEliminar, setErrorEliminar] = useState(null);
   const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
+  // 2026-09-07: si "Descartar" se niega a borrar porque el curso
+  // enlazado ya está publicado (ver handleDescartarCurso), esto explica
+  // por qué en vez de fallar en silencio o borrar igual.
+  const [errorDescartar, setErrorDescartar] = useState(null);
   const [confirmandoVersionId, setConfirmandoVersionId] = useState(null);
   // Si el cambio de estado a "en_revision" falla (permisos, conexión,
   // etc.), lo mostramos acá en vez de fallar en silencio — antes, si
@@ -843,6 +852,7 @@ export default function Contenido({ session }) {
     setTituloEdit(c.archivo_original || '');
     setTextoEdit(c.texto_procesado || '');
     setErrorGenerar(null);
+    setErrorDescartar(null);
     setBorrador(null);
     setPuestosNuevoCurso([]);
 
@@ -1050,8 +1060,24 @@ export default function Contenido({ session }) {
 
   async function handleDescartarCurso() {
     if (!borrador) return;
-    setConfirmandoDescartar(false);
 
+    // 2026-09-07: si el curso enlazado a este contenido YA está
+    // publicado (o en medio de un cambio de versión), no lo borramos.
+    // Antes esto borraba cualquier curso enlazado sin distinguir un
+    // borrador sin usar de un curso real y ya completado por
+    // empleados — y como un contenido nunca se marca como "ya usado"
+    // después de aprobarse, podía seguir apuntando a ese curso real
+    // mucho después, así que "Descartar" acá terminaba borrando algo
+    // que no era un simple borrador.
+    if (borrador.microcurso.estado === 'aprobado' || borrador.microcurso.estado === 'en_revision') {
+      setConfirmandoDescartar(false);
+      setErrorDescartar(
+        'Este contenido ya generó un curso que está publicado (o en medio de un cambio de versión). No se puede descartar así para no perder ese curso ni el historial de tus empleados. Para modificarlo, usá "Cambiar versión" desde Cursos disponibles.'
+      );
+      return;
+    }
+
+    setConfirmandoDescartar(false);
     setProcesandoAccion(true);
     await supabase.from('microcursos').delete().eq('id', borrador.microcurso.id);
     await supabase
@@ -1685,7 +1711,7 @@ export default function Contenido({ session }) {
 
                     {abierto && c.estado === 'generando' && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
-                        <p className="text-sm text-[#0055A4]">
+                        <p className="text-sm text-[#8a6d1f]">
                           Generando el curso con inteligencia artificial. Puede tardar uno o dos
                           minutos — podés cerrar esta pantalla o incluso el celular, el trabajo
                           sigue solo en el servidor y cuando termine lo vas a ver acá como "Curso
@@ -1817,6 +1843,9 @@ export default function Contenido({ session }) {
                                 </p>
                               )}
                             </div>
+                            {errorDescartar && (
+                              <p className="text-xs font-semibold text-[#C1502E]">{errorDescartar}</p>
+                            )}
                             {confirmandoDescartar && (
                               <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
                                 <p className="font-semibold text-[#2C2C2A]">
@@ -1855,7 +1884,10 @@ export default function Contenido({ session }) {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setConfirmandoDescartar(true)}
+                                onClick={() => {
+                                  setErrorDescartar(null);
+                                  setConfirmandoDescartar(true);
+                                }}
                                 disabled={procesandoAccion}
                                 className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] border border-[#C1502E] rounded-full px-4 py-2 disabled:opacity-60"
                                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
