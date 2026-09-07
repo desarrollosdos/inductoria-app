@@ -1821,7 +1821,8 @@ export default function Contenido({ session }) {
                                 type="button"
                                 onClick={handleAprobarCurso}
                                 disabled={procesandoAccion || puestosNuevoCurso.length === 0}
-                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold text-[#694F11] bg-[#EEB52F] border border-[#B88714] rounded-full px-4 py-2 disabled:opacity-60"
+                                className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#7C8B6F] border border-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                               >
                                 {procesandoAccion ? 'Procesando...' : 'Aprobar y publicar'}
                               </button>
