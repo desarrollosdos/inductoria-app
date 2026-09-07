@@ -252,6 +252,11 @@ export default function Contenido({ session }) {
   const [confirmandoEliminarId, setConfirmandoEliminarId] = useState(null);
   const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
   const [confirmandoVersionId, setConfirmandoVersionId] = useState(null);
+  // Si el cambio de estado a "en_revision" falla (permisos, conexión,
+  // etc.), lo mostramos acá en vez de fallar en silencio — antes, si
+  // esto fallaba, el cartel de confirmación se cerraba solo y el curso
+  // nunca se movía a "Contenido cargado", sin ninguna pista de qué pasó.
+  const [errorCambiarVersion, setErrorCambiarVersion] = useState(null);
 
   function abrirAccionesPublicado(microcursoId) {
     setConfirmandoAccionesId(microcursoId);
@@ -1045,6 +1050,7 @@ export default function Contenido({ session }) {
   // está publicado en este momento, así que acá no hay nada para
   // mostrar u ocultar — eso pasa recién al confirmar.
   function abrirEdicionPublicado(microcursoId) {
+    setErrorCambiarVersion(null);
     setConfirmandoVersionId(microcursoId);
   }
 
@@ -1055,8 +1061,23 @@ export default function Contenido({ session }) {
   // más de los contenidos — no hace falta esperar a escribir nada ni a
   // que la IA regenere el curso para que deje de estar "Disponible".
   async function confirmarEdicionPublicado(microcursoId) {
+    setErrorCambiarVersion(null);
+
+    const { error } = await supabase
+      .from('microcursos')
+      .update({ estado: 'en_revision' })
+      .eq('id', microcursoId);
+
+    if (error) {
+      // No cerramos el cartel de confirmación: si lo cerráramos acá, esto
+      // se ve exactamente como "no pasa nada" y invita a tocar "Sí,
+      // continuar" una y otra vez sin que nunca funcione.
+      console.error(error);
+      setErrorCambiarVersion(error.message || 'No se pudo cambiar de versión. Probá de nuevo.');
+      return;
+    }
+
     setConfirmandoVersionId(null);
-    await supabase.from('microcursos').update({ estado: 'en_revision' }).eq('id', microcursoId);
     await cargarTodo();
     await abrirEdicionEnRevision(microcursoId);
   }
@@ -1985,10 +2006,16 @@ export default function Contenido({ session }) {
                             completaron van a ver un aviso para volver a hacerlo recién cuando
                             publiques la versión nueva. ¿Querés continuar?
                           </p>
+                          {errorCambiarVersion && (
+                            <p className="text-xs font-semibold text-[#C1502E]">{errorCambiarVersion}</p>
+                          )}
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => setConfirmandoVersionId(null)}
+                              onClick={() => {
+                                setConfirmandoVersionId(null);
+                                setErrorCambiarVersion(null);
+                              }}
                               className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
                             >
                               Cancelar
