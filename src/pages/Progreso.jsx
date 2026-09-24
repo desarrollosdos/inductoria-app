@@ -53,6 +53,36 @@ function formatearHora(fecha) {
   return `${horas}:${minutos} ${sufijo}`;
 }
 
+// Supabase devuelve como máximo 1000 filas por pedido, y un .in() con
+// cientos de ids arma una URL tan larga que el pedido puede fallar. Con
+// un equipo grande y varios meses de uso, progreso_empleado e
+// intentos_evaluacion pasan las 1000 filas y el avance se calculaba con
+// datos cortados. Esto parte los ids en tandas y, dentro de cada tanda,
+// pide de a páginas hasta traer todo. armarQuery(idsTanda) tiene que
+// devolver una query nueva cada vez, con un orden fijo (para que las
+// páginas no se pisen).
+const TAMANIO_PAGINA = 1000;
+const TAMANIO_TANDA_IDS = 150;
+async function traerFilasPorIds(ids, armarQuery) {
+  const filas = [];
+  for (let i = 0; i < ids.length; i += TAMANIO_TANDA_IDS) {
+    const tanda = ids.slice(i, i + TAMANIO_TANDA_IDS);
+    for (let desde = 0; ; desde += TAMANIO_PAGINA) {
+      const { data, error } = await armarQuery(tanda).range(desde, desde + TAMANIO_PAGINA - 1);
+      if (error) return { data: filas, error };
+      filas.push(...(data || []));
+      if (!data || data.length < TAMANIO_PAGINA) break;
+    }
+  }
+  return { data: filas, error: null };
+}
+
+// Mismo mensaje que en Empleados.jsx, para que el empleado reciba
+// siempre el mismo texto venga de donde venga.
+function mensajeAccesoEmpleado(empleado, link) {
+  return `¡Hola ${empleado.nombre}! Entrá a este link para hacer tus cursos: ${link} Tu PIN es ${empleado.pin}.`;
+}
+
 function IconQR(props) {
   return (
     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -180,7 +210,7 @@ function BarraSegmentada({ completados, total }) {
 // tanto en la vista agrupada por sucursal como en la vista por empleado
 // (alfabética, sin agrupar) — misma fila, distinto criterio de orden afuera.
 function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
-  const linkAcceso = `${window.location.origin}/e?c=${f.token_acceso.slice(0, 10)}`;
+  const linkAcceso = f.token_acceso ? `${window.location.origin}/e?c=${f.token_acceso.slice(0, 10)}` : null;
   const [acuseAbierto, setAcuseAbierto] = useState(null);
   // Aviso propio (mismo cartel color crema que el resto de la app) en vez
   // de window.alert nativo, que sale con letra negra estándar del
@@ -190,27 +220,29 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
     <div className="px-6 py-2.5 border-t border-[#F3EEE1]">
       <div className="flex items-center gap-3 mb-1">
         <Avatar e={f} />
-        <div className="flex-1">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[#2C2C2A]">{f.nombre}</p>
-            {f.totalCursos > 0 && f.completados < f.totalCursos && (
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-[#2C2C2A] min-w-0 break-words">{f.nombre}</p>
+            {linkAcceso && f.totalCursos > 0 && f.completados < f.totalCursos && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => setQrAbierto(qrAbierto === f.id ? null : f.id)}
                   title="Ver código QR"
-                  className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
+                  aria-label="Ver código QR"
+                  className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#2C2C2A] flex items-center justify-center flex-shrink-0"
                 >
                   <IconQR />
                 </button>
                 {formatoWhatsApp(f.telefono) ? (
                   <a
                     href={`https://wa.me/${formatoWhatsApp(f.telefono)}?text=${encodeURIComponent(
-                      `Hola ${f.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${linkAcceso} y usá el PIN ${f.pin}.`
+                      mensajeAccesoEmpleado(f, linkAcceso)
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Enviar por WhatsApp"
-                    className="w-6 h-6 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
+                    aria-label="Enviar por WhatsApp"
+                    className="w-8 h-8 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center flex-shrink-0"
                   >
                     <IconWhatsApp />
                   </a>
@@ -220,13 +252,14 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
                       type="button"
                       onClick={() => setAvisoTelefono(!avisoTelefono)}
                       title="Falta cargar el teléfono"
-                      className="w-6 h-6 rounded-full bg-[#EDE0C8] text-[#a89f8a] flex items-center justify-center flex-shrink-0"
+                      aria-label="Falta cargar el teléfono"
+                      className="w-8 h-8 rounded-full bg-[#EDE0C8] text-[#a89f8a] flex items-center justify-center flex-shrink-0"
                     >
                       <IconWhatsApp />
                     </button>
                     {avisoTelefono && (
                       <div
-                        className="absolute right-0 top-full mt-1.5 z-10 bg-[#FDF6ED] border border-[#F0DFC4] text-[#6b6455] text-[11px] font-semibold px-3 py-2 rounded-lg whitespace-nowrap text-right"
+                        className="absolute right-0 top-full mt-1.5 z-10 bg-[#FDF6ED] border border-[#F0DFC4] text-[#6b6455] text-[11px] font-semibold px-3 py-2 rounded-lg w-56 text-right"
                         style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
                       >
                         {f.nombre} no tiene teléfono cargado.
@@ -253,7 +286,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
         </div>
       </div>
 
-      {qrAbierto === f.id && (
+      {linkAcceso && qrAbierto === f.id && (
         <div className="mt-2 mb-1 bg-[#EDE0C8] rounded-lg p-3 flex items-center gap-3">
           <img
             src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(linkAcceso)}`}
@@ -264,7 +297,7 @@ function FilaEmpleadoEquipo({ f, qrAbierto, setQrAbierto }) {
           />
           <div>
             <p className="text-xs font-semibold text-[#2C2C2A]">
-              Escaneá desde el celular del empleado
+              Que lo escanee con la cámara de su celular
             </p>
             <p className="text-xs text-[#8a8471] mt-1">
               PIN: <span className="font-bold text-[#C1502E]">{f.pin}</span>
@@ -390,6 +423,7 @@ export default function Progreso({ session }) {
   // sin agrupar (útil cuando un curso aplica a todas las sucursales y el
   // dueño quiere ver a todo el equipo junto, no separado por local).
   const [vistaEquipo, setVistaEquipo] = useState('sucursal');
+  const [errorCarga, setErrorCarga] = useState(null);
 
   useEffect(() => {
     cargarTodo();
@@ -398,6 +432,7 @@ export default function Progreso({ session }) {
 
   async function cargarTodo() {
     setLoading(true);
+    setErrorCarga(null);
 
     const { data: cuentaData } = await supabase
       .from('cuentas')
@@ -469,14 +504,33 @@ export default function Progreso({ session }) {
     // empleados no lo pueden ver ni hacer, así que no debe contar en lo
     // que "le falta" a cada uno en este momento.
     const cursosVigentes = (cursosData || []).filter((c) => c.estado === 'aprobado');
-    function totalCursosParaPuesto(puesto) {
-      return cursosVigentes.filter((c) => {
-        const puestos = c.puestos_aplicables;
-        if (!puestos || puestos.length === 0) return false;
-        if (puestos.includes('TODOS')) return true;
-        return puesto && puestos.includes(puesto);
-      }).length;
+    function cursoAplicaAPuesto(c, puesto) {
+      const puestos = c.puestos_aplicables;
+      if (!puestos || puestos.length === 0) return false;
+      if (puestos.includes('TODOS')) return true;
+      return !!puesto && puestos.includes(puesto);
     }
+    function totalCursosParaPuesto(puesto) {
+      return cursosVigentes.filter((c) => cursoAplicaAPuesto(c, puesto)).length;
+    }
+    // Ids de los cursos que HOY le corresponden a un puesto. El avance
+    // (completados / total) cuenta solo esos: antes contaba cualquier
+    // curso completado, incluso uno que después se despublicó o se le
+    // sacó a su puesto, y el avance podía pasar del 100%.
+    const idsVigentesPorPuesto = {};
+    function idsCursosParaPuesto(puesto) {
+      const clave = puesto || '';
+      if (!idsVigentesPorPuesto[clave]) {
+        idsVigentesPorPuesto[clave] = new Set(
+          cursosVigentes.filter((c) => cursoAplicaAPuesto(c, puesto)).map((c) => String(c.id))
+        );
+      }
+      return idsVigentesPorPuesto[clave];
+    }
+    const puestoPorEmpleado = {};
+    (empleadosData || []).forEach((e) => {
+      puestoPorEmpleado[e.id] = e.puesto;
+    });
 
     // Historial por versión (2026-09-07, a pedido de Roberto): antes cada
     // empleado tenía UNA fila en progreso_empleado por curso, que se
@@ -491,12 +545,20 @@ export default function Progreso({ session }) {
     let progresoPorEmpleado = {};
     const conteoPorCurso = {};
     if (empleadoIds.length > 0) {
-      const { data: progresoData } = await supabase
-        .from('progreso_empleado')
-        .select(
-          'id, empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at, version_completada'
-        )
-        .in('empleado_id', empleadoIds);
+      const { data: progresoData, error: progresoError } = await traerFilasPorIds(empleadoIds, (tanda) =>
+        supabase
+          .from('progreso_empleado')
+          .select(
+            'id, empleado_id, microcurso_id, completado, fecha_completado, puntaje, acuse_confirmado_at, version_completada'
+          )
+          .in('empleado_id', tanda)
+          .eq('completado', true)
+          .order('id', { ascending: true })
+      );
+      if (progresoError) {
+        console.error(progresoError);
+        setErrorCarga('No se pudo cargar todo el avance del equipo. Recargá la página para probar de nuevo.');
+      }
 
       const filasCompletadasPorEmpleado = {};
       (progresoData || []).forEach((p) => {
@@ -568,8 +630,9 @@ export default function Progreso({ session }) {
           conteoPorCurso[microcursoId] = (conteoPorCurso[microcursoId] || 0) + 1;
         });
 
+        const vigentes = idsCursosParaPuesto(puestoPorEmpleado[empleadoId]);
         progresoPorEmpleado[empleadoId] = {
-          completados: Object.keys(porCurso).length,
+          completados: Object.keys(porCurso).filter((id) => vigentes.has(String(id))).length,
           ultimaActividad,
           badges,
         };
@@ -582,14 +645,38 @@ export default function Progreso({ session }) {
     // romper el resto de la pantalla.
     let intentosFallidosPorEmpleado = {};
     if (empleadoIds.length > 0) {
-      const { data: intentosData, error: intentosError } = await supabase
-        .from('intentos_evaluacion')
-        .select('empleado_id, aprobado')
-        .in('empleado_id', empleadoIds)
-        .eq('aprobado', false);
-      if (!intentosError) {
-        (intentosData || []).forEach((it) => {
-          intentosFallidosPorEmpleado[it.empleado_id] = (intentosFallidosPorEmpleado[it.empleado_id] || 0) + 1;
+      // Solo hacen falta cantidades, y esta tabla no tiene una columna
+      // única conocida para paginar con orden estable. Entonces: por cada
+      // tanda de empleados se piden hasta 1000 filas; si vienen menos,
+      // alcanza con contarlas; si viene justo el tope, para esa tanda se
+      // pide el conteo exacto empleado por empleado (count sin traer filas).
+      const TANDA_INTENTOS = 50;
+      for (let i = 0; i < empleadoIds.length; i += TANDA_INTENTOS) {
+        const tanda = empleadoIds.slice(i, i + TANDA_INTENTOS);
+        const { data: intentosData, error: intentosError } = await supabase
+          .from('intentos_evaluacion')
+          .select('empleado_id')
+          .in('empleado_id', tanda)
+          .eq('aprobado', false)
+          .range(0, TAMANIO_PAGINA - 1);
+        if (intentosError) break;
+        if ((intentosData || []).length < TAMANIO_PAGINA) {
+          (intentosData || []).forEach((it) => {
+            intentosFallidosPorEmpleado[it.empleado_id] = (intentosFallidosPorEmpleado[it.empleado_id] || 0) + 1;
+          });
+          continue;
+        }
+        const conteos = await Promise.all(
+          tanda.map((id) =>
+            supabase
+              .from('intentos_evaluacion')
+              .select('empleado_id', { count: 'exact', head: true })
+              .eq('empleado_id', id)
+              .eq('aprobado', false)
+          )
+        );
+        conteos.forEach(({ count }, j) => {
+          if (count) intentosFallidosPorEmpleado[tanda[j]] = count;
         });
       }
     }
@@ -610,7 +697,7 @@ export default function Progreso({ session }) {
 
     const filasArmadas = (empleadosData || []).map((e) => ({
       ...e,
-      negocioNombre: negociosPorId[e.negocio_id] || '—',
+      negocioNombre: negociosPorId[e.negocio_id] || 'Sin sucursal',
       completados: progresoPorEmpleado[e.id]?.completados || 0,
       totalCursos: totalCursosParaPuesto(e.puesto),
       ultimaActividad: progresoPorEmpleado[e.id]?.ultimaActividad || null,
@@ -776,6 +863,11 @@ export default function Progreso({ session }) {
             </div>
           }
         />
+        {errorCarga && (
+          <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm font-semibold text-[#C1502E]">
+            {errorCarga}
+          </div>
+        )}
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           {totalCursos === 0 ? (
             <p className="text-sm text-[#6b6455]">Todavía no tenés cursos aprobados cargados.</p>
@@ -787,7 +879,7 @@ export default function Progreso({ session }) {
               >
                 {totalCursos}
               </span>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#3d382c]">CURSOS DISPONIBLES</p>
+              <p className="text-sm font-semibold tracking-wide text-[#3d382c]">Cursos disponibles</p>
             </div>
           )}
         </div>
@@ -828,7 +920,7 @@ export default function Progreso({ session }) {
                     className="text-[9px] font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-2 py-1.5 flex-shrink-0 whitespace-nowrap"
                     style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                   >
-                    MÁS ACTIVO
+                    El más activo
                   </span>
                 </div>
               ) : hayEmpateActivo ? null : (
@@ -854,7 +946,7 @@ export default function Progreso({ session }) {
                     </p>
                     {prom !== null && (
                       <p className="text-[11px] text-[#6b6455]">
-                        Prom. evaluación: <span className="font-bold tracking-wide text-[#2C2C2A]">{prom}%</span>
+                        Nota promedio: <span className="font-bold tracking-wide text-[#2C2C2A]">{prom}%</span>
                       </p>
                     )}
                   </div>
@@ -886,8 +978,8 @@ export default function Progreso({ session }) {
         )}
 
         {tiempoOnboardingPromedio !== null && (
-          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 flex items-center justify-between">
-            <div>
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
               <h2 className="font-semibold text-[#2C2C2A]">Tiempo promedio de capacitación</h2>
               <p className="text-xs text-[#8a8471] mt-0.5">Desde el alta hasta completar todo lo que le corresponde</p>
             </div>
@@ -964,7 +1056,7 @@ export default function Progreso({ session }) {
             </p>
             <div className="space-y-2">
               {estancados.map((f) => (
-                <div key={f.id} className="flex items-center gap-3">
+                <div key={f.id} className="flex items-center gap-x-3 gap-y-0.5 flex-wrap">
                   <Avatar e={f} size={26} />
                   <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">{f.nombre}</p>
                   <p className="text-xs text-[#8a8471]">
@@ -987,7 +1079,7 @@ export default function Progreso({ session }) {
             <p className="text-xs text-[#8a8471] mb-3">Puede que necesiten un empujón para empezar.</p>
             <div className="space-y-2">
               {sinArrancar.map((f) => (
-                <div key={f.id} className="flex items-center gap-3">
+                <div key={f.id} className="flex items-center gap-x-3 gap-y-0.5 flex-wrap">
                   <Avatar e={f} size={26} />
                   <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">{f.nombre}</p>
                   <p className="text-xs font-semibold text-[#A2734C]">· {f.negocioNombre}</p>

@@ -19,7 +19,35 @@ const BADGE_DIPLOMA_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOYAAAE
 const RATIO_SEGURIDAD_E_HIGIENE = 223 / 260;
 const RATIO_DIPLOMA = 230 / 260;
 
-export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCurso, puntaje, fechaCompletado }) {
+// Fecha del certificado en texto ("23 de septiembre de 2026"), siempre
+// en hora de Argentina: un curso terminado a las 22 hs se guarda en UTC
+// como el día siguiente, y sin la zona horaria el certificado salía con
+// la fecha corrida. Si llega solo "YYYY-MM-DD" (sin hora) se toma tal
+// cual como día de calendario. Sin fecha, o con una fecha inválida, usa hoy.
+const ZONA_ARGENTINA = 'America/Argentina/Buenos_Aires';
+function textoFechaCertificado(fecha) {
+  const opciones = { day: 'numeric', month: 'long', year: 'numeric' };
+  if (typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    const d = new Date(`${fecha}T12:00:00Z`);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('es-AR', { ...opciones, timeZone: 'UTC' });
+  }
+  const d = fecha ? new Date(fecha) : null;
+  const valida = d && !Number.isNaN(d.getTime()) ? d : new Date();
+  return valida.toLocaleDateString('es-AR', { ...opciones, timeZone: ZONA_ARGENTINA });
+}
+
+// Parámetros (un solo objeto, así se pueden sumar opcionales sin romper
+// a quien ya la llama):
+// - fechaCompletado (o su alias `fecha`): Date, ISO string o "YYYY-MM-DD"
+//   con el día en que se completó el curso. Opcional: si no viene, usa hoy.
+export function generarCertificadoPDF({
+  nombreEmpleado,
+  negocioNombre,
+  tituloCurso,
+  puntaje,
+  fechaCompletado,
+  fecha: fechaAlias,
+} = {}) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -78,7 +106,7 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...MUTED);
-  doc.text('completó satisfactoriamente el curso', centroX, 59, { align: 'center' });
+  doc.text('completó y aprobó el curso', centroX, 59, { align: 'center' });
 
   // Título del curso completo (no solo la mitad después de los ":"),
   // con salto de línea automático si no entra en el ancho disponible.
@@ -99,7 +127,11 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(...TEXTO);
-    doc.text(`Puntaje obtenido: ${puntaje}%`, centroX, y, { align: 'center' });
+    // Con coma decimal, como se escribe en Argentina (85,5% y no 85.5%).
+    const puntajeTexto = Number.isFinite(Number(puntaje))
+      ? Number(puntaje).toLocaleString('es-AR', { maximumFractionDigits: 1 })
+      : String(puntaje);
+    doc.text(`Puntaje obtenido: ${puntajeTexto}%`, centroX, y, { align: 'center' });
   }
 
   // Sello del escudo (Seguridad e Higiene o Diploma, el mismo criterio que
@@ -125,9 +157,7 @@ export function generarCertificadoPDF({ nombreEmpleado, negocioNombre, tituloCur
   doc.setLineWidth(0.3);
   doc.line(centroX - 22, h - 26, centroX + 22, h - 26);
 
-  const fecha = fechaCompletado
-    ? new Date(fechaCompletado).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const fecha = textoFechaCertificado(fechaCompletado ?? fechaAlias);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);

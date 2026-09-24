@@ -3,59 +3,43 @@
 // Público, sin login. Valida que el token del link Y el PIN de 4 dígitos
 // coincidan con el mismo empleado, antes de que el frontend muestre
 // cualquier contenido (Mi Perfil, un curso, etc).
+//
+// 2026-09-24: la validación vive en _shared/empleado-auth.ts (la misma
+// que usan ahora todas las funciones del empleado, con tope de intentos).
+// El PIN llega en el header x-empleado-pin; se sigue aceptando en el body
+// solo para no romperle la pantalla a quien tenga la versión anterior de
+// la app cargada en el navegador.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  autenticarEmpleado,
+  corsEmpleado,
+  leerPin,
+  respuestaError,
+  respuestaErrorServidor,
+  respuestaJson,
+} from '../_shared/empleado-auth.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsEmpleado });
   }
 
   try {
-    const { token, pin } = await req.json();
-
-    if (!token || !pin) {
-      return new Response(JSON.stringify({ error: 'Faltan datos.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const body = await req.json().catch(() => ({}));
+    const token = body?.token;
+    const pin = leerPin(req) ?? (typeof body?.pin === 'string' ? body.pin.trim() : null);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: empleado, error } = await supabase
-      .from('empleados')
-      .select('id, nombre')
-      .eq('token_acceso', token)
-      .eq('pin', pin)
-      .is('fecha_baja', null)
-      .maybeSingle();
+    const auth = await autenticarEmpleado(supabase, token, pin);
+    if (auth.error) return respuestaError(auth.error);
 
-    if (error) throw error;
-
-    if (!empleado) {
-      return new Response(JSON.stringify({ error: 'PIN incorrecto.' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ ok: true, nombre: empleado.nombre }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return respuestaJson({ ok: true, nombre: auth.empleado.nombre });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: 'Error inesperado.' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return respuestaErrorServidor(err);
   }
 });

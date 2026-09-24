@@ -3,8 +3,8 @@ import { supabase } from '../supabaseClient';
 
 const BENEFICIOS = [
   'Armás cursos cortos con lo que ya usás para explicar (manuales, audios)',
-  'Cumplís con la Ley 19.587 (seguridad e higiene) sin armar nada de cero',
-  'Preparás a tu equipo para el carnet de manipulación de alimentos (Art. 21, Código Alimentario Argentino)',
+  'Tenés listo el curso de seguridad e higiene (Ley 19.587)',
+  'Tenés listo el curso de manipulación de alimentos (Código Alimentario Argentino, Art. 21)',
   'Ves el progreso de cada empleado en un solo lugar',
 ];
 
@@ -35,7 +35,7 @@ export default function Login() {
 
   return (
     <div className="max-w-md mx-auto mt-12 px-4">
-      <h1 className="text-lg font-bold text-[#C1502E] mb-2 whitespace-nowrap">Entrená a tu personal sin perder tiempo.</h1>
+      <h1 className="text-lg font-bold text-[#C1502E] mb-2">Capacitá a tu equipo sin perder tiempo.</h1>
       <p className="text-lg font-bold text-[#2C2C2A] mb-1">Dejá de explicar lo mismo a cada persona nueva.</p>
       <p className="text-sm text-[#6b6455] mb-8">Entrá para armar los cursos de tu equipo.</p>
 
@@ -46,7 +46,7 @@ export default function Login() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-6 border border-[#EFDDCE] shadow-sm">
-          <h2 className="text-lg font-bold text-[#2C2C2A] mb-1">Iniciar sesión</h2>
+          <h2 className="text-lg font-bold text-[#2C2C2A] mb-1">Entrar</h2>
           <p className="text-sm text-[#6b6455] mb-4">Te mandamos un link a tu mail, sin contraseñas.</p>
 
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -58,7 +58,7 @@ export default function Login() {
               placeholder="tu@negocio.com"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs font-semibold text-[#C1502E]">{error}</p>}
             <button
               type="submit"
               disabled={enviando}
@@ -70,9 +70,7 @@ export default function Login() {
 
           <div className="border-t border-[#EFDDCE] my-5" />
 
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-3">
-            Adentro podrás hacer
-          </p>
+          <p className="text-xs font-semibold tracking-wide text-[#8a8471] mb-3">Adentro vas a poder:</p>
           <ul className="space-y-2.5">
             {BENEFICIOS.map((texto) => (
               <li key={texto} className="flex items-start gap-2 text-sm text-[#3d382c]">

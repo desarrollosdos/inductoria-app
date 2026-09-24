@@ -1,17 +1,20 @@
 // Inductoria · Edge Function: admin-metrics
 // ------------------------------------------------
-// Métricas completas para el panel de Admin (visible solo para
-// desarrollosdos@gmail.com). Usa service role para ver todas las
-// cuentas, no solo la del usuario logueado.
+// Métricas completas para el panel de Admin (solo para quienes estén en
+// la tabla `administradores`, ver _shared/admin.ts). Usa service role
+// para ver todas las cuentas, no solo la del usuario logueado.
+//
+// Todas las lecturas van paginadas (traerTodasLasFilas): Supabase corta
+// cada select en 1000 filas sin avisar, y con eso los totales quedaban
+// mal en silencio apenas alguna tabla crecía.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { esAdministrador, traerTodasLasFilas } from '../_shared/admin.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 
 // Duplicado de src/lib/acceso.js (las Edge Functions no pueden importar
 // directo desde src/lib, mismo criterio que crear-suscripcion). Modelo de
@@ -37,19 +40,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseUser.auth.getUser();
-
-    if (userError || !user || user.email !== ADMIN_EMAIL) {
+    if (!(await esAdministrador(req.headers.get('Authorization')))) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -64,17 +55,27 @@ Deno.serve(async (req) => {
     // -----------------------------
     // Datos base: todas las cuentas, negocios y empleados activos
     // -----------------------------
-    const { data: cuentas } = await supabase
-      .from('cuentas')
-      .select('id, owner_id, nombre, plan, sucursales_contratadas, created_at, trial_ends_at, mp_preapproval_id')
-      .order('created_at', { ascending: false });
+    const cuentas = await traerTodasLasFilas((desde, hasta) =>
+      supabase
+        .from('cuentas')
+        .select('id, owner_id, nombre, plan, sucursales_contratadas, created_at, trial_ends_at, mp_preapproval_id')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(desde, hasta)
+    );
 
-    const { data: negocios } = await supabase.from('negocios').select('id, cuenta_id');
+    const negocios = await traerTodasLasFilas((desde, hasta) =>
+      supabase.from('negocios').select('id, cuenta_id').order('id', { ascending: true }).range(desde, hasta)
+    );
 
-    const { data: empleados } = await supabase
-      .from('empleados')
-      .select('id, negocio_id')
-      .is('fecha_baja', null);
+    const empleados = await traerTodasLasFilas((desde, hasta) =>
+      supabase
+        .from('empleados')
+        .select('id, negocio_id')
+        .is('fecha_baja', null)
+        .order('id', { ascending: true })
+        .range(desde, hasta)
+    );
 
     const { count: totalMicrocursos } = await supabase
       .from('microcursos')
@@ -83,11 +84,20 @@ Deno.serve(async (req) => {
     // -----------------------------
     // Última conexión por cuenta (vía Supabase Auth), cruzando por owner_id
     // -----------------------------
-    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    // listUsers también viene paginado (máximo 1000 por página).
     const ultimaConexionPorId: Record<string, string | null> = {};
-    (usersData?.users || []).forEach((u) => {
-      ultimaConexionPorId[u.id] = u.last_sign_in_at ?? null;
-    });
+    for (let pagina = 1; ; pagina++) {
+      const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers({
+        page: pagina,
+        perPage: 1000,
+      });
+      if (usersError) throw usersError;
+      const usuarios = usersData?.users || [];
+      usuarios.forEach((u) => {
+        ultimaConexionPorId[u.id] = u.last_sign_in_at ?? null;
+      });
+      if (usuarios.length < 1000) break;
+    }
 
     const negociosPorCuenta: Record<string, string[]> = {};
     (negocios || []).forEach((n) => {
@@ -181,14 +191,22 @@ Deno.serve(async (req) => {
     // dudas, con algunas preguntas de ejemplo. Un curso con muchas
     // preguntas repetidas probablemente está mal explicado en algún paso.
     // -----------------------------
-    const { data: todosMicrocursos } = await supabase
-      .from('microcursos')
-      .select('id, titulo, cuenta_id')
-      .eq('estado', 'aprobado');
+    const todosMicrocursos = await traerTodasLasFilas((desde, hasta) =>
+      supabase
+        .from('microcursos')
+        .select('id, titulo, cuenta_id')
+        .eq('estado', 'aprobado')
+        .order('id', { ascending: true })
+        .range(desde, hasta)
+    );
 
-    const { data: preguntasIA } = await supabase
-      .from('preguntas_ia')
-      .select('microcurso_id, pregunta');
+    const preguntasIA = await traerTodasLasFilas((desde, hasta) =>
+      supabase
+        .from('preguntas_ia')
+        .select('microcurso_id, pregunta')
+        .order('created_at', { ascending: true })
+        .range(desde, hasta)
+    );
 
     const nombrePorCuenta: Record<string, string> = {};
     (cuentas || []).forEach((c) => (nombrePorCuenta[c.id] = c.nombre));
@@ -200,7 +218,7 @@ Deno.serve(async (req) => {
     (todosMicrocursos || []).forEach((m) => {
       infoPorCurso[m.id] = {
         titulo: m.titulo,
-        cuenta: nombrePorCuenta[m.cuenta_id] || '—',
+        cuenta: nombrePorCuenta[m.cuenta_id] || 'Sin cuenta',
         total: 0,
         ejemplos: [],
       };

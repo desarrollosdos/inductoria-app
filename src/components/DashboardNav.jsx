@@ -114,7 +114,7 @@ const TABS = [
 // seccionActiva (opcional): id de TABS a marcar en terracota en vez de
 // usar la URL actual. Lo usa Ayuda.jsx para que, a medida que se
 // scrollea por cada sección de la guía, la pestaña correspondiente se
-// vaya marcando acá arriba también — pero solo si esa pestaña está
+// vaya marcando acá arriba también, pero solo si esa pestaña está
 // visible (si la cuenta la tiene desactivada, ya no está en tabsVisibles
 // y no hay nada que marcar). El resto de las pantallas no pasa esta
 // prop, así que siguen marcando por URL como siempre (2026-09-07, a
@@ -180,21 +180,37 @@ export default function DashboardNav({ flags: flagsProp, seccionActiva }) {
 
   const tabsVisibles = TABS.filter((tab) => {
     if (!tab.campo) return true;
-    if (!flags) return true;
-    return flags[tab.campo] !== false;
+    if (!flags) return false;
+    // Procedimientos y Checklists son extras: si nunca se activaron (null)
+    // cuentan como apagados, igual que en Configuración y Checklists.
+    return flags[tab.campo] === true;
   });
+
+  // En mobile la pestaña activa puede quedar fuera de la parte visible
+  // de la barra (se scrollea de costado): la traemos a la vista al cargar.
+  // Se mueve solo el scroll horizontal de la barra (no scrollIntoView,
+  // que en Ayuda arrastraría toda la página hacia arriba cada vez que
+  // cambia la sección activa mientras se lee).
+  const barraRef = useRef(null);
+  const activaRef = useRef(null);
+  useEffect(() => {
+    const barra = barraRef.current;
+    const activa = activaRef.current;
+    if (!barra || !activa || barra.scrollWidth <= barra.clientWidth) return;
+    barra.scrollLeft = activa.offsetLeft - (barra.clientWidth - activa.clientWidth) / 2;
+  }, [seccionActiva, tabsVisibles.length]);
 
   return (
     <nav className="max-w-4xl mx-auto mt-4 px-4">
-      {/* Con 7 pestañas ahora (se sumó Checklists), cada columna en mobile
-          quedaba bastante angosta. Antes el texto tenía whitespace-nowrap
-          y sin gap entre columnas, así que una etiqueta larga como
-          "Suscripción" se salía de su propia columna y quedaba pegada a
-          la de al lado. Con un gap chico entre columnas y dejando que el
-          texto pueda partirse en 2 líneas en mobile (nowrap solo desde
-          sm: en adelante, donde ya hay más aire), cada etiqueta se queda
-          dentro de su propio espacio en vez de invadir el vecino. */}
-      <div className="flex justify-between gap-1 sm:justify-start sm:gap-4">
+      {/* Con 7 pestañas, en un celular de 360px no entran todas con un
+          texto legible (antes quedaban a 9,5px y "Procedimientos" se
+          salía de su columna). Ahora en mobile la barra se desliza de
+          costado: cada pestaña tiene su ancho natural, texto de 11px y
+          un área de toque de al menos 40px. Desde sm: en adelante entran
+          todas y se ve igual que antes. El -mx-4/px-4 deja que la barra
+          llegue hasta el borde de la pantalla al deslizar, sin cortar la
+          primera ni la última pestaña. */}
+      <div ref={barraRef} className="relative flex gap-1 overflow-x-auto -mx-4 px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:gap-4">
         {tabsVisibles.map((tab) => {
           const active = seccionActiva ? tab.id === seccionActiva : path === tab.path;
           const destacado = destacados.includes(tab.id);
@@ -202,10 +218,12 @@ export default function DashboardNav({ flags: flagsProp, seccionActiva }) {
             <a
               key={tab.id}
               href={tab.path}
-              className="flex-1 sm:flex-none flex flex-col items-center gap-2.5 text-center"
+              ref={active ? activaRef : undefined}
+              aria-current={active ? 'page' : undefined}
+              className="flex-shrink-0 min-w-[64px] min-h-[44px] px-1.5 py-1 flex flex-col items-center gap-1.5 text-center"
             >
               <span
-                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-1000 flex-shrink-0"
+                className="w-10 h-10 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-colors duration-1000 flex-shrink-0"
                 style={{
                   background: destacado ? '#7C8B6F' : active ? '#C1502E' : '#EDE0C8',
                   color: destacado || active ? '#fff' : '#8a8471',
@@ -214,7 +232,7 @@ export default function DashboardNav({ flags: flagsProp, seccionActiva }) {
                 <tab.Icon />
               </span>
               <span
-                className={`text-[9.5px] sm:text-xs font-semibold leading-tight sm:whitespace-nowrap ${
+                className={`text-[11px] sm:text-xs font-semibold leading-tight whitespace-nowrap ${
                   active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
                 }`}
               >

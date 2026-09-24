@@ -32,7 +32,17 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
-import { AVISO_MATERIAL_NO_CONFIABLE, envolverMaterialNoConfiable, validarCursoGenerado } from '../_shared/prompt-seguridad.ts';
+import {
+  AVISO_MATERIAL_NO_CONFIABLE,
+  envolverMaterialNoConfiable,
+  validarCursoGenerado,
+  instruccionesCurso,
+  MAX_MATERIAL_CARACTERES,
+  MENSAJE_MATERIAL_MUY_LARGO,
+  MENSAJE_RESPUESTA_CORTADA,
+  extraerJson,
+  sacarRayasDeTodo,
+} from '../_shared/prompt-seguridad.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,33 +55,6 @@ const corsHeaders = {
 // nunca — no para "llegar a tiempo" antes de que alguien se harte de
 // esperar en pantalla.
 const TIMEOUT_CLAUDE_MS = 170_000;
-
-function construirInstrucciones() {
-  return `${AVISO_MATERIAL_NO_CONFIABLE}
-
-Convertí el material de capacitación de un comercio que te van a pasar en un curso completo y serio para un empleado nuevo, con el mismo nivel de profundidad y formato que usaría una plataforma de capacitación profesional (no un resumen ni un apunte rápido).
-
-Estructura obligatoria, siempre 5 pasos, en este orden:
-1. Marco y por qué importa: contexto de por qué este tema es relevante para el puesto (si el material menciona una norma, ley o estándar, citala acá con precisión; si no menciona ninguna, explicá el motivo práctico/de negocio).
-2 a 4. Desarrollo práctico: el contenido concreto dividido en 3 pasos temáticos coherentes (por ejemplo, separado por proceso, por situación, o por tipo de tarea, según lo que tenga sentido para el material).
-5. Qué hacer ante problemas o casos límite, y cierre: qué hacer cuando algo sale mal o hay dudas, y una idea final que resuma el punto central del curso.
-
-Reglas de contenido:
-- Cada uno de los 5 pasos tiene que tener entre 200 y 280 palabras. No menos. Esto no es negociable: un paso de 3 líneas no sirve para capacitar a nadie.
-- Desarrollá el POR QUÉ de cada cosa, no solo el QUÉ. Sumá contexto y al menos un ejemplo concreto o situación típica del día a día del comercio en cada paso donde ayude a entender mejor.
-- Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (cosas que sí hacer, cosas que no hacer, checklist), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones. Podés combinar: un párrafo de contexto seguido de una lista con guiones dentro del mismo paso.
-- Tono serio y profesional, pero en segunda persona ("vos"), tono argentino, sin sonar acartonado ni como un trámite burocrático, como si un compañero con experiencia real le explicara el tema a alguien que recién arranca.
-- Exactamente 5 preguntas de opción múltiple (3 opciones cada una), una por cada paso, que evalúen el punto central de ESE paso puntual, no detalles menores ni trivia.
-- No inventes información que no esté en el material original. Si el material es corto, desarrollá y explicá mejor lo que SÍ está (con más contexto, ejemplos y aplicación práctica), pero no agregues datos, cifras o normas que no estén en el original.
-
-Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta forma exacta:
-{
-  "titulo": "string corto para el curso",
-  "duracion_min": número estimado de minutos de lectura,
-  "pasos": [{"titulo": "string", "contenido": "string"}],
-  "preguntas": [{"pregunta": "string", "opciones": ["string","string","string"], "correcta": índice 0/1/2 de la correcta}]
-}`;
-}
 
 // Todo el trabajo pesado, corre en segundo plano DESPUÉS de que la
 // función ya respondió. Cualquier error acá adentro se guarda en
@@ -106,8 +89,8 @@ async function generarEnSegundoPlano(supabase: any, contenido: any, contenidoId:
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 4000,
-          system: construirInstrucciones(),
+          max_tokens: 6000,
+          system: instruccionesCurso(),
           messages: [{ role: 'user', content: envolverMaterialNoConfiable(contenido.texto_procesado) }],
         }),
         signal: controller.signal,
@@ -115,7 +98,7 @@ async function generarEnSegundoPlano(supabase: any, contenido: any, contenidoId:
     } catch (fetchErr) {
       clearTimeout(timeoutId);
       if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-        await marcarError('La IA tardó demasiado en responder. Probá de nuevo — si el contenido es muy largo, puede ayudar dividirlo en partes más cortas.');
+        await marcarError('La IA tardó demasiado en responder. Probá de nuevo. Si el contenido es muy largo, dividilo en partes más cortas.');
         return;
       }
       await marcarError('No se pudo conectar con la IA. Probá de nuevo.', fetchErr);
@@ -151,16 +134,22 @@ async function generarEnSegundoPlano(supabase: any, contenido: any, contenidoId:
     });
     if (usageError) console.error('No se pudo registrar el costo de IA:', usageError);
 
-    // Por si Claude envuelve el JSON en ```json ... ``` a pesar de que se lo pedimos limpio.
-    const jsonLimpio = textoRespuesta.replace(/```json|```/g, '').trim();
-
-    let cursoGenerado;
-    try {
-      cursoGenerado = JSON.parse(jsonLimpio);
-    } catch (e) {
-      await marcarError('La IA devolvió una respuesta inválida. Probá de nuevo.', textoRespuesta);
+    // Si la IA se quedó sin espacio, el JSON viene cortado: avisamos la
+    // causa real en vez de un genérico "respuesta inválida".
+    if (claudeData.stop_reason === 'max_tokens') {
+      await marcarError(MENSAJE_RESPUESTA_CORTADA, { outputTokens });
       return;
     }
+
+    // Tolera ```json ... ``` o texto suelto alrededor del JSON.
+    const jsonCrudo = extraerJson(textoRespuesta);
+    if (!jsonCrudo) {
+      await marcarError('La IA devolvió una respuesta que no pudimos leer. Probá de nuevo.', textoRespuesta);
+      return;
+    }
+    // El prompt pide no usar rayas, pero por las dudas las sacamos acá.
+    // deno-lint-ignore no-explicit-any
+    const cursoGenerado: any = sacarRayasDeTodo(jsonCrudo);
 
     // Validamos que el JSON tenga exactamente la forma que pedimos antes
     // de guardar nada. Además de ser una buena práctica en general, esto
@@ -182,7 +171,7 @@ async function generarEnSegundoPlano(supabase: any, contenido: any, contenidoId:
       .insert({
         cuenta_id: contenido.cuenta_id,
         titulo: cursoGenerado.titulo,
-        duracion_min: cursoGenerado.duracion_min || null,
+        duracion_min: Number.isFinite(Number(cursoGenerado.duracion_min)) ? Math.max(1, Math.round(Number(cursoGenerado.duracion_min))) : null,
         estado: 'pendiente',
         preguntas: cursoGenerado.preguntas || [],
       })
@@ -204,6 +193,10 @@ async function generarEnSegundoPlano(supabase: any, contenido: any, contenidoId:
     if (pasosAInsertar.length > 0) {
       const { error: pasosError } = await supabase.from('pasos').insert(pasosAInsertar);
       if (pasosError) {
+        // Sin pasos el borrador no sirve: lo borramos para no dejar un
+        // curso vacío colgado, y el contenido vuelve a quedar listo para
+        // reintentar.
+        await supabase.from('microcursos').delete().eq('id', microcurso.id);
         await marcarError('No se pudo guardar el contenido del curso. Probá de nuevo.', pasosError);
         return;
       }
@@ -279,6 +272,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Tope de largo ANTES de marcar "generando" y gastar la llamada.
+    const largoMaterial = (contenido.texto_procesado || '').length;
+    if (largoMaterial > MAX_MATERIAL_CARACTERES) {
+      return new Response(JSON.stringify({ error: MENSAJE_MATERIAL_MUY_LARGO }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!(contenido.texto_procesado || '').trim()) {
+      return new Response(JSON.stringify({ error: 'El contenido está vacío. Escribí o subí el material antes de generar el curso.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (contenido.estado !== 'aprobado') {
       return new Response(
         JSON.stringify({ error: 'Marcá el contenido como aprobado antes de generar el curso' }),
@@ -317,6 +325,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Anotamos cuándo arrancó, para que el frontend pueda detectar una
+    // generación trabada (si el proceso en segundo plano se corta, el
+    // contenido quedaría en "generando" para siempre). Va en un update
+    // aparte y sin cortar nada si falla: la columna generando_desde se
+    // agrega en supabase/sql/2026-09-24-cursos-versiones.sql y hasta que
+    // se corra ese SQL este update da error.
+    const { error: desdeError } = await supabase
+      .from('contenidos')
+      .update({ generando_desde: new Date().toISOString() })
+      .eq('id', contenidoId);
+    if (desdeError) console.warn('procesar-contenido: no se pudo guardar generando_desde', desdeError.message);
+
     const trabajo = generarEnSegundoPlano(supabase, contenido, contenidoId, anthropicKey);
 
     // EdgeRuntime.waitUntil deja que el trabajo siga corriendo después de
@@ -338,7 +358,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('procesar-contenido: error inesperado', err);
-    return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {
+    return new Response(JSON.stringify({ error: 'Algo salió mal al generar el curso. Probá de nuevo.', detalle: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

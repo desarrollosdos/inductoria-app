@@ -11,33 +11,45 @@ import {
 // Cartel que aparece una sola vez, en el primer ingreso logueado desde
 // un navegador que soporta instalación por código (Chrome/Edge,
 // desktop o Android), ofreciendo instalar Inductoria con ícono propio.
-// En Safari y Firefox nunca aparece — no es un error, esos navegadores
+// En Safari y Firefox nunca aparece: no es un error, esos navegadores
 // no tienen forma de disparar la instalación desde la página (ver el
 // comentario en lib/instalarApp.js).
 export default function InstalarAppPrompt() {
   const [visible, setVisible] = useState(false);
   const [instalando, setInstalando] = useState(false);
 
+  // yaSePregunto/marcarPreguntado (lib/instalarApp.js) ya envuelven
+  // localStorage en try/catch: si está bloqueado, el cartel puede volver
+  // a aparecer, pero nunca rompe la pantalla.
   useEffect(() => {
-    if (appYaInstalada() || yaSePregunto()) return;
+    if (appYaInstalada() || yaSePregunto()) return undefined;
 
+    let timer = null;
     function mostrarSiCorresponde() {
       if (appYaInstalada() || yaSePregunto()) return;
       // Pequeño delay para no competir con la carga inicial de la
       // pantalla recién logueada.
-      setTimeout(() => setVisible(true), 1500);
+      timer = setTimeout(() => setVisible(true), 1500);
     }
 
     if (hayInstalacionDisponible()) {
       mostrarSiCorresponde();
-      return undefined;
+      return () => clearTimeout(timer);
     }
-    return onInstalacionDisponible(mostrarSiCorresponde);
+    const desuscribir = onInstalacionDisponible(mostrarSiCorresponde);
+    return () => {
+      desuscribir();
+      clearTimeout(timer);
+    };
   }, []);
 
   async function handleInstalar() {
     setInstalando(true);
-    await instalarApp();
+    try {
+      await instalarApp();
+    } catch {
+      // Si el navegador rechaza la instalación, igual cerramos el cartel.
+    }
     setInstalando(false);
     setVisible(false);
     marcarPreguntado();
@@ -62,15 +74,15 @@ export default function InstalarAppPrompt() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#2C2C2A] mb-0.5">¿Instalar Inductoria en esta compu?</p>
+          <p className="text-sm font-semibold text-[#2C2C2A] mb-0.5">¿Querés instalar Inductoria?</p>
           <p className="text-xs text-[#6b6455] mb-3">
-            Se agrega un ícono propio y la abrís directo, sin pasar por el navegador.
+            Te queda un ícono propio y la abrís directo, sin pasar por el navegador.
           </p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleDescartar}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-[#8a8471] bg-[#EDE0C8]"
+              className="flex-1 min-h-[40px] py-2 rounded-lg text-xs font-semibold text-[#6b6455] bg-[#EDE0C8]"
             >
               Ahora no
             </button>
@@ -78,7 +90,7 @@ export default function InstalarAppPrompt() {
               type="button"
               onClick={handleInstalar}
               disabled={instalando}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#C1502E] disabled:opacity-60"
+              className="flex-1 min-h-[40px] py-2 rounded-lg text-xs font-semibold text-white bg-[#C1502E] disabled:opacity-60"
             >
               {instalando ? 'Instalando...' : 'Instalar'}
             </button>

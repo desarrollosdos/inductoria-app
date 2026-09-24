@@ -11,17 +11,28 @@ export default function VisitTracker() {
   useEffect(() => {
     const YA_CONTADA = 'inductoria_visita_contada';
 
-    if (sessionStorage.getItem(YA_CONTADA)) return;
+    // sessionStorage puede tirar error (modo privado de Safari viejo,
+    // almacenamiento bloqueado): si pasa, contamos la visita igual y
+    // seguimos, la app nunca debe romperse por esto.
+    try {
+      if (sessionStorage.getItem(YA_CONTADA)) return;
+    } catch {
+      // sin sessionStorage: se cuenta igual
+    }
 
-    supabase.functions
-      .invoke('registrar-visita', {
+    Promise.resolve()
+      .then(() => supabase.functions.invoke('registrar-visita', {
         body: { path: window.location.pathname, origen: 'app' },
-      })
+      }))
       .catch(() => {
         // Si falla, no importa: la app nunca debe romperse por esto.
       });
 
-    sessionStorage.setItem(YA_CONTADA, '1');
+    try {
+      sessionStorage.setItem(YA_CONTADA, '1');
+    } catch {
+      // no se pudo guardar: en el peor caso se cuenta de nuevo al recargar
+    }
   }, []);
 
   return null;

@@ -11,8 +11,8 @@
 // Cliente.
 //
 // Solo para cuenta.plan === 'active' y sin cancelacion_pendiente. Para
-// trial no hace falta pasar por acá: el trial no tiene tope de
-// sucursales (ver acceso.js / acceso.ts). Para past_due/suspended/
+// trial no aplica: durante la prueba el tope es 1 sucursal (ver
+// limiteSucursales en Dashboard.jsx) y se destraba al suscribirse. Para past_due/suspended/
 // cancelled no tiene sentido subir el monto de un cobro que ya está
 // fallando o que no existe: se le sigue pidiendo a la persona que se
 // contacte, como hasta ahora (mensaje que arma el frontend).
@@ -36,6 +36,10 @@ const TIERS_PRECIO = [
   { hasta: 9, factor: 9000 / 12000 },
   { hasta: Infinity, factor: 8000 / 12000 },
 ];
+
+// Mismo valor por defecto que precio-publico, crear-suscripcion y
+// PRECIO_BASE_POR_DEFECTO en src/lib/precio.js.
+const PRECIO_BASE_POR_DEFECTO = 12000;
 
 function precioTotalMensual(cantidadSucursales: number, precioBase: number): number {
   const tier = TIERS_PRECIO.find((t) => cantidadSucursales <= t.hasta)!;
@@ -92,7 +96,7 @@ Deno.serve(async (req) => {
     if (cuenta.plan !== 'active' || cuenta.cancelacion_pendiente) {
       return new Response(
         JSON.stringify({
-          error: 'Solo se puede agregar una sucursal a un plan activo (sin cancelación pendiente)',
+          error: 'Solo podés sumar una sucursal con la suscripción al día y sin una cancelación pendiente.',
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -100,7 +104,7 @@ Deno.serve(async (req) => {
 
     if (!cuenta.mp_preapproval_id) {
       return new Response(
-        JSON.stringify({ error: 'Esta cuenta no tiene una suscripción de MercadoPago asociada' }),
+        JSON.stringify({ error: 'No encontramos tu suscripción en Mercado Pago. Escribinos y lo vemos.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -123,7 +127,7 @@ Deno.serve(async (req) => {
       .eq('id', 1)
       .maybeSingle();
 
-    const precioBase = configPrecio?.precio_base || 12000;
+    const precioBase = configPrecio?.precio_base || PRECIO_BASE_POR_DEFECTO;
     const montoNuevo = precioTotalMensual(cantidadNueva, precioBase);
 
     const mpToken = Deno.env.get('MP_ACCESS_TOKEN')!;
@@ -146,7 +150,7 @@ Deno.serve(async (req) => {
       const detalle = await mpRes.text();
       console.error('Error actualizando monto en MercadoPago:', detalle);
       return new Response(
-        JSON.stringify({ error: 'No se pudo actualizar la suscripción en MercadoPago', detalle }),
+        JSON.stringify({ error: 'No pudimos actualizar tu suscripción en Mercado Pago. Probá de nuevo en un rato.', detalle }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

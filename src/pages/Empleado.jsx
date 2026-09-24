@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import PinGate from '../components/PinGate';
+import PinGate, { usePinEmpleado } from '../components/PinGate';
 import { esCursoSeguridadEHigiene, BadgeEspecialImg, BadgeCursoImg } from '../components/Badges';
 
 function Avatar({ nombre, fotoUrl, size = 72 }) {
@@ -44,27 +44,15 @@ function EmpleadoInterno({ onDatosCargados }) {
   const [error, setError] = useState(null);
   const [datos, setDatos] = useState(null);
 
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
+  // El PIN lo maneja PinGate: fetchEmpleado ya manda token + PIN, y si
+  // el PIN deja de valer, PinGate lo vuelve a pedir.
+  const { token, fetchEmpleado } = usePinEmpleado();
 
   useEffect(() => {
-    if (!token) {
-      setError('Falta el token de acceso en el link.');
-      setLoading(false);
-      return;
-    }
-
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    fetch(`${base}/functions/v1/empleado-info?token=${encodeURIComponent(token)}`, {
-      headers: {
-        Authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
-      },
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
+    let cancelado = false;
+    fetchEmpleado('empleado-info')
+      .then(({ ok, data, pinInvalido }) => {
+        if (cancelado || pinInvalido) return;
         if (!ok) {
           setError(data.error || 'No se pudo cargar tu información.');
           return;
@@ -72,9 +60,16 @@ function EmpleadoInterno({ onDatosCargados }) {
         setDatos(data);
         if (onDatosCargados) onDatosCargados(data.empleado.nombre);
       })
-      .catch(() => setError('No se pudo cargar tu información.'))
-      .finally(() => setLoading(false));
-  }, [token]);
+      .catch(() => {
+        if (!cancelado) setError('No se pudo cargar tu información. Revisá tu conexión y probá de nuevo.');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [fetchEmpleado]);
 
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
@@ -85,13 +80,16 @@ function EmpleadoInterno({ onDatosCargados }) {
       <div className="max-w-md mx-auto mt-24 px-4 text-center">
         <p className="text-[#C1502E] font-semibold">{error}</p>
         <p className="text-sm text-[#6b6455] mt-2">
-          Pedile a tu encargado que te reenvíe el link de acceso.
+          Si sigue pasando, pedile a tu encargado que te reenvíe el link.
         </p>
       </div>
     );
   }
 
   const { empleado, negocio, cuenta, microcursos, checklist_disponible } = datos;
+  // Lo que cuenta es la versión actual de cada curso: si completó una
+  // versión anterior y el curso se actualizó, vuelve a pendientes con el
+  // aviso "Contenido actualizado" (empleado-info manda `desactualizado`).
   const completados = microcursos.filter((m) => m.completado);
   const pendientes = microcursos.filter((m) => !m.completado);
 
@@ -149,6 +147,7 @@ function EmpleadoInterno({ onDatosCargados }) {
           <div className="space-y-2">
             {pendientes.map((m) => {
               const vencido = m.fecha_limite && new Date(m.fecha_limite) < new Date();
+              const desactualizado = !!m.desactualizado;
               return (
                 <a
                   key={m.id}
@@ -176,9 +175,15 @@ function EmpleadoInterno({ onDatosCargados }) {
                         </span>
                       )}
                     </p>
+                    {desactualizado && (
+                      <p className="text-xs font-semibold text-[#D69A2D] flex items-center gap-1 mt-1">
+                        <IconAviso />
+                        Contenido actualizado, revisalo de nuevo
+                      </p>
+                    )}
                   </div>
                   <span className="text-xs font-semibold text-white bg-[#D69A2D] rounded-full px-3 py-1 flex-shrink-0">
-                    Pendiente
+                    {desactualizado ? 'Actualizado' : 'Pendiente'}
                   </span>
                 </a>
               );
@@ -192,7 +197,6 @@ function EmpleadoInterno({ onDatosCargados }) {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[#8a8471] mb-2">Completados</h2>
           <div className="space-y-2">
             {completados.map((m) => {
-              const contenidoActualizado = m.actualizado_despues_de_completar;
               // Antes esto solo era clickeable si el contenido se había
               // actualizado — el resto de los cursos completados quedaban
               // sin ninguna forma de volver a entrar (ni para confirmar un
@@ -229,12 +233,6 @@ function EmpleadoInterno({ onDatosCargados }) {
                           : 'Completado'}
                         {m.puntaje != null && ` · ${m.puntaje}%`}
                       </p>
-                      {contenidoActualizado && (
-                        <p className="text-xs font-semibold text-[#D69A2D] flex items-center gap-1 mt-1">
-                          <IconAviso />
-                          Contenido actualizado, revisalo de nuevo
-                        </p>
-                      )}
                     </div>
                   </div>
                 </a>

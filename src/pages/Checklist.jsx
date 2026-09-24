@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import PinGate from '../components/PinGate';
+import PinGate, { usePinEmpleado } from '../components/PinGate';
 
 // Cada checklist puede ser diario, semanal o mensual (lo elige el dueño en
 // su pantalla) — el texto de "ya completado" tiene que reflejar el período
@@ -21,7 +21,8 @@ function IconChecklistMini(props) {
 // Una tarjeta por checklist: cada uno se completa y se envía por separado
 // (un empleado puede tener más de uno asignado a su puesto el mismo día,
 // por ejemplo "Apertura" y "Cierre de caja").
-function TarjetaChecklist({ checklist, token, onEnviado }) {
+function TarjetaChecklist({ checklist, onEnviado }) {
+  const { fetchEmpleado } = usePinEmpleado();
   const [marcados, setMarcados] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState(null);
@@ -38,22 +39,14 @@ function TarjetaChecklist({ checklist, token, onEnviado }) {
     setEnviando(true);
     setErrorEnvio(null);
 
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
     try {
-      const res = await fetch(`${base}/functions/v1/empleado-checklist`, {
+      const { ok, data, pinInvalido } = await fetchEmpleado('empleado-checklist', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, checklist_id: checklist.id }),
+        body: { checklist_id: checklist.id },
       });
-      const data = await res.json();
+      if (pinInvalido) return;
 
-      if (!res.ok) {
+      if (!ok) {
         setErrorEnvio(data.error || 'No se pudo enviar el checklist.');
         return;
       }
@@ -118,37 +111,34 @@ function TarjetaChecklist({ checklist, token, onEnviado }) {
 }
 
 function ChecklistInterno() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
+  // token + PIN los maneja PinGate.
+  const { token, fetchEmpleado } = usePinEmpleado();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [checklists, setChecklists] = useState([]);
 
   useEffect(() => {
-    if (!token) {
-      setError('Falta información en el link.');
-      setLoading(false);
-      return;
-    }
-
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    fetch(`${base}/functions/v1/empleado-checklist?token=${encodeURIComponent(token)}`, {
-      headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
+    let cancelado = false;
+    fetchEmpleado('empleado-checklist')
+      .then(({ ok, data, pinInvalido }) => {
+        if (cancelado || pinInvalido) return;
         if (!ok) {
           setError(data.error || 'No se pudo cargar el checklist.');
           return;
         }
         setChecklists(data.checklists || []);
       })
-      .catch(() => setError('No se pudo cargar el checklist.'))
-      .finally(() => setLoading(false));
-  }, [token]);
+      .catch(() => {
+        if (!cancelado) setError('No se pudo cargar el checklist. Revisá tu conexión y probá de nuevo.');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [fetchEmpleado]);
 
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
@@ -190,7 +180,7 @@ function ChecklistInterno() {
 
       <div className="space-y-4">
         {checklists.map((c) => (
-          <TarjetaChecklist key={c.id} checklist={c} token={token} onEnviado={() => {}} />
+          <TarjetaChecklist key={c.id} checklist={c} onEnviado={() => {}} />
         ))}
       </div>
 

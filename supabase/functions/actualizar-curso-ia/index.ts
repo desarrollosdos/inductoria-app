@@ -1,22 +1,51 @@
 // Inductoria · Edge Function: actualizar-curso-ia
 // ------------------------------------------------
-// El dueño aprieta "Actualizar contenido" sobre un curso ya publicado,
-// suma material nuevo (texto), y esto le pide a Claude que regenere el
-// curso completo (mismo formato que procesar-contenido) combinando el
-// material original + el nuevo. A diferencia de procesar-contenido, esto
-// NUNCA crea un microcurso nuevo ni lo borra: actualiza el mismo registro
-// (titulo, duracion_min, preguntas, pasos) para no perder el historial de
-// progreso de los empleados que ya lo completaron, y marca actualizado_at
-// para que esos empleados vean el aviso de "contenido actualizado".
+// El dueño aprieta "Cambiar versión" sobre un curso publicado (el curso
+// pasa a 'en_revision' y deja de verlo el empleado), escribe qué quiere
+// cambiar o agregar, y esto le pide a Claude que regenere el curso
+// completo (mismo formato que procesar-contenido) a partir del curso
+// actual + lo nuevo. NUNCA crea un microcurso nuevo ni lo borra: actualiza
+// el mismo registro para no perder el historial de los empleados.
+//
+// Versiones (2026-09-24, ver supabase/sql/2026-09-24-cursos-versiones.sql):
+// esta función NO sube microcursos.version. Solo marca
+// revision_con_cambios = true. La versión sube en 1 recién cuando el
+// dueño vuelve a publicar (en_revision -> aprobado), y lo hace un trigger
+// en la base. Así, varias actualizaciones con IA dentro de la misma
+// revisión cuentan como una sola versión nueva.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
-import { AVISO_MATERIAL_NO_CONFIABLE, envolverMaterialNoConfiable, validarCursoGenerado } from '../_shared/prompt-seguridad.ts';
+import {
+  envolverMaterialNoConfiable,
+  validarCursoGenerado,
+  instruccionesCurso,
+  MAX_MATERIAL_CARACTERES,
+  MENSAJE_RESPUESTA_CORTADA,
+  extraerJson,
+  sacarRayasDeTodo,
+} from '../_shared/prompt-seguridad.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Esta función espera a la IA mientras el celular del dueño espera la
+// respuesta. Cortamos antes de los 150 segundos de Supabase para poder
+// devolver un mensaje claro en vez de un 504 sin explicación.
+const TIMEOUT_CLAUDE_MS = 120_000;
+
+// Tope para lo que escribe el dueño en "qué querés cambiar". El resto del
+// material es el curso actual (5 pasos), que ya tiene un largo acotado.
+const MAX_TEXTO_NUEVO_CARACTERES = 15_000;
+
+function responder(cuerpo: unknown, status = 200) {
+  return new Response(JSON.stringify(cuerpo), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -37,10 +66,7 @@ Deno.serve(async (req) => {
     } = await supabaseUser.auth.getUser();
 
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'No autorizado' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return responder({ error: 'No autorizado' }, 401);
     }
 
     const body = await req.json();
@@ -48,10 +74,14 @@ Deno.serve(async (req) => {
     const textoNuevo = (body.texto_nuevo || '').trim();
 
     if (!microcursoId || !textoNuevo) {
-      return new Response(JSON.stringify({ error: 'Falta el curso o el contenido nuevo' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return responder({ error: 'Falta el curso o lo que querés cambiar.' }, 400);
+    }
+
+    if (textoNuevo.length > MAX_TEXTO_NUEVO_CARACTERES) {
+      return responder(
+        { error: 'Lo que escribiste es muy largo, dividilo en partes. Probá con hasta 15.000 caracteres por vez.' },
+        400
+      );
     }
 
     const supabase = createClient(
@@ -67,100 +97,107 @@ Deno.serve(async (req) => {
       .single();
 
     if (microcursoError || !microcurso || microcurso.cuentas.owner_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Curso no encontrado' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return responder({ error: 'No encontramos ese curso.' }, 404);
     }
 
-    // Actualizar/regenerar con IA es la misma función (y el mismo costo)
-    // que generar un curso nuevo: tampoco disponible en trial.
+    // Actualizar/regenerar con IA tiene el mismo costo que generar un
+    // curso nuevo: tampoco disponible en trial.
     if (!puedeUsarIA(microcurso.cuentas, user.email)) {
-      return new Response(JSON.stringify({ error: MENSAJE_IA_BLOQUEADA_TRIAL }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return responder({ error: MENSAJE_IA_BLOQUEADA_TRIAL }, 403);
     }
 
-    if (microcurso.estado !== 'aprobado') {
-      return new Response(JSON.stringify({ error: 'Este curso no está publicado' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // El flujo de la app es: "Cambiar versión" (pasa a 'en_revision') y
+    // recién ahí "Actualizar con IA". Antes esta función exigía 'aprobado'
+    // y por eso el flujo real fallaba siempre con "no está publicado".
+    // Solo aceptamos 'en_revision': cambiar el contenido de un curso que
+    // los empleados están viendo en ese momento dejaría la versión
+    // desincronizada.
+    if (microcurso.estado !== 'en_revision') {
+      return responder(
+        { error: 'Para cambiar este curso primero tocá "Cambiar versión" en Cursos disponibles.' },
+        400
+      );
     }
 
-    // Buscamos el contenido original vinculado (si existe) para sumar el
-    // material previo al nuevo. Los cursos de biblioteca (cursos_base) no
-    // tienen un contenido vinculado, en ese caso se arranca solo del texto
-    // nuevo más los pasos actuales como referencia.
-    const { data: contenidoOriginal } = await supabase
-      .from('contenidos')
-      .select('*')
-      .eq('microcurso_id', microcursoId)
-      .maybeSingle();
-
-    const { data: pasosActuales } = await supabase
+    // Material de base: el curso tal como está ahora (ya integra todo lo
+    // que se fue sumando en actualizaciones anteriores). Antes se usaba el
+    // texto original + todo lo nuevo, y ese combinado se guardaba de vuelta
+    // en el contenido, así que cada actualización mandaba más texto que la
+    // anterior (y costaba más). Ahora la entrada queda acotada al curso
+    // actual + el pedido nuevo, y no se guarda nada acumulado.
+    const { data: pasosActuales, error: pasosActualesError } = await supabase
       .from('pasos')
       .select('titulo, contenido')
       .eq('microcurso_id', microcursoId)
       .order('orden', { ascending: true });
 
-    const materialPrevio =
-      contenidoOriginal?.texto_procesado ||
-      (pasosActuales || []).map((p) => `${p.titulo}\n${p.contenido}`).join('\n\n');
+    if (pasosActualesError) {
+      console.error('No se pudieron leer los pasos actuales:', pasosActualesError);
+      return responder({ error: 'No pudimos leer el curso actual. Probá de nuevo.' }, 500);
+    }
 
-    const textoCombinado = `${materialPrevio}\n\n---\nMaterial adicional agregado después:\n${textoNuevo}`;
+    let materialPrevio = (pasosActuales || []).map((p) => `${p.titulo}\n${p.contenido}`).join('\n\n');
+
+    // Curso sin pasos (pasaba cuando fallaba el reemplazo viejo): usamos
+    // el material original si existe.
+    const { data: contenidoOriginal } = await supabase
+      .from('contenidos')
+      .select('id, texto_procesado')
+      .eq('microcurso_id', microcursoId)
+      .limit(1)
+      .maybeSingle();
+    if (!materialPrevio.trim() && contenidoOriginal?.texto_procesado) {
+      materialPrevio = contenidoOriginal.texto_procesado;
+    }
+
+    const textoCombinado = `Curso actual (título: ${microcurso.titulo}):\n${materialPrevio}\n\nCambios o agregados que pide el dueño:\n${textoNuevo}`;
+
+    if (textoCombinado.length > MAX_MATERIAL_CARACTERES) {
+      return responder(
+        { error: 'El curso con lo que querés sumar queda muy largo. Dividilo en partes o armá un curso aparte para el tema nuevo.' },
+        400
+      );
+    }
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-    const instrucciones = `${AVISO_MATERIAL_NO_CONFIABLE}
+    const instrucciones = instruccionesCurso(
+      '- El material que te pasan es un curso que ya existe más un pedido del dueño con cambios o cosas para agregar. Aplicá lo que pide y armá un curso único y coherente, sin tratarlo como dos partes separadas. Lo que el dueño no pidió cambiar, dejalo con el mismo sentido que tenía.'
+    );
 
-Convertí el material de capacitación de un comercio que te van a pasar en un curso completo y serio para un empleado nuevo, con el mismo nivel de profundidad y formato que usaría una plataforma de capacitación profesional (no un resumen ni un apunte rápido).
-
-Estructura obligatoria, siempre 5 pasos, en este orden:
-1. Marco y por qué importa: contexto de por qué este tema es relevante para el puesto (si el material menciona una norma, ley o estándar, citala acá con precisión; si no menciona ninguna, explicá el motivo práctico/de negocio).
-2 a 4. Desarrollo práctico: el contenido concreto dividido en 3 pasos temáticos coherentes (por ejemplo, separado por proceso, por situación, o por tipo de tarea, según lo que tenga sentido para el material).
-5. Qué hacer ante problemas o casos límite, y cierre: qué hacer cuando algo sale mal o hay dudas, y una idea final que resuma el punto central del curso.
-
-Reglas de contenido:
-- Cada uno de los 5 pasos tiene que tener entre 200 y 280 palabras. No menos. Esto no es negociable: un paso de 3 líneas no sirve para capacitar a nadie.
-- Desarrollá el POR QUÉ de cada cosa, no solo el QUÉ. Sumá contexto y al menos un ejemplo concreto o situación típica del día a día del comercio en cada paso donde ayude a entender mejor.
-- Si dentro de un paso hay una lista de reglas, pasos a seguir, o ítems puntuales (cosas que sí hacer, cosas que no hacer, checklist), escribilos como líneas separadas por salto de línea, cada una arrancando con un guión "-". Si en cambio es una explicación conceptual corrida, escribila como párrafo normal, sin guiones. Podés combinar: un párrafo de contexto seguido de una lista con guiones dentro del mismo paso.
-- Tono serio y profesional, pero en segunda persona ("vos"), tono argentino, sin sonar acartonado ni como un trámite burocrático, como si un compañero con experiencia real le explicara el tema a alguien que recién arranca.
-- Exactamente 5 preguntas de opción múltiple (3 opciones cada una), una por cada paso, que evalúen el punto central de ESE paso puntual, no detalles menores ni trivia.
-- Este material combina contenido que ya estaba en el curso publicado más contenido nuevo que se acaba de sumar. Integrá todo en un curso único y coherente, no los trates como dos secciones separadas.
-- No inventes información que no esté en el material original. Si el material es corto, desarrollá y explicá mejor lo que SÍ está (con más contexto, ejemplos y aplicación práctica), pero no agregues datos, cifras o normas que no estén en el original.
-
-Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta forma exacta:
-{
-  "titulo": "string corto para el curso",
-  "duracion_min": número estimado de minutos de lectura,
-  "pasos": [{"titulo": "string", "contenido": "string"}],
-  "preguntas": [{"pregunta": "string", "opciones": ["string","string","string"], "correcta": índice 0/1/2 de la correcta}]
-}`;
-
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
-        system: instrucciones,
-        messages: [{ role: 'user', content: envolverMaterialNoConfiable(textoCombinado) }],
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CLAUDE_MS);
+    let claudeRes: Response;
+    try {
+      claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 6000,
+          system: instrucciones,
+          messages: [{ role: 'user', content: envolverMaterialNoConfiable(textoCombinado) }],
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+        return responder({ error: 'La IA tardó demasiado en responder. Probá de nuevo con un pedido más corto.' }, 504);
+      }
+      console.error('No se pudo conectar con Claude:', fetchErr);
+      return responder({ error: 'No pudimos conectar con la IA. Probá de nuevo.' }, 502);
+    }
+    clearTimeout(timeoutId);
 
     if (!claudeRes.ok) {
       const errText = await claudeRes.text();
       console.error('Error de Claude:', errText);
-      return new Response(JSON.stringify({ error: 'No se pudo actualizar el curso' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return responder({ error: 'No se pudo actualizar el curso. Probá de nuevo.' }, 500);
     }
 
     const claudeData = await claudeRes.json();
@@ -181,79 +218,109 @@ Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta
     });
     if (usageError) console.error('No se pudo registrar el costo de IA:', usageError);
 
-    const jsonLimpio = textoRespuesta.replace(/```json|```/g, '').trim();
-
-    let cursoRegenerado;
-    try {
-      cursoRegenerado = JSON.parse(jsonLimpio);
-    } catch (e) {
-      console.error('No se pudo parsear la respuesta de Claude:', textoRespuesta);
-      return new Response(JSON.stringify({ error: 'La IA devolvió una respuesta inválida' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (claudeData.stop_reason === 'max_tokens') {
+      console.error('Respuesta de Claude cortada por max_tokens', { microcursoId, outputTokens });
+      return responder({ error: MENSAJE_RESPUESTA_CORTADA }, 422);
     }
 
-    // Misma validación de forma que procesar-contenido, y por el mismo
-    // motivo: última barrera contra una inyección metida en el material
-    // (original o el texto nuevo que se acaba de sumar) antes de
-    // pisar un curso que empleados ya vienen usando.
+    const jsonCrudo = extraerJson(textoRespuesta);
+    if (!jsonCrudo) {
+      console.error('No se pudo parsear la respuesta de Claude:', textoRespuesta);
+      return responder({ error: 'La IA devolvió una respuesta que no pudimos leer. Probá de nuevo.' }, 500);
+    }
+    // deno-lint-ignore no-explicit-any
+    const cursoRegenerado: any = sacarRayasDeTodo(jsonCrudo);
+
+    // Misma validación de forma que procesar-contenido: última barrera
+    // contra una inyección metida en el material antes de pisar el curso.
     const errorValidacion = validarCursoGenerado(cursoRegenerado);
     if (errorValidacion) {
       console.error('Curso regenerado con formato inválido:', errorValidacion, textoRespuesta);
-      return new Response(
-        JSON.stringify({ error: 'La IA devolvió un curso con un formato inesperado. Probá de nuevo.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return responder({ error: 'La IA devolvió un curso con un formato inesperado. Probá de nuevo.' }, 500);
     }
 
-    // Actualizamos el MISMO microcurso (nunca uno nuevo), y marcamos
-    // actualizado_at para que los empleados que ya lo completaron vean
-    // el aviso de contenido actualizado.
-    const { error: updateError } = await supabase
-      .from('microcursos')
-      .update({
-        titulo: cursoRegenerado.titulo,
-        duracion_min: cursoRegenerado.duracion_min || null,
-        preguntas: cursoRegenerado.preguntas || [],
-        actualizado_at: new Date().toISOString(),
-      })
-      .eq('id', microcursoId);
-
-    if (updateError) throw updateError;
-
-    // Reemplazamos los pasos: borramos los viejos e insertamos los nuevos.
-    await supabase.from('pasos').delete().eq('microcurso_id', microcursoId);
-
-    const pasosAInsertar = (cursoRegenerado.pasos || []).map((p: any, i: number) => ({
-      microcurso_id: microcursoId,
-      orden: i + 1,
+    const duracion = Number.isFinite(Number(cursoRegenerado.duracion_min))
+      ? Math.max(1, Math.round(Number(cursoRegenerado.duracion_min)))
+      : null;
+    const pasosNuevos = (cursoRegenerado.pasos || []).map((p: { titulo: string; contenido: string }) => ({
       titulo: p.titulo,
       contenido: p.contenido,
     }));
 
-    if (pasosAInsertar.length > 0) {
-      const { error: pasosError } = await supabase.from('pasos').insert(pasosAInsertar);
-      if (pasosError) throw pasosError;
-    }
-
-    // Guardamos el texto combinado como el nuevo "material original", así
-    // la próxima actualización sigue construyendo sobre todo lo acumulado.
-    if (contenidoOriginal) {
-      await supabase
-        .from('contenidos')
-        .update({ texto_procesado: textoCombinado })
-        .eq('id', contenidoOriginal.id);
-    }
-
-    return new Response(JSON.stringify({ ok: true, titulo: cursoRegenerado.titulo }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Reemplazo atómico (una sola transacción en la base): datos del
+    // curso + borrar pasos viejos + insertar los nuevos + marcar
+    // revision_con_cambios. Si algo falla, el curso queda como estaba.
+    // Antes se borraban los pasos y después se insertaban, y un insert
+    // fallido dejaba un curso sin pasos.
+    const { error: rpcError } = await supabase.rpc('reemplazar_contenido_curso', {
+      p_microcurso_id: microcursoId,
+      p_titulo: cursoRegenerado.titulo,
+      p_duracion_min: duracion,
+      p_preguntas: cursoRegenerado.preguntas || [],
+      p_pasos: pasosNuevos,
     });
+
+    if (rpcError) {
+      // Si la función SQL todavía no existe (no se corrió el SQL del
+      // 2026-09-24), usamos un reemplazo sin transacción pero seguro:
+      // primero insertamos los pasos nuevos y solo si salió bien borramos
+      // los viejos. Así nunca queda el curso sin pasos.
+      const noExiste = rpcError.code === 'PGRST202' || rpcError.code === '42883';
+      if (!noExiste) {
+        console.error('Error en reemplazar_contenido_curso:', rpcError);
+        return responder({ error: 'No se pudo guardar el curso actualizado. El curso quedó como estaba, probá de nuevo.' }, 500);
+      }
+      console.warn('reemplazar_contenido_curso no existe, uso el reemplazo sin transacción');
+      const fallo = await reemplazoSinTransaccion(supabase, microcursoId, cursoRegenerado, duracion, pasosNuevos);
+      if (fallo) {
+        console.error('Reemplazo sin transacción falló:', fallo);
+        return responder({ error: 'No se pudo guardar el curso actualizado. El curso quedó como estaba, probá de nuevo.' }, 500);
+      }
+    }
+
+    return responder({ ok: true, titulo: cursoRegenerado.titulo });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return responder({ error: 'Algo salió mal al actualizar el curso. Probá de nuevo.', detalle: String(err) }, 500);
   }
 });
+
+// Plan B cuando la función SQL no está instalada. Devuelve el error, o
+// null si salió todo bien.
+async function reemplazoSinTransaccion(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  microcursoId: string,
+  // deno-lint-ignore no-explicit-any
+  curso: any,
+  duracion: number | null,
+  pasosNuevos: { titulo: string; contenido: string }[]
+): Promise<unknown> {
+  const { data: viejos, error: viejosError } = await supabase
+    .from('pasos')
+    .select('id')
+    .eq('microcurso_id', microcursoId);
+  if (viejosError) return viejosError;
+
+  const { error: insertError } = await supabase.from('pasos').insert(
+    pasosNuevos.map((p, i) => ({ microcurso_id: microcursoId, orden: i + 1, titulo: p.titulo, contenido: p.contenido }))
+  );
+  if (insertError) return insertError;
+
+  const idsViejos = (viejos || []).map((p: { id: string }) => p.id);
+  if (idsViejos.length > 0) {
+    const { error: deleteError } = await supabase.from('pasos').delete().in('id', idsViejos);
+    if (deleteError) return deleteError;
+  }
+
+  const { error: updateError } = await supabase
+    .from('microcursos')
+    .update({
+      titulo: curso.titulo,
+      duracion_min: duracion,
+      preguntas: curso.preguntas || [],
+      actualizado_at: new Date().toISOString(),
+    })
+    .eq('id', microcursoId);
+  return updateError || null;
+}

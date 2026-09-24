@@ -65,20 +65,14 @@ export function validarCursoGenerado(obj: unknown): string | null {
     if (!paso || typeof paso.titulo !== 'string' || typeof paso.contenido !== 'string') {
       return 'Un paso generado tiene un formato inválido.';
     }
-    // 2026-08-26: el tope de paso.contenido era 6000 caracteres. La
-    // instrucción le pide a Claude 200-280 palabras "no negociables" por
-    // paso, pero eso es un PISO, no un techo — con material rico (por
-    // ejemplo un audio transcripto largo), un paso bien desarrollado con
-    // ejemplos y listas con guiones supera fácil los 6000 caracteres
-    // estando perfectamente bien, y este validador lo rechazaba igual,
-    // disfrazado de "no se pudo generar el curso" (bug real reportado por
-    // Roberto: dejó de poder generar cursos justo después de que se
-    // agregó este validador). Subido a un techo mucho más generoso
-    // (20000 caracteres, ~3000-3500 palabras) que sigue funcionando como
-    // barrera de seguridad real (una respuesta desviada por una
-    // inyección se nota por tener una FORMA distinta — más o menos
-    // pasos/preguntas, campos faltantes, tipos incorrectos — no por
-    // quedar un poco más larga de lo pedido).
+    // 2026-08-26: el tope de paso.contenido era 6000 caracteres y
+    // rechazaba pasos largos pero correctos (material rico, como un audio
+    // transcripto largo). Techo generoso de 20000 caracteres: sigue
+    // sirviendo como barrera, porque una respuesta desviada por una
+    // inyección se nota por la FORMA (más o menos pasos, campos que
+    // faltan, tipos incorrectos), no por quedar un poco más larga.
+    // 2026-09-24: el prompt ya no pide un mínimo de palabras por paso
+    // (forzaba relleno cuando el material era corto).
     if (paso.titulo.length > 200 || paso.contenido.length > 20000) {
       return 'Un paso generado quedó con un largo fuera de lo esperado.';
     }
@@ -135,4 +129,132 @@ export function validarProcedimientoGenerado(obj: unknown): string | null {
     }
   }
   return null;
+}
+
+
+// ---------------------------------------------------------------------
+// Utilidades compartidas para las tres funciones que generan contenido
+// con IA (procesar-contenido, actualizar-curso-ia, generar-procedimiento).
+// ---------------------------------------------------------------------
+
+// Tope de largo del material que le mandamos a la IA. Con más que esto la
+// respuesta (5 pasos + 5 preguntas) no entra en el máximo de tokens de
+// salida, o la llamada tarda tanto que se corta. Mejor avisarle al dueño
+// antes que gastar la llamada y fallar igual.
+export const MAX_MATERIAL_CARACTERES = 40_000;
+
+export const MENSAJE_MATERIAL_MUY_LARGO =
+  'El contenido es muy largo, dividilo en partes. Cada parte puede tener hasta 40.000 caracteres (unas 12 carillas).';
+
+// Mismo mensaje cuando la IA se quedó sin espacio para terminar la
+// respuesta (stop_reason = max_tokens): el JSON quedaría cortado.
+export const MENSAJE_RESPUESTA_CORTADA = 'El contenido es muy largo, dividilo en partes y probá de nuevo.';
+
+// Reglas de estilo que comparten los prompts de cursos, actualizaciones y
+// procedimientos. Están acá para que las tres funciones escriban igual.
+export const REGLAS_DE_ESTILO = `Reglas de estilo (obligatorias, en todo el texto que generes):
+- Escribí siempre en español rioplatense con voseo: "tenés", "fijate", "avisá", "revisá", "contá". Nunca uses tú ("tienes", "revisa") ni usted ("tiene", "revise").
+- Tono: como lo explicaría un compañero con experiencia a alguien que recién arranca. Claro, directo y cercano, sin sonar a manual ni a trámite.
+- No uses rayas ni guiones largos (— o –) en ningún lado. Para separar ideas usá comas, puntos o dos puntos.
+- Nada de frases de relleno ni de lenguaje corporativo, por ejemplo "es importante destacar", "cabe mencionar", "en este sentido", "a continuación", "sin lugar a dudas", "de manera eficiente", "brindar una experiencia". Andá directo a lo concreto.
+- Títulos en formato oración: solo la primera letra en mayúscula (y los nombres propios). Ejemplo: "Cómo abrir la caja", no "Cómo Abrir La Caja".
+- Nunca inventes datos concretos del negocio: nombres de personas, marcas, precios, montos, horarios, días, plazos, políticas internas, leyes o normas. Si no están en el material, no los pongas. Si hace falta referirse a alguien, usá algo genérico como "tu encargado" o "el responsable del turno".
+- Los ejemplos tienen que ser genéricos y creíbles para cualquier comercio chico, sin datos inventados.
+- Si el material es corto, escribí menos. Es mejor un texto breve y claro que uno largo y relleno.`;
+
+// Saca el JSON de la respuesta de la IA aunque venga envuelto en ```json
+// ... ``` o con algún texto antes o después. Devuelve null si no hay
+// ningún JSON válido.
+export function extraerJson(texto: string): unknown | null {
+  const sinCercos = (texto || '').replace(/```(?:json)?/gi, '').trim();
+  try {
+    return JSON.parse(sinCercos);
+  } catch {
+    // seguimos con el plan B
+  }
+  // Plan B: el primer bloque {...} balanceado (respetando strings).
+  const inicio = sinCercos.indexOf('{');
+  if (inicio === -1) return null;
+  let profundidad = 0;
+  let enString = false;
+  let escapado = false;
+  for (let i = inicio; i < sinCercos.length; i++) {
+    const ch = sinCercos[i];
+    if (enString) {
+      if (escapado) escapado = false;
+      else if (ch === '\\') escapado = true;
+      else if (ch === '"') enString = false;
+      continue;
+    }
+    if (ch === '"') enString = true;
+    else if (ch === '{') profundidad++;
+    else if (ch === '}') {
+      profundidad--;
+      if (profundidad === 0) {
+        try {
+          return JSON.parse(sinCercos.slice(inicio, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Reemplaza rayas (—) y guiones medios (–) por comas en un texto. El
+// prompt ya lo pide, pero el modelo a veces igual los usa. Entre dos
+// números (rangos tipo "9–18") se usa "a" para que siga leyéndose bien.
+export function sacarRayas(texto: string): string {
+  return texto
+    .replace(/(\d)\s*[\u2013\u2014]\s*(\d)/g, '$1 a $2')
+    .replace(/[ \t]*[\u2013\u2014][ \t]*/g, ', ')
+    .replace(/^, /gm, '')
+    .replace(/,\s*,/g, ',')
+    .replace(/, ([.,;:!?)])/g, '$1')
+    .replace(/, $/gm, '');
+}
+
+// Aplica sacarRayas a todos los strings de un objeto/array (recursivo).
+export function sacarRayasDeTodo<T>(valor: T): T {
+  if (typeof valor === 'string') return sacarRayas(valor) as unknown as T;
+  if (Array.isArray(valor)) return valor.map((v) => sacarRayasDeTodo(v)) as unknown as T;
+  if (valor && typeof valor === 'object') {
+    const salida: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(valor as Record<string, unknown>)) salida[k] = sacarRayasDeTodo(v);
+    return salida as T;
+  }
+  return valor;
+}
+
+// Instrucciones para armar un curso (procesar-contenido y
+// actualizar-curso-ia usan las mismas, así los dos escriben igual).
+// reglaExtra se suma al final de las reglas de contenido.
+export function instruccionesCurso(reglaExtra = ''): string {
+  return `${AVISO_MATERIAL_NO_CONFIABLE}
+
+Convertí el material de capacitación de un comercio que te van a pasar en un curso para un empleado nuevo. Tiene que servir para aprender de verdad (no un resumen de dos líneas), pero sin estirar el texto de más.
+
+Estructura obligatoria, siempre 5 pasos, en este orden:
+1. Por qué importa: por qué este tema es relevante para el puesto. Si el material menciona una norma, ley o estándar, citala tal cual aparece; si no menciona ninguna, explicá el motivo práctico, sin inventar normas.
+2 a 4. Desarrollo práctico: el contenido concreto dividido en 3 pasos coherentes (por proceso, por situación o por tipo de tarea, lo que tenga más sentido para el material).
+5. Qué hacer cuando algo sale mal o hay dudas. Cerrá con una idea final que resuma lo central del curso.
+
+Reglas de contenido:
+- El largo de cada paso depende de cuánto material hay. Con material rico, cada paso puede tener unas 150 a 250 palabras; con material corto, alcanza con pocas oraciones claras. No rellenes para llegar a un largo.
+- Explicá el porqué de cada cosa, no solo el qué. Sumá un ejemplo de una situación típica del día a día cuando ayude a entender, sin inventar datos concretos del negocio.
+- Si dentro de un paso hay una lista de reglas, pasos a seguir o ítems puntuales, escribilos como líneas separadas por salto de línea, cada una arrancando con "- ". Si es una explicación corrida, escribila como párrafo normal. Podés combinar: un párrafo de contexto y después una lista.
+- Hablale al empleado de vos, en segunda persona.
+- Exactamente 5 preguntas de opción múltiple (3 opciones cada una), una por cada paso, que evalúen lo central de ESE paso, no detalles menores. Las opciones incorrectas tienen que ser creíbles, no absurdas.
+- No agregues información que no esté en el material: ni datos, ni cifras, ni nombres, ni horarios, ni normas.${reglaExtra ? `\n${reglaExtra}` : ''}
+
+${REGLAS_DE_ESTILO}
+
+Respondé ÚNICAMENTE con un JSON válido, sin texto antes ni después, con esta forma exacta:
+{
+  "titulo": "string corto para el curso, en formato oración",
+  "duracion_min": número estimado de minutos de lectura,
+  "pasos": [{"titulo": "string", "contenido": "string"}],
+  "preguntas": [{"pregunta": "string", "opciones": ["string","string","string"], "correcta": índice 0/1/2 de la correcta}]
+}`;
 }

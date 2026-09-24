@@ -5,7 +5,7 @@ import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
 import SuscripcionRequeridaModal from '../components/SuscripcionRequeridaModal';
 import { tieneAccesoBase } from '../lib/acceso';
-import { capitalizarPalabras } from '../lib/texto';
+import { capitalizarPalabras, capitalizarPrimeraLetra } from '../lib/texto';
 
 // Mismo catálogo que usa Empleados.jsx / Contenido.jsx para el campo
 // "puesto" — se duplica acá porque son archivos separados sin un módulo
@@ -137,43 +137,84 @@ const NOMBRE_PERIODICIDAD = { diario: 'Diario', semanal: 'Semanal', mensual: 'Me
 // para que el número diga algo sin ir a buscar años de historial.
 const VENTANA_METRICAS = { diario: 30, semanal: 12, mensual: 6 };
 
-// El "ancla" del período al que pertenece una fecha dada, según la
-// periodicidad del checklist: el día exacto si es diario, el lunes de
-// esa semana si es semanal, o el día 1 del mes si es mensual. Mismo
-// criterio que usa empleado-checklist del lado del servidor — checklist_runs.fecha
-// se sigue usando tal cual, solo cambia qué representa.
-function fechaAncla(periodicidad, base) {
+// Fecha de hoy (o de cualquier instante) en Argentina, como YYYY-MM-DD.
+// Antes se usaba toISOString(), que da la fecha en UTC: de 21 a 24 hs
+// de Argentina ya era "mañana" y el checklist aparecía pendiente de nuevo.
+// 'en-CA' se usa solo porque formatea justo como YYYY-MM-DD.
+const ZONA_ARGENTINA = 'America/Argentina/Buenos_Aires';
+function fechaLocalArgentina(instante) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_ARGENTINA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(instante);
+}
+
+// Convierte "YYYY-MM-DD" en un Date a medianoche UTC de ese día, solo
+// para hacer cuentas de calendario (sumar días, ver qué día de la semana
+// es) sin que la zona horaria del navegador mueva la fecha.
+function diaCalendario(ymd) {
+  return new Date(`${ymd}T00:00:00Z`);
+}
+
+// El "ancla" del período al que pertenece un día (YYYY-MM-DD de
+// Argentina), según la periodicidad del checklist: el día exacto si es
+// diario, el lunes de esa semana si es semanal, o el día 1 del mes si es
+// mensual. Mismo criterio que usa empleado-checklist del lado del
+// servidor, que también calcula con la fecha de Argentina.
+function fechaAncla(periodicidad, ymd) {
   if (periodicidad === 'semanal') {
+    const base = diaCalendario(ymd);
     const dia = base.getUTCDay(); // 0 = domingo
     const diff = (dia === 0 ? -6 : 1) - dia;
-    const lunes = new Date(base);
-    lunes.setUTCDate(base.getUTCDate() + diff);
-    return lunes.toISOString().slice(0, 10);
+    base.setUTCDate(base.getUTCDate() + diff);
+    return base.toISOString().slice(0, 10);
   }
   if (periodicidad === 'mensual') {
-    return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    return `${ymd.slice(0, 7)}-01`;
   }
-  return base.toISOString().slice(0, 10);
+  return ymd;
 }
 
 function anclaActual(periodicidad) {
-  return fechaAncla(periodicidad, new Date());
+  return fechaAncla(periodicidad, fechaLocalArgentina(new Date()));
 }
 
 // Las anclas de los últimos N períodos (el actual incluido), de más
-// reciente a más viejo — para calcular el % de cumplimiento contra el
+// reciente a más viejo, para calcular el % de cumplimiento contra el
 // historial real.
 function anclasRecientes(periodicidad, cantidad) {
-  const hoy = new Date();
+  const hoy = fechaLocalArgentina(new Date());
   const anclas = [];
   for (let i = 0; i < cantidad; i++) {
-    const base = new Date(hoy);
-    if (periodicidad === 'semanal') base.setUTCDate(hoy.getUTCDate() - i * 7);
-    else if (periodicidad === 'mensual') base.setUTCMonth(hoy.getUTCMonth() - i);
-    else base.setUTCDate(hoy.getUTCDate() - i);
-    anclas.push(fechaAncla(periodicidad, base));
+    const base = diaCalendario(hoy);
+    if (periodicidad === 'semanal') base.setUTCDate(base.getUTCDate() - i * 7);
+    else if (periodicidad === 'mensual') {
+      // Día 1 antes de restar meses: si hoy es 31, restar un mes a un 31
+      // salta de mes (31 de marzo - 1 mes = 3 de marzo).
+      base.setUTCDate(1);
+      base.setUTCMonth(base.getUTCMonth() - i);
+    } else base.setUTCDate(base.getUTCDate() - i);
+    anclas.push(fechaAncla(periodicidad, base.toISOString().slice(0, 10)));
   }
   return anclas;
+}
+
+// Supabase devuelve como máximo 1000 filas por pedido. Con un checklist
+// diario y un par de años de uso se pasa ese número, y el historial y el
+// % de cumplimiento quedaban calculados con datos cortados. Esto pide de
+// a páginas hasta traer todo. armarQuery tiene que devolver una query
+// nueva cada vez (con su orden fijo, para que las páginas no se pisen).
+const TAMANIO_PAGINA = 1000;
+async function traerTodasLasFilas(armarQuery) {
+  const filas = [];
+  for (let desde = 0; ; desde += TAMANIO_PAGINA) {
+    const { data, error } = await armarQuery().range(desde, desde + TAMANIO_PAGINA - 1);
+    if (error) return { data: filas, error };
+    filas.push(...(data || []));
+    if (!data || data.length < TAMANIO_PAGINA) return { data: filas, error: null };
+  }
 }
 
 function resumenPuestos(puestos) {
@@ -220,6 +261,12 @@ export default function Checklists({ session }) {
   const [periodicidadEdit, setPeriodicidadEdit] = useState('diario');
   const [puestosEdit, setPuestosEdit] = useState(['TODOS']);
   const [guardando, setGuardando] = useState(false);
+
+  // Antes, si algo fallaba al guardar, pausar o eliminar, solo quedaba en
+  // la consola del navegador y el dueño no se enteraba. errorGeneral se
+  // muestra arriba de todo; errorFormulario, adentro del formulario abierto.
+  const [errorGeneral, setErrorGeneral] = useState(null);
+  const [errorFormulario, setErrorFormulario] = useState(null);
 
   // Bloqueo completo de la sección cuando no hay acceso (2026-09-05, a
   // pedido de Roberto): a diferencia del resto de la app, Checklists no
@@ -268,11 +315,20 @@ export default function Checklists({ session }) {
         // Se trae TODO el historial (no solo el período actual): hace
         // falta para la lista de "ver historial" y para calcular el %
         // de cumplimiento de cada checklist.
-        const { data: runsData } = await supabase
-          .from('checklist_runs')
-          .select('checklist_id, fecha, empleado_nombre')
-          .in('checklist_id', listas.map((c) => c.id))
-          .order('fecha', { ascending: false });
+        const idsChecklists = listas.map((c) => c.id);
+        const { data: runsData, error: runsError } = await traerTodasLasFilas(() =>
+          supabase
+            .from('checklist_runs')
+            .select('checklist_id, fecha, empleado_nombre')
+            .in('checklist_id', idsChecklists)
+            .order('fecha', { ascending: false })
+            .order('checklist_id', { ascending: true })
+            .order('empleado_nombre', { ascending: true })
+        );
+        if (runsError) {
+          console.error(runsError);
+          setErrorGeneral('No se pudo cargar el historial de los checklists. Recargá la página para probar de nuevo.');
+        }
 
         const mapa = {};
         (runsData || []).forEach((r) => {
@@ -297,8 +353,10 @@ export default function Checklists({ session }) {
     setCambiandoActivacion(false);
     if (error) {
       console.error(error);
+      setErrorGeneral('No se pudieron activar los checklists. Probá de nuevo.');
       return;
     }
+    setErrorGeneral(null);
     setCuenta({ ...cuenta, checklists_habilitado: true });
   }
 
@@ -312,12 +370,15 @@ export default function Checklists({ session }) {
     setCambiandoActivacion(false);
     if (error) {
       console.error(error);
+      setErrorGeneral('No se pudieron desactivar los checklists. Probá de nuevo.');
       return;
     }
+    setErrorGeneral(null);
     setCuenta({ ...cuenta, checklists_habilitado: false });
   }
 
   function cerrarEdicion() {
+    setErrorFormulario(null);
     setEditandoChecklistId(null);
     setAgregandoNegocioId(null);
   }
@@ -353,7 +414,7 @@ export default function Checklists({ session }) {
 
   function agregarItem() {
     if (!nuevoItem.trim()) return;
-    setItemsEdit([...itemsEdit, capitalizarPalabras(nuevoItem.trim())]);
+    setItemsEdit([...itemsEdit, capitalizarPrimeraLetra(nuevoItem.trim())]);
     setNuevoItem('');
   }
 
@@ -362,17 +423,21 @@ export default function Checklists({ session }) {
   }
 
   // Reemplaza todos los ítems en vez de calcular un diff ítem por ítem:
-  // la lista siempre es corta (una checklist diaria, no un documento
-  // largo como en Contenido/Procedimientos), así que no vale la pena la
-  // complejidad extra.
+  // la lista siempre es corta, así que no vale la pena la complejidad.
+  // El orden importa: primero se insertan los ítems nuevos y recién si
+  // eso salió bien se borran los viejos. Antes se borraban primero, y si
+  // el insert fallaba el checklist quedaba vacío.
   async function guardarChecklist(negocio, checklistExistente) {
     if (!tituloEdit.trim() || itemsEdit.length === 0 || puestosEdit.length === 0) return;
     setGuardando(true);
+    setErrorFormulario(null);
 
+    const mensajeError = 'No se pudo guardar el checklist. Revisá tu conexión y probá de nuevo.';
     let checklistId = checklistExistente?.id;
+    const idsItemsViejos = (checklistExistente?.checklist_items || []).map((i) => i.id);
 
     if (checklistId) {
-      await supabase
+      const { error } = await supabase
         .from('checklists')
         .update({
           titulo: capitalizarPalabras(tituloEdit.trim()),
@@ -380,7 +445,12 @@ export default function Checklists({ session }) {
           periodicidad: periodicidadEdit,
         })
         .eq('id', checklistId);
-      await supabase.from('checklist_items').delete().eq('checklist_id', checklistId);
+      if (error) {
+        console.error(error);
+        setErrorFormulario(mensajeError);
+        setGuardando(false);
+        return;
+      }
     } else {
       const { data: nuevo, error } = await supabase
         .from('checklists')
@@ -395,6 +465,7 @@ export default function Checklists({ session }) {
         .single();
       if (error || !nuevo) {
         console.error(error);
+        setErrorFormulario(mensajeError);
         setGuardando(false);
         return;
       }
@@ -402,8 +473,35 @@ export default function Checklists({ session }) {
     }
 
     const itemsAInsertar = itemsEdit.map((texto, orden) => ({ checklist_id: checklistId, texto, orden }));
-    const { error: itemsError } = await supabase.from('checklist_items').insert(itemsAInsertar);
-    if (itemsError) console.error(itemsError);
+    const { data: insertados, error: itemsError } = await supabase
+      .from('checklist_items')
+      .insert(itemsAInsertar)
+      .select('id');
+    if (itemsError) {
+      // Los ítems viejos siguen intactos: el checklist no queda vacío.
+      console.error(itemsError);
+      setErrorFormulario(mensajeError);
+      setGuardando(false);
+      await cargarTodo();
+      return;
+    }
+
+    if (idsItemsViejos.length > 0) {
+      const { error: borrarError } = await supabase.from('checklist_items').delete().in('id', idsItemsViejos);
+      if (borrarError) {
+        // Si no se pudieron sacar los viejos, deshacemos los nuevos para
+        // que no quede cada ítem repetido dos veces.
+        console.error(borrarError);
+        const idsNuevos = (insertados || []).map((i) => i.id);
+        if (idsNuevos.length > 0) {
+          await supabase.from('checklist_items').delete().in('id', idsNuevos);
+        }
+        setErrorFormulario(mensajeError);
+        setGuardando(false);
+        await cargarTodo();
+        return;
+      }
+    }
 
     setGuardando(false);
     cerrarEdicion();
@@ -415,8 +513,10 @@ export default function Checklists({ session }) {
     const { error } = await supabase.from('checklists').delete().eq('id', checklistId);
     if (error) {
       console.error(error);
+      setErrorGeneral('No se pudo eliminar el checklist. Probá de nuevo.');
       return;
     }
+    setErrorGeneral(null);
     await cargarTodo();
   }
 
@@ -427,15 +527,24 @@ export default function Checklists({ session }) {
       .eq('id', checklist.id);
     if (error) {
       console.error(error);
+      setErrorGeneral(
+        checklist.activo
+          ? 'No se pudo pausar el checklist. Probá de nuevo.'
+          : 'No se pudo reactivar el checklist. Probá de nuevo.'
+      );
       return;
     }
+    setErrorGeneral(null);
     await cargarTodo();
   }
 
   // Formulario de alta/edición, compartido entre "editar uno que ya
-  // existe" y "crear uno nuevo para esta sucursal" — es el mismo bloque
+  // existe" y "crear uno nuevo para esta sucursal": es el mismo bloque
   // en los dos casos, solo cambia a qué checklist (o negocio, si es
-  // nuevo) se le aplica al guardar.
+  // nuevo) se le aplica al guardar. Se llama como función y no como
+  // <FormularioChecklist />: al estar definido adentro del componente,
+  // como etiqueta React lo desmontaba en cada tecla y el input perdía
+  // el foco después de cada letra.
   function FormularioChecklist({ negocio, checklistExistente }) {
     return (
       <div className="space-y-3 border-t border-[#EDE0C8] pt-3 mt-2">
@@ -470,7 +579,7 @@ export default function Checklists({ session }) {
 
         <div>
           <p className="text-xs font-semibold text-[#6b6455] mb-1.5">
-            ¿A qué puestos aplica? (Ctrl/Cmd para elegir varios)
+            ¿A qué puestos aplica? (en la compu, con Ctrl apretado elegís varios)
           </p>
           <SelectorPuestos seleccionados={puestosEdit} onChange={manejarSeleccionPuestos(setPuestosEdit)} />
         </div>
@@ -519,6 +628,10 @@ export default function Checklists({ session }) {
             Agregar
           </button>
         </div>
+
+        {errorFormulario && (
+          <p className="text-xs font-semibold text-[#C1502E]">{errorFormulario}</p>
+        )}
 
         <div className="flex flex-wrap gap-2 pt-1">
           <button
@@ -648,11 +761,10 @@ export default function Checklists({ session }) {
             que sigue (activar/desactivar, armar y ver checklists). */}
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
           <p className="mb-3">
-            <strong>Checklists operativos</strong>: funcionalidad adicional a la capacitación. Tu
-            equipo puede tener tareas que se repiten y vos ves desde acá quién las completó. Podés
-            armar más de un checklist por sucursal, elegir si es diario, semanal o mensual, y a
-            qué puestos le aplica cada uno — por ejemplo, que "Cierre de caja" solo lo vea el
-            cajero.
+            <strong>Checklists</strong>: es un extra, aparte de los cursos. Tu equipo marca desde
+            el celular las tareas que se repiten y vos ves desde acá quién las hizo. Podés armar
+            más de un checklist por sucursal, elegir si es diario, semanal o mensual y a qué
+            puestos le aplica cada uno. Por ejemplo, que "Cierre de caja" solo lo vea el cajero.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {['Apertura', 'Cierre', 'Limpieza', 'Caja'].map((ejemplo) => (
@@ -666,9 +778,15 @@ export default function Checklists({ session }) {
           </div>
         </div>
 
+        {errorGeneral && (
+          <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm font-semibold text-[#C1502E]">
+            {errorGeneral}
+          </div>
+        )}
+
         {!hasAccess ? (
           <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-4 text-sm text-[#6b6455] flex items-center justify-between gap-3 flex-wrap">
-            <span>Necesitás una suscripción activa para usar los checklists operativos.</span>
+            <span>Necesitás una suscripción activa para usar los checklists.</span>
             <button
               type="button"
               onClick={() => setMostrarSuscripcion(true)}
@@ -685,7 +803,7 @@ export default function Checklists({ session }) {
                 confirmandoDesactivar ? (
                   <div className="w-full bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
                     <p className="font-semibold text-[#2C2C2A]">
-                      ¿Desactivar los checklists operativos? Los que ya armaste no se borran, solo
+                      ¿Desactivar los checklists? Los que ya armaste no se borran, solo
                       dejan de verse hasta que los actives de nuevo.
                     </p>
                     <div className="flex gap-2">
@@ -857,7 +975,7 @@ export default function Checklists({ session }) {
                               </>
                             )}
 
-                            {editando && <FormularioChecklist negocio={negocio} checklistExistente={checklist} />}
+                            {editando && FormularioChecklist({ negocio, checklistExistente: checklist })}
                           </div>
                         );
                       })}
@@ -876,7 +994,7 @@ export default function Checklists({ session }) {
                       </button>
                     )}
 
-                    {agregandoAca && <FormularioChecklist negocio={negocio} checklistExistente={null} />}
+                    {agregandoAca && FormularioChecklist({ negocio, checklistExistente: null })}
                   </div>
                 );
               })}

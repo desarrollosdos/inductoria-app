@@ -143,15 +143,15 @@ export default function Configuracion({ session }) {
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
           <h1 className="text-lg font-bold tracking-wide text-[#2C2C2A] mb-1">Configuración</h1>
           <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">
-            Elegí qué funciones aparecen en tu menú. Vienen todas activadas; si tu negocio no usa
-            alguna, la desactivás acá y desaparece del menú hasta que la vuelvas a activar.
+            Elegí qué secciones usás. Vienen todas activadas. Si tu negocio no usa alguna,
+            desactivala acá: sale del menú y queda apagada hasta que la vuelvas a activar.
           </p>
         </div>
 
         {SECCIONES.map(({ id, campo, label, Icon, texto }) => (
           <div
             key={id}
-            className="bg-white rounded-2xl border border-[#EFDDCE] p-6 flex items-start justify-between gap-4"
+            className="bg-white rounded-2xl border border-[#EFDDCE] p-4 sm:p-6 flex items-start justify-between gap-3 sm:gap-4"
           >
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-[#EDE0C8] text-[#C1502E] flex items-center justify-center flex-shrink-0">

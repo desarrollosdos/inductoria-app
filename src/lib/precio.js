@@ -6,6 +6,16 @@
 // por ejemplo "2 a 4 sucursales" siempre sale un 83,3% del precio base
 // por sucursal, sea cual sea el precio base actual.
 
+// Precio base (1 sucursal) que se usa si todavía no se pudo leer
+// configuracion_precio. Tiene que ser el mismo número que usan como
+// valor por defecto precio-publico (la landing), crear-suscripcion y
+// agregar-sucursal-plan, para que nunca se muestre un precio y se cobre
+// otro. Si cambia, hay que cambiarlo en esos tres lugares también.
+export const PRECIO_BASE_POR_DEFECTO = 12000;
+
+// Mismas proporciones copiadas en crear-suscripcion y
+// agregar-sucursal-plan (las Edge Functions no pueden importar este
+// archivo).
 export const TIERS_PRECIO = [
   { hasta: 1, factor: 12000 / 12000, etiqueta: '1 sucursal' },
   { hasta: 4, factor: 10000 / 12000, etiqueta: '2 a 4 sucursales' },

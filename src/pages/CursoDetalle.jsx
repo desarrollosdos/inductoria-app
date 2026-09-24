@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { generarCertificadoPDF } from '../lib/certificado';
 import { esCursoSeguridadEHigiene, BadgeCursoImg, BadgeEspecialImg } from '../components/Badges';
-import PinGate from '../components/PinGate';
+import PinGate, { usePinEmpleado } from '../components/PinGate';
 
 // Si el contenido del paso viene en varias líneas (cosas puntuales), se
 // muestra como lista con viñetas, mucho más práctico de leer que un
@@ -27,14 +27,20 @@ function ContenidoPaso({ texto }) {
   return <p className="text-[15px] text-[#2C2C2A] font-medium leading-relaxed">{texto}</p>;
 }
 
-// Clave de localStorage para recordar que este empleado ya terminó este
-// curso puntual. Antes, si terminaba el curso y por error (o a propósito)
-// hacía refresh en la pantalla de resultado, "resultado" volvía a null y
-// lo mandaba a rehacer el curso de cero — nada le avisaba que ya lo había
-// completado. Guardando el resultado acá, un refresh restaura esa misma
-// pantalla en vez de reiniciar el curso.
-function claveResultado(token, microcursoId) {
+// Clave de localStorage que se usaba antes para recordar el resultado de
+// un curso en este navegador. 2026-09-24: ya no se usa (el servidor manda
+// el progreso de la versión actual, y un resultado guardado acá podía ser
+// de una versión vieja del curso). Solo se borra si quedó de antes.
+function claveResultadoViejo(token, microcursoId) {
   return `inductoria-resultado:${token}:${microcursoId}`;
+}
+
+function borrarResultadoViejo(token, microcursoId) {
+  try {
+    localStorage.removeItem(claveResultadoViejo(token, microcursoId));
+  } catch {
+    // no-op
+  }
 }
 
 // Título del curso: siempre se muestra completo. Se achica con el ancho
@@ -58,8 +64,9 @@ function TituloCurso({ titulo, className = '' }) {
 
 function CursoDetalleInterno() {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
   const microcursoId = params.get('curso');
+  // token + PIN los maneja PinGate (fetchEmpleado los manda solos).
+  const { token, fetchEmpleado } = usePinEmpleado();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -69,6 +76,7 @@ function CursoDetalleInterno() {
   const [enEvaluacion, setEnEvaluacion] = useState(false);
   const [respuestas, setRespuestas] = useState([]);
   const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState(null);
   const [resultado, setResultado] = useState(null);
 
   const [acuseChecked, setAcuseChecked] = useState(false);
@@ -83,43 +91,38 @@ function CursoDetalleInterno() {
   const [errorChat, setErrorChat] = useState(null);
   const [preguntasRestantes, setPreguntasRestantes] = useState(null);
 
+  // Datos de Mi perfil (nombre para el certificado, y si la cuenta tiene
+  // el chat de dudas con IA). null mientras carga; 'error' si no se pudo.
   const [datosEmpleado, setDatosEmpleado] = useState(null);
   const [generandoCertificado, setGenerandoCertificado] = useState(false);
 
   useEffect(() => {
-    if (!token || !microcursoId) {
+    if (!microcursoId) {
       setError('Falta información en el link.');
       setLoading(false);
       return;
     }
 
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    let cancelado = false;
+    borrarResultadoViejo(token, microcursoId);
 
-    fetch(
-      `${base}/functions/v1/empleado-curso?token=${encodeURIComponent(token)}&microcurso_id=${encodeURIComponent(
-        microcursoId
-      )}`,
-      { headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey } }
-    )
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
+    fetchEmpleado('empleado-curso', { query: { microcurso_id: microcursoId } })
+      .then(({ ok, data, pinInvalido }) => {
+        if (cancelado || pinInvalido) return;
         if (!ok) {
           setError(data.error || 'No se pudo cargar el curso.');
           return;
         }
         setCurso(data);
-        setRespuestas(new Array(data.preguntas.length).fill(null));
+        setRespuestas(new Array((data.preguntas || []).length).fill(null));
 
-        // El servidor ahora es la fuente de verdad del progreso de este
-        // empleado en este curso puntual (viene de progreso_empleado). Si
-        // ya lo completó alguna vez —apruebe o no, y sin importar desde
-        // qué dispositivo o navegador— reconstruimos acá la pantalla de
-        // resultado. Esto es lo que permite volver a entrar en cualquier
-        // momento, por ejemplo para terminar de confirmar un acuse de
-        // recibido pendiente o volver a descargar el certificado, en vez
-        // de depender de que el resultado siga guardado en el localStorage
-        // de ese mismo navegador.
+        // El servidor es la fuente de verdad del progreso de este empleado
+        // en la versión ACTUAL del curso (una fila por versión en
+        // progreso_empleado). Si ya la rindió (apruebe o no, desde
+        // cualquier dispositivo) reconstruimos acá la pantalla de
+        // resultado; eso permite volver a entrar para confirmar un acuse
+        // pendiente o bajar el certificado. Si solo completó una versión
+        // anterior, `progreso` viene null y se muestra el curso nuevo.
         if (data.progreso) {
           setResultado({
             puntaje: data.progreso.puntaje,
@@ -131,98 +134,95 @@ function CursoDetalleInterno() {
           if (data.progreso.acuse_confirmado_at) {
             setAcuseFecha(data.progreso.acuse_confirmado_at);
           }
-        } else {
-          // Fallback de compatibilidad: un resultado guardado en
-          // localStorage de antes de este cambio, o de un instante en que
-          // el registro en el servidor todavía no se haya terminado de
-          // escribir.
-          try {
-            const guardado = localStorage.getItem(claveResultado(token, microcursoId));
-            if (guardado) setResultado(JSON.parse(guardado));
-          } catch {
-            // localStorage puede fallar (modo privado, cuota llena, etc.) —
-            // en el peor caso el empleado ve el curso de nuevo, no es grave.
-          }
         }
       })
-      .catch(() => setError('No se pudo cargar el curso.'))
-      .finally(() => setLoading(false));
-  }, [token, microcursoId]);
+      .catch(() => {
+        if (!cancelado) setError('No se pudo cargar el curso. Revisá tu conexión y probá de nuevo.');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
 
-  useEffect(() => {
-    if (!resultado || !token) return;
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // En paralelo: nombre del empleado (certificado) y si hay chat de IA.
+    fetchEmpleado('empleado-info')
+      .then(({ ok, data, pinInvalido }) => {
+        if (cancelado || pinInvalido) return;
+        setDatosEmpleado(ok ? data : 'error');
+      })
+      .catch(() => {
+        if (!cancelado) setDatosEmpleado('error');
+      });
 
-    fetch(`${base}/functions/v1/empleado-info?token=${encodeURIComponent(token)}`, {
-      headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey },
-    })
-      .then((res) => res.json())
-      .then((data) => setDatosEmpleado(data))
-      .catch(() => {});
-  }, [resultado, token]);
+    return () => {
+      cancelado = true;
+    };
+  }, [token, microcursoId, fetchEmpleado]);
+
+  const nombreEmpleado = datosEmpleado && datosEmpleado !== 'error' ? datosEmpleado.empleado?.nombre : null;
+  const iaDisponible = !!(datosEmpleado && datosEmpleado !== 'error' && datosEmpleado.ia_disponible);
 
   function handleDescargarCertificado() {
-    if (!resultado || !curso) return;
+    // Sin el nombre real no se genera: antes salía "Empleado" si los
+    // datos todavía no habían llegado.
+    if (!resultado || !curso || !nombreEmpleado) return;
     setGenerandoCertificado(true);
 
-    generarCertificadoPDF({
-      nombreEmpleado: datosEmpleado?.empleado?.nombre || 'Empleado',
-      negocioNombre: datosEmpleado?.negocio?.nombre || '',
-      tituloCurso: curso.titulo,
-      puntaje: resultado.puntaje,
-      fechaCompletado: new Date().toISOString(),
-    });
-
-    setGenerandoCertificado(false);
+    try {
+      generarCertificadoPDF({
+        nombreEmpleado,
+        negocioNombre: datosEmpleado?.negocio?.nombre || '',
+        tituloCurso: curso.titulo,
+        puntaje: resultado.puntaje,
+        // Fecha en que aprobó (viene del servidor), no la de hoy.
+        fechaCompletado: resultado.fecha_completado,
+      });
+    } finally {
+      setGenerandoCertificado(false);
+    }
   }
 
   async function handleEnviarEvaluacion() {
+    if (enviando) return;
     setEnviando(true);
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    setErrorEnvio(null);
 
-    const res = await fetch(`${base}/functions/v1/empleado-completar-curso`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token, microcurso_id: microcursoId, respuestas }),
-    });
-    const data = await res.json();
-    setEnviando(false);
-
-    if (!res.ok) {
-      setError(data.error || 'No se pudo guardar tu resultado.');
-      return;
-    }
-    // El endpoint no manda fecha_completado (no la necesita para calificar),
-    // así que la completamos acá mismo con el mismo criterio que usa el
-    // servidor: solo si aprobó, y con el momento real en que lo hizo. La
-    // próxima vez que este empleado entre a esta pantalla, esa fecha ya va
-    // a venir directamente del servidor (progreso_empleado.fecha_completado).
-    const resultadoCompleto = { ...data, fecha_completado: data.aprobado ? new Date().toISOString() : null };
-    setResultado(resultadoCompleto);
+    // Si algo falla, las respuestas quedan en pantalla y se avisa para
+    // reintentar (antes un error reemplazaba toda la página, o el botón
+    // quedaba en "Enviando..." para siempre si se cortaba la red).
     try {
-      localStorage.setItem(claveResultado(token, microcursoId), JSON.stringify(resultadoCompleto));
+      const { ok, data, pinInvalido } = await fetchEmpleado('empleado-completar-curso', {
+        method: 'POST',
+        body: { microcurso_id: microcursoId, respuestas },
+      });
+      if (pinInvalido) return;
+      if (!ok) {
+        setErrorEnvio(data.error || 'No pudimos guardar tu resultado. Tus respuestas siguen acá, probá de nuevo.');
+        return;
+      }
+      setResultado({
+        puntaje: data.puntaje,
+        correctas: data.correctas,
+        total: data.total,
+        aprobado: data.aprobado,
+        // La manda el servidor (momento real en que aprobó). Si por algún
+        // motivo no viniera, se usa ahora solo si aprobó.
+        fecha_completado: data.fecha_completado ?? (data.aprobado ? new Date().toISOString() : null),
+      });
+      // Una versión nueva aprobada todavía no tiene acuse.
+      setAcuseFecha(null);
+      setAcuseChecked(false);
     } catch {
-      // idem arriba: si falla, no rompe el flujo, solo no persiste el refresh.
+      setErrorEnvio('No pudimos enviar tus respuestas. Revisá tu conexión y probá de nuevo, no se borraron.');
+    } finally {
+      setEnviando(false);
     }
   }
 
-  // No aprobó: vuelve a la evaluación desde cero (respuestas en blanco),
-  // borrando el resultado guardado para que un refresh no lo devuelva a
-  // la pantalla de "no aprobado" de antes.
+  // No aprobó: vuelve a la evaluación desde cero (respuestas en blanco).
   function handleReintentar() {
     setRespuestas(new Array((curso?.preguntas || []).length).fill(null));
     setResultado(null);
-    try {
-      localStorage.removeItem(claveResultado(token, microcursoId));
-    } catch {
-      // no-op
-    }
+    setErrorEnvio(null);
     setEnEvaluacion(true);
   }
 
@@ -231,22 +231,14 @@ function CursoDetalleInterno() {
     setEnviandoAcuse(true);
     setErrorAcuse(null);
 
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
     try {
-      const res = await fetch(`${base}/functions/v1/confirmar-acuse`, {
+      const { ok, data, pinInvalido } = await fetchEmpleado('confirmar-acuse', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, microcurso_id: microcursoId }),
+        body: { microcurso_id: microcursoId },
       });
-      const data = await res.json();
+      if (pinInvalido) return;
 
-      if (!res.ok) {
+      if (!ok) {
         setErrorAcuse(data.error || 'No se pudo confirmar el acuse. Probá de nuevo.');
         return;
       }
@@ -266,23 +258,16 @@ function CursoDetalleInterno() {
     setEnviandoPregunta(true);
     setErrorChat(null);
 
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
     try {
-      const res = await fetch(`${base}/functions/v1/preguntar-curso`, {
+      const { ok, data, pinInvalido } = await fetchEmpleado('preguntar-curso', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, microcurso_id: microcursoId, pregunta: preguntaActual }),
+        body: { microcurso_id: microcursoId, pregunta: preguntaActual },
       });
-      const data = await res.json();
+      if (pinInvalido) return;
 
-      if (!res.ok) {
+      if (!ok) {
         setErrorChat(data.error || 'No se pudo enviar la pregunta.');
+        if (data.limite) setPreguntasRestantes(0);
         return;
       }
 
@@ -313,10 +298,8 @@ function CursoDetalleInterno() {
 
   if (resultado) {
     const esEspecial = esCursoSeguridadEHigiene(curso.titulo);
-    // empleado-completar-curso ahora manda `aprobado` calculado en el
-    // servidor con el mismo 70% de corte. El fallback de acá es solo por
-    // compatibilidad con un resultado viejo que haya quedado guardado en
-    // localStorage de antes de este cambio (no tenía el campo `aprobado`).
+    // `aprobado` lo calcula el servidor con el mismo 70% de corte; el
+    // fallback es solo por si faltara el campo.
     const aprobado = resultado.aprobado ?? resultado.puntaje >= 70;
     // Fecha real en que se hizo (y aprobó) el curso — viene del servidor
     // (progreso_empleado.fecha_completado), no del momento en que se
@@ -426,14 +409,25 @@ function CursoDetalleInterno() {
 
           <div className="flex flex-col gap-2">
             {aprobado ? (
-              <button
-                onClick={handleDescargarCertificado}
-                disabled={generandoCertificado}
-                className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {generandoCertificado ? 'Generando...' : 'Descargar certificado (PDF)'}
-              </button>
+              <>
+                <button
+                  onClick={handleDescargarCertificado}
+                  disabled={generandoCertificado || !nombreEmpleado}
+                  className="w-full py-2 rounded-lg font-bold tracking-wide text-white bg-[#6B655A] disabled:opacity-60"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  {generandoCertificado
+                    ? 'Generando...'
+                    : !datosEmpleado
+                      ? 'Preparando certificado...'
+                      : 'Descargar certificado (PDF)'}
+                </button>
+                {datosEmpleado === 'error' && (
+                  <p className="text-xs text-[#C1502E]">
+                    No pudimos cargar tus datos para el certificado. Recargá la página para probar de nuevo.
+                  </p>
+                )}
+              </>
             ) : (
               <button
                 onClick={handleReintentar}
@@ -456,6 +450,15 @@ function CursoDetalleInterno() {
   }
 
   const { titulo, pasos, preguntas } = curso;
+
+  // Completó una versión anterior de este curso pero no la actual: se le
+  // avisa por qué tiene que volver a hacerlo.
+  const avisoVersionNueva = curso.version_anterior_completada ? (
+    <div className="bg-[#FBF7EA] border border-[#EFDDCE] rounded-xl p-3 mb-5 text-sm text-[#3d382c] font-medium">
+      Este curso se actualizó desde la última vez que lo hiciste. Revisalo de nuevo y hacé la evaluación para
+      tenerlo al día.
+    </div>
+  ) : null;
   // Antes acá se asumía que "pasos" siempre tenía al menos un elemento:
   // pasos[pasoActual].titulo se leía sin chequear nada. Si un curso queda
   // sin pasos cargados (por ejemplo "Manejo de situaciones difíciles",
@@ -489,6 +492,7 @@ function CursoDetalleInterno() {
       <div className="max-w-md sm:max-w-2xl mx-auto mt-8 px-4 sm:px-0 pb-16">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-1">Evaluación</p>
         <TituloCurso titulo={titulo} className="mb-6" />
+        {avisoVersionNueva}
 
         <div className="space-y-5">
           {preguntas.map((p, i) => (
@@ -521,6 +525,8 @@ function CursoDetalleInterno() {
           ))}
         </div>
 
+        {errorEnvio && <p className="text-sm text-[#C1502E] mt-6 -mb-3">{errorEnvio}</p>}
+
         <button
           onClick={handleEnviarEvaluacion}
           disabled={!todasRespondidas || enviando}
@@ -542,6 +548,7 @@ function CursoDetalleInterno() {
         Paso {pasoActual + 1} de {pasos.length}
       </p>
       <TituloCurso titulo={titulo} className="mb-4" />
+      {avisoVersionNueva}
 
       <div className="w-full h-1.5 bg-[#EDE0C8] rounded-full overflow-hidden mb-6">
         <div
@@ -572,6 +579,9 @@ function CursoDetalleInterno() {
         </button>
       </div>
 
+      {/* El chat de dudas usa IA: solo se muestra si la cuenta lo tiene
+          habilitado (mismo criterio que preguntar-curso). */}
+      {iaDisponible && (
       <div className="mt-4">
         {!chatAbierto ? (
           <button
@@ -623,14 +633,17 @@ function CursoDetalleInterno() {
 
             {preguntasRestantes !== null && (
               <p className="text-[10px] text-[#8a8471] mt-2">
-                {preguntasRestantes > 0
+                {preguntasRestantes > 1
                   ? `Te quedan ${preguntasRestantes} preguntas hoy.`
-                  : 'Llegaste al límite de preguntas de hoy.'}
+                  : preguntasRestantes === 1
+                    ? 'Te queda 1 pregunta hoy.'
+                    : 'Llegaste al límite de preguntas de hoy.'}
               </p>
             )}
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

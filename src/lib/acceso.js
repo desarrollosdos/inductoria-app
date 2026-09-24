@@ -8,9 +8,11 @@
 // 'suspended' | 'cancelled' | 'inactive' (legado: cuentas viejas
 // creadas antes del trial, nunca llegaron a suscribirse).
 //
-// Modelo de trial (definido 2026-08-16): 7 días de acceso completo a
-// la app (mismo criterio que Trainual: sin tope de empleados ni
-// sucursales), EXCEPTO las funciones que usan un modelo de IA con
+// Modelo de trial (definido 2026-08-16): 7 días de acceso a la app con
+// 1 sucursal como máximo (ver limiteSucursales en Dashboard.jsx) y el
+// mismo tope de empleados que cualquier plan (EMPLEADOS_POR_SUCURSAL
+// por sucursal declarada, ver Empleados.jsx), EXCEPTO las funciones que
+// usan un modelo de IA con
 // costo real (generar/actualizar cursos con Claude, chat de dudas del
 // empleado con Claude, lectura de imágenes con Claude vision al cargar
 // contenido), que requieren suscripción real. Esto es lo que mantiene
@@ -27,13 +29,31 @@
 
 export const TRIAL_DIAS = 7;
 
-// Cuentas que siempre tienen acceso completo, sin importar el estado de
-// la suscripción (equipo interno / pruebas).
+// CUENTAS EXENTAS (lado navegador): ÚNICO lugar donde se define esta
+// lista en el frontend; Dashboard y el resto la importan de acá.
+// Del lado del servidor la lista equivalente está en
+// supabase/functions/_shared/acceso.ts: si agregás o sacás un mail,
+// cambialo en los DOS lugares, o el botón se ve pero la función lo
+// rechaza (o al revés).
+// Son cuentas del equipo / de prueba que tienen acceso completo sin
+// suscripción. No es la lista de administradores del panel: esa vive
+// en la tabla `administradores` (RPC es_administrador), y no se usa acá
+// porque estas funciones son sincrónicas y las usan muchas pantallas.
 export const CUENTAS_EXENTAS = [
   'desarrollosdos@gmail.com',
   'lucasanzone@gmail.com',
   'sofiasanzone@gmail.com',
 ];
+
+export function esCuentaExenta(email) {
+  return !!email && CUENTAS_EXENTAS.includes(email);
+}
+
+// Tope de empleados activos por sucursal contratada. Mismo número que
+// EMPLEADOS_POR_SUCURSAL en Empleados.jsx (que por ahora tiene su propia
+// copia); se usa acá para mostrar los límites reales de la prueba gratis
+// en Suscripcion.jsx.
+export const EMPLEADOS_POR_SUCURSAL = 20;
 
 export function trialActivo(cuenta) {
   return (
@@ -71,10 +91,11 @@ export function textoTrialRestante(cuenta) {
 
 // Acceso a las funciones generales de la app: cargar sucursales,
 // empleados, contenido, agregar cursos de biblioteca, ver progreso,
-// etc. Incluye trial vigente (sin topes).
+// etc. Incluye trial vigente (con los topes de la prueba: 1 sucursal,
+// ver Dashboard.jsx).
 export function tieneAccesoBase(cuenta, email) {
   return (
-    CUENTAS_EXENTAS.includes(email) ||
+    esCuentaExenta(email) ||
     cuenta?.plan === 'active' ||
     cuenta?.plan === 'past_due' ||
     trialActivo(cuenta)
@@ -89,5 +110,5 @@ export function tieneAccesoBase(cuenta, email) {
 // audio (Groq, gratis) NO pasa por acá — ver el comentario de más
 // arriba.
 export function puedeUsarIA(cuenta, email) {
-  return CUENTAS_EXENTAS.includes(email) || cuenta?.plan === 'active' || cuenta?.plan === 'past_due';
+  return esCuentaExenta(email) || cuenta?.plan === 'active' || cuenta?.plan === 'past_due';
 }

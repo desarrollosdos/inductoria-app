@@ -1,7 +1,7 @@
 {
   "name": "Inductoria",
   "short_name": "Inductoria",
-  "description": "Capacitación simple y optimizada para retail, indumentaria y estética",
+  "description": "Capacitá a tu equipo. Para locales de ropa, peluquerías y centros de estética.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#2C2C2A",

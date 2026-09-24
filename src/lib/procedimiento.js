@@ -19,6 +19,11 @@ const MUTED = [120, 113, 97];
 
 const MARGEN = 18;
 
+function textoVersion(p) {
+  if (p.version_mayor != null) return `${p.version_mayor}.${p.version_menor ?? 0}`;
+  return String(p.version || 1);
+}
+
 export function generarProcedimientoPDF({ negocioNombre, procedimiento }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const w = doc.internal.pageSize.getWidth();
@@ -130,7 +135,10 @@ export function generarProcedimientoPDF({ negocioNombre, procedimiento }) {
   const metadatos = [
     ['Negocio', negocioNombre || '-'],
     ['Área', procedimiento.area || '-'],
-    ['Versión', String(procedimiento.version || 1)],
+    // procedimientos guarda la versión en dos columnas (version_mayor y
+    // version_menor, ver Procedimientos.jsx); antes acá se leía un campo
+    // `version` que no existe y el PDF decía siempre "1".
+    ['Versión', textoVersion(procedimiento)],
     ['Responsable', procedimiento.responsable || 'A definir'],
   ];
   const colEtiquetaW = 32;
@@ -214,7 +222,12 @@ export function generarProcedimientoPDF({ negocioNombre, procedimiento }) {
 
   // ---------- Pie de página, en todas las páginas ----------
   const totalPaginas = doc.internal.getNumberOfPages();
-  const fecha = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const fecha = new Date().toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
   for (let i = 1; i <= totalPaginas; i++) {
     doc.setPage(i);
     doc.setDrawColor(...MUTED);

@@ -2,8 +2,14 @@ import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 // Modal de confirmacion fuerte para dar de baja la suscripcion.
-// Solo debe montarse/mostrarse cuando business.plan === 'active'
-// (el llamador decide eso, este componente no lo revisa).
+// Solo debe montarse/mostrarse cuando cuenta.plan === 'active' y sin
+// cancelacion_pendiente (el llamador decide eso, este componente no lo
+// revisa).
+//
+// Lo que promete este texto tiene que coincidir con lo que hace
+// cancelar-suscripcion y con lo que muestra Suscripcion.jsx después:
+// se corta la renovación, pero el acceso sigue hasta el final del
+// período ya pagado (cuentas.acceso_hasta).
 export default function CancelarSuscripcionModal({ onClose, onCancelled }) {
   const [texto, setTexto] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,9 +36,9 @@ export default function CancelarSuscripcionModal({ onClose, onCancelled }) {
           },
         }
       );
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || 'No se pudo cancelar. Intentá de nuevo.');
+        setError(data.error || 'No se pudo cancelar. Probá de nuevo.');
         setLoading(false);
         return;
       }
@@ -40,7 +46,7 @@ export default function CancelarSuscripcionModal({ onClose, onCancelled }) {
       onCancelled?.();
     } catch (err) {
       console.error(err);
-      setError('Error de conexión. Intentá de nuevo.');
+      setError('No hay conexión. Probá de nuevo en un momento.');
       setLoading(false);
     }
   }
@@ -58,12 +64,13 @@ export default function CancelarSuscripcionModal({ onClose, onCancelled }) {
           ¿Cancelar tu suscripción?
         </h3>
         <p className="text-sm text-[#6b7a80] mb-1">
-          Vas a perder acceso a Inductoria al final de tu período ya pagado.
-          Tus cursos, empleados y su progreso quedan guardados por si volvés,
-          pero no vas a poder usarlos hasta reactivar.
+          Tu suscripción no se va a renovar. Seguís usando Inductoria como
+          siempre hasta el final del período que ya pagaste y después la
+          cuenta queda sin acceso. Tus cursos, empleados y su progreso quedan
+          guardados por si volvés a suscribirte.
         </p>
         <p className="text-sm text-[#6b7a80] mb-4">
-          Esta acción no se puede deshacer desde acá. Si estás seguro,
+          Una vez cancelada no se puede deshacer desde acá. Si estás seguro,
           escribí <b>CANCELAR</b> abajo.
         </p>
 

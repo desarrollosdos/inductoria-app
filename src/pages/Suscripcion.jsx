@@ -3,8 +3,8 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
 import CancelarSuscripcionModal from '../components/CancelarSuscripcionModal';
-import { precioTotalMensual } from '../lib/precio';
-import { trialActivo, textoTrialRestante } from '../lib/acceso';
+import { precioTotalMensual, PRECIO_BASE_POR_DEFECTO } from '../lib/precio';
+import { trialActivo, textoTrialRestante, EMPLEADOS_POR_SUCURSAL } from '../lib/acceso';
 
 function IconCard(props) {
   return (
@@ -25,11 +25,10 @@ function IconAyuda(props) {
   );
 }
 
-// Mismos 4 estados y mismos colores que ya usás en Repunte. "inactive" es
-// propio de Inductoria (acá no hay trial), tratado con el mismo criterio
-// que "prueba vencida" en Repunte: fondo suave, no una pastilla sólida
-// como los otros 4, para que se lea distinto (todavía no es un problema
-// de pago, es que nunca arrancó).
+// Mismos 4 estados y mismos colores que ya usás en Repunte. "inactive"
+// (cuenta vieja que nunca se suscribió, o prueba gratis vencida) y
+// "trial" van con fondo suave, no una pastilla sólida como los otros 4,
+// para que se lea distinto: todavía no es un problema de pago.
 const ESTADOS = {
   inactive: {
     pillBg: '#FCE79A',
@@ -38,9 +37,6 @@ const ESTADOS = {
     corto: 'Inactiva',
     largo: 'Todavía no te suscribiste',
   },
-  // Prueba gratis: mismo criterio visual que "inactive" (fondo suave,
-  // no pastilla sólida como active/past_due/suspended/cancelled),
-  // porque tampoco es un problema de pago.
   trial: {
     pillBg: '#DCEEF7',
     pillText: '#1B6E8C',
@@ -49,15 +45,14 @@ const ESTADOS = {
     largo: 'Estás en tu prueba gratis',
   },
   // Mismo verde salvia que ya usa el resto del sitio (el avatar del
-  // header, los acentos de Admin), antes era un verde distinto (#1D9E75)
-  // que no coincidía con la paleta de la marca.
+  // header, los acentos de Admin).
   active: { pillBg: '#7C8B6F', pillText: '#fff', solido: true, corto: 'Activa', largo: 'Suscripción activa' },
   past_due: {
     pillBg: '#EF9F27',
     pillText: '#fff',
     solido: true,
     corto: 'Pago pendiente',
-    largo: 'Suscripción con pago pendiente',
+    largo: 'No pudimos cobrar tu suscripción',
   },
   suspended: {
     pillBg: '#7F77DD',
@@ -75,16 +70,78 @@ const ESTADOS = {
   },
 };
 
+// Marca de "me fui a pagar a MercadoPago". Se guarda al tocar el botón
+// de pago y se usa al volver para esperar la confirmación del webhook,
+// que puede tardar. Antes solo se esperaba si la cuenta estaba en
+// 'inactive', así que alguien que pagaba desde la prueba gratis (o con el
+// pago trabado) volvía y seguía viendo el estado viejo hasta refrescar.
+const CLAVE_PAGO_PENDIENTE = 'inductoria_pago_pendiente';
+const INTERVALO_ESPERA_MS = 5000;
+const TOPE_ESPERA_MS = 2 * 60 * 1000;
+// Una marca más vieja que esto ya no sirve (se fue a pagar y nunca
+// volvió, por ejemplo).
+const VIGENCIA_MARCA_MS = 60 * 60 * 1000;
+
+function leerMarcaPago() {
+  try {
+    const raw = sessionStorage.getItem(CLAVE_PAGO_PENDIENTE);
+    if (!raw) return null;
+    const marca = JSON.parse(raw);
+    if (!marca?.desde || Date.now() - marca.desde > VIGENCIA_MARCA_MS) {
+      sessionStorage.removeItem(CLAVE_PAGO_PENDIENTE);
+      return null;
+    }
+    return marca;
+  } catch {
+    return null;
+  }
+}
+
+function guardarMarcaPago() {
+  try {
+    sessionStorage.setItem(CLAVE_PAGO_PENDIENTE, JSON.stringify({ desde: Date.now() }));
+  } catch {
+    // Sin sessionStorage igual se puede pagar; solo no esperamos al volver.
+  }
+}
+
+function borrarMarcaPago() {
+  try {
+    sessionStorage.removeItem(CLAVE_PAGO_PENDIENTE);
+  } catch {
+    // nada
+  }
+}
+
+function formatearFecha(fecha) {
+  return fecha ? new Date(fecha).toLocaleDateString('es-AR') : null;
+}
+
+// La cuenta ya quedó paga y al día (lo que se espera después de pagar).
+function estaAlDia(cuenta) {
+  return !!cuenta && cuenta.plan === 'active' && !cuenta.cancelacion_pendiente;
+}
+
+async function leerCuenta(userId) {
+  const { data } = await supabase.from('cuentas').select('*').eq('owner_id', userId).maybeSingle();
+  return data;
+}
+
 export default function Suscripcion({ session }) {
   const [cuenta, setCuenta] = useState(null);
   const [negocios, setNegocios] = useState([]);
-  const [precioBase, setPrecioBase] = useState(12000);
+  const [precioBase, setPrecioBase] = useState(PRECIO_BASE_POR_DEFECTO);
   const [loading, setLoading] = useState(true);
   const [iniciandoPago, setIniciandoPago] = useState(false);
   // Aviso propio en vez de window.alert nativo, que sale con letra negra
   // estándar del navegador (2026-09-06, a pedido de Roberto).
   const [errorPago, setErrorPago] = useState(null);
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
+  // null | 'esperando' | 'listo' | 'demorado'
+  const [esperaPago, setEsperaPago] = useState(null);
+  // Se incrementa para (re)arrancar la espera, por ejemplo cuando el
+  // navegador restaura la página desde memoria al tocar "atrás".
+  const [intentoEspera, setIntentoEspera] = useState(0);
 
   useEffect(() => {
     cargar();
@@ -94,12 +151,14 @@ export default function Suscripcion({ session }) {
   // Si volvés de MercadoPago con el botón "atrás" del navegador, a veces
   // Chrome restaura la página desde memoria (bfcache) en vez de recargarla,
   // y el botón se queda trabado diciendo "Redirigiendo..." para siempre.
-  // Esto lo destraba y de paso refresca el estado real de la cuenta.
+  // Esto lo destraba, refresca el estado real de la cuenta y, si te
+  // habías ido a pagar, vuelve a esperar la confirmación.
   useEffect(() => {
     function handlePageShow(event) {
       if (event.persisted) {
         setIniciandoPago(false);
         cargar();
+        setIntentoEspera((n) => n + 1);
       }
     }
     window.addEventListener('pageshow', handlePageShow);
@@ -109,11 +168,7 @@ export default function Suscripcion({ session }) {
 
   async function cargar() {
     setLoading(true);
-    const { data: cuentaData } = await supabase
-      .from('cuentas')
-      .select('*')
-      .eq('owner_id', session.user.id)
-      .maybeSingle();
+    const cuentaData = await leerCuenta(session.user.id);
     setCuenta(cuentaData);
 
     if (cuentaData) {
@@ -129,36 +184,55 @@ export default function Suscripcion({ session }) {
       .select('precio_base')
       .eq('id', 1)
       .maybeSingle();
-    if (configData) setPrecioBase(configData.precio_base);
+    if (configData?.precio_base) setPrecioBase(configData.precio_base);
 
     setLoading(false);
   }
 
-  // Cuando volvés de MercadoPago, el webhook que activa la cuenta puede
-  // tardar unos segundos en llegar. Si nos fuimos a pagar (bandera con
-  // reintentos restantes en sessionStorage, seteada en handleSuscribirme)
-  // y la cuenta sigue en "inactive", forzamos un reload de la página a los
-  // 3s en vez de dejarla así hasta que la persona refresque a mano. Tope de
-  // 5 reintentos (~15s) para no quedar recargando en loop si el pago
-  // realmente no se acredita.
+  // Espera la confirmación del pago: si volvés de MercadoPago (MercadoPago
+  // agrega ?preapproval_id=... a la dirección de vuelta) o si quedó la
+  // marca de que te fuiste a pagar, consultamos la cuenta cada 5 segundos
+  // durante hasta 2 minutos, sea cual sea el plan con el que arrancaste
+  // (prueba gratis, inactiva, pago trabado, etc.).
   useEffect(() => {
-    if (!cuenta) return;
+    const params = new URLSearchParams(window.location.search);
+    const volvioDeMercadoPago = params.has('preapproval_id');
+    if (volvioDeMercadoPago) {
+      // Limpiamos la dirección para que un refresh no vuelva a esperar.
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    if (!volvioDeMercadoPago && !leerMarcaPago()) return;
 
-    const intentosRestantes = parseInt(sessionStorage.getItem('inductoria_pago_pendiente') || '0', 10);
-    if (intentosRestantes <= 0) return;
+    setEsperaPago('esperando');
+    const inicio = Date.now();
+    let cancelado = false;
+    let timeoutId = null;
 
-    if (cuenta.plan !== 'inactive') {
-      sessionStorage.removeItem('inductoria_pago_pendiente');
-      return;
+    async function revisar() {
+      const cuentaData = await leerCuenta(session.user.id);
+      if (cancelado) return;
+      if (cuentaData) setCuenta(cuentaData);
+
+      if (estaAlDia(cuentaData)) {
+        borrarMarcaPago();
+        setEsperaPago('listo');
+        return;
+      }
+      if (Date.now() - inicio >= TOPE_ESPERA_MS) {
+        borrarMarcaPago();
+        setEsperaPago('demorado');
+        return;
+      }
+      timeoutId = setTimeout(revisar, INTERVALO_ESPERA_MS);
     }
 
-    sessionStorage.setItem('inductoria_pago_pendiente', String(intentosRestantes - 1));
-    const timeoutId = setTimeout(() => {
-      window.location.reload();
-    }, 3000);
-
-    return () => clearTimeout(timeoutId);
-  }, [cuenta]);
+    revisar();
+    return () => {
+      cancelado = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intentoEspera]);
 
   async function handleSuscribirme() {
     setIniciandoPago(true);
@@ -167,13 +241,22 @@ export default function Suscripcion({ session }) {
       method: 'POST',
       body: { cuenta_id: cuenta.id },
     });
-    setIniciandoPago(false);
 
     if (error || !data?.init_point) {
-      setErrorPago('No se pudo iniciar el pago. Probá de nuevo en un momento.');
+      // Si la función respondió con un mensaje propio (por ejemplo "ya
+      // tenés un pago acreditándose"), mostramos ese.
+      let mensaje = null;
+      try {
+        const cuerpo = await error?.context?.json();
+        mensaje = cuerpo?.error || null;
+      } catch {
+        // sin cuerpo legible
+      }
+      setIniciandoPago(false);
+      setErrorPago(mensaje || 'No se pudo iniciar el pago. Probá de nuevo en un momento.');
       return;
     }
-    sessionStorage.setItem('inductoria_pago_pendiente', '5');
+    guardarMarcaPago();
     window.location.href = data.init_point;
   }
 
@@ -202,6 +285,38 @@ export default function Suscripcion({ session }) {
   const estado = ESTADOS[cuenta.plan] || ESTADOS.inactive;
   const cantidadSucursales = Math.max(negocios.length, cuenta.sucursales_contratadas || 1);
   const precioMensual = precioTotalMensual(cantidadSucursales, precioBase);
+  const textoPrecio = `$${precioMensual.toLocaleString('es-AR')}`;
+  const textoPlan = `Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale ${textoPrecio} por mes.`;
+  const topeEmpleadosTrial = (cuenta.sucursales_contratadas || 1) * EMPLEADOS_POR_SUCURSAL;
+
+  const alDia = estaAlDia(cuenta);
+  const cancelacionPendiente = cuenta.plan === 'active' && !!cuenta.cancelacion_pendiente;
+  // Con el cobro trabado, "Pagar con otra tarjeta" arma una suscripción
+  // nueva y crear-suscripcion da de baja la anterior sola.
+  const pagoTrabado = cuenta.plan === 'past_due' || cuenta.plan === 'suspended';
+  // Nunca ofrecemos suscribirse a una cuenta activa (al día o con la
+  // cancelación ya pedida, que sigue teniendo acceso), ni mientras
+  // esperamos la confirmación de un pago recién hecho.
+  const mostrarBotonPago = cuenta.plan !== 'active' && esperaPago !== 'esperando';
+
+  let descripcion = null;
+  if (cuenta.plan === 'past_due') {
+    const limite = formatearFecha(cuenta.past_due_limite);
+    descripcion = limite
+      ? `No pudimos cobrar la última cuota. Mercado Pago lo va a volver a intentar. Mientras tanto seguís usando Inductoria hasta el ${limite}. Si preferís, podés pagar con otra tarjeta.`
+      : 'No pudimos cobrar la última cuota. Mercado Pago lo va a volver a intentar. Mientras tanto seguís usando Inductoria. Si preferís, podés pagar con otra tarjeta.';
+  } else if (cuenta.plan === 'suspended') {
+    descripcion = 'Tu cuenta quedó suspendida porque no pudimos cobrar la suscripción. Pagá con otra tarjeta para volver a usarla.';
+  } else if (cuenta.plan === 'cancelled') {
+    descripcion = `Tu suscripción está cancelada. Podés volver a suscribirte cuando quieras. ${textoPlan}`;
+  } else if (trialActivo(cuenta)) {
+    descripcion = `Te quedan ${textoTrialRestante(cuenta)} de prueba gratis. Durante la prueba podés cargar 1 sucursal y hasta ${topeEmpleadosTrial} empleados. Crear o actualizar cursos y procedimientos con IA, leer imágenes y el chat de dudas de tus empleados se habilitan cuando te suscribís. ${textoPlan}`;
+  } else if (cuenta.plan === 'trial') {
+    descripcion = `Tu prueba gratis venció. Suscribite para seguir usando Inductoria. ${textoPlan}`;
+  } else if (cuenta.plan !== 'active') {
+    // inactive o cualquier estado desconocido.
+    descripcion = textoPlan;
+  }
 
   return (
     <div>
@@ -228,54 +343,72 @@ export default function Suscripcion({ session }) {
             style={{ backgroundColor: estado.pillBg, color: estado.pillText }}
           >
             {estado.largo}
-            {cuenta.plan === 'active' &&
-              cuenta.updated_at &&
-              ` desde el ${new Date(cuenta.updated_at).toLocaleDateString('es-AR')}`}
           </div>
 
-          {cuenta.plan !== 'active' && (
+          {esperaPago === 'esperando' && (
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C2C2A] mb-4">
+              Si ya pagaste en Mercado Pago, estamos esperando que nos confirmen el pago. Puede
+              tardar un par de minutos y no hace falta que hagas nada: esta pantalla se actualiza
+              sola.
+            </div>
+          )}
+          {esperaPago === 'listo' && (
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C2C2A] mb-4">
+              Listo, recibimos tu pago. Tu suscripción quedó activa.
+            </div>
+          )}
+          {esperaPago === 'demorado' && !alDia && (
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] mb-4">
+              Todavía no nos llegó la confirmación de Mercado Pago. Si ya pagaste, a veces demora
+              un rato más: volvé a entrar en unos minutos. Si el pago no se completó, podés
+              intentarlo de nuevo.
+            </div>
+          )}
+
+          {descripcion && <p className="text-sm text-[#6b6455] mb-4">{descripcion}</p>}
+
+          {mostrarBotonPago && (
             <>
-              <p className="text-sm text-[#6b6455] mb-4">
-                {cuenta.plan === 'past_due' &&
-                  'Regularizá tu pago para volver a usar todas las funciones.'}
-                {cuenta.plan === 'suspended' &&
-                  'Tu acceso quedó limitado. Ponete al día para reactivar tu cuenta.'}
-                {cuenta.plan === 'cancelled' &&
-                  'Tu suscripción está cancelada. Podés volver a suscribirte cuando quieras.'}
-                {cuenta.plan === 'inactive' &&
-                  `Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
-                {trialActivo(cuenta) &&
-                  `Te quedan ${textoTrialRestante(cuenta)} de prueba gratis. Podés usar Inductoria sin límite de empleados ni sucursales, salvo generar o actualizar cursos con IA. Con ${cantidadSucursales} sucursal${cantidadSucursales === 1 ? '' : 'es'}, tu plan sale $${precioMensual.toLocaleString('es-AR')}/mes.`}
-                {cuenta.plan === 'trial' &&
-                  !trialActivo(cuenta) &&
-                  'Tu prueba gratis venció. Suscribite para seguir usando Inductoria.'}
-              </p>
               <button
                 onClick={handleSuscribirme}
                 disabled={iniciandoPago}
                 className="px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
                 style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
               >
-                {iniciandoPago ? 'Redirigiendo...' : `Suscribirme por $${precioMensual.toLocaleString('es-AR')}/mes`}
+                {iniciandoPago
+                  ? 'Redirigiendo...'
+                  : pagoTrabado
+                    ? 'Pagar con otra tarjeta'
+                    : `Suscribirme por ${textoPrecio}/mes`}
               </button>
+              {pagoTrabado && (
+                <p className="text-xs text-[#6b6455] mt-2">
+                  Tu suscripción anterior se da de baja sola, así que no te vamos a cobrar dos veces.
+                </p>
+              )}
               {errorPago && (
                 <p className="text-xs font-semibold text-[#C1502E] mt-2">{errorPago}</p>
               )}
             </>
           )}
 
-          {cuenta.plan === 'active' && cuenta.cancelacion_pendiente && (
+          {cancelacionPendiente && (
             <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455]">
-              Cancelaste tu suscripción — no se va a renovar. Mantenés acceso completo hasta el{' '}
-              <strong className="text-[#2C2C2A]">
-                {cuenta.acceso_hasta ? new Date(cuenta.acceso_hasta).toLocaleDateString('es-AR') : '—'}
-              </strong>
-              . Si te arrepentís, podés volver a suscribirte en cualquier momento después de esa
-              fecha.
+              Cancelaste tu suscripción, no se va a renovar.{' '}
+              {cuenta.acceso_hasta ? (
+                <>
+                  Seguís usando Inductoria como siempre hasta el{' '}
+                  <strong className="text-[#2C2C2A]">{formatearFecha(cuenta.acceso_hasta)}</strong>.
+                </>
+              ) : (
+                'Seguís usando Inductoria como siempre hasta el final del período que ya pagaste.'
+              )}{' '}
+              Después de esa fecha podés volver a suscribirte cuando quieras. Tus cursos, empleados y
+              su progreso quedan guardados.
             </div>
           )}
 
-          {cuenta.plan === 'active' && !cuenta.cancelacion_pendiente && (
+          {alDia && (
             <div>
               <button
                 onClick={() => setMostrarCancelar(true)}
@@ -288,14 +421,9 @@ export default function Suscripcion({ session }) {
         </div>
       </PageShell>
 
-      {/* Antes bg-[#C1502E] (terracota, el mismo color que "Suscribirme").
-          A pedido de Roberto (2026-09-06), pasa a usar el mismo gris oscuro
-          #2C2C2A que ya usás para el ícono circular de "Suscripción" arriba
-          en esta misma página: es el tono neutro que la app usa para íconos
-          que no son un llamado a la acción de pago. No tengo DashboardNav.jsx
-          a mano para confirmar que el engranaje de arriba sea exactamente
-          este mismo hex — si es otro gris, pasame el código y lo cambio en
-          una sola pasada. */}
+      {/* Gris oscuro #2C2C2A, el mismo del ícono circular de "Suscripción"
+          de arriba: es el tono neutro que la app usa para lo que no es un
+          llamado a la acción de pago (2026-09-06, a pedido de Roberto). */}
       <div className="pb-6 pt-2 flex justify-center px-4">
         <a
           href="/ayuda"

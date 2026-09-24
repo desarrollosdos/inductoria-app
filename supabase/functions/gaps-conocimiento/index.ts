@@ -13,6 +13,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// PostgREST devuelve como máximo 1000 filas por consulta. Antes se hacía
+// una sola consulta y, pasadas las 1000 preguntas, el conteo quedaba
+// cortado sin aviso. Traemos de a páginas hasta que no venga más nada.
+const TAMANO_PAGINA = 1000;
+// Los ids van en la URL (filtro "in"), así que los mandamos de a tandas
+// para no armar una URL gigante con cuentas de muchos cursos.
+const IDS_POR_TANDA = 100;
+
+// deno-lint-ignore no-explicit-any
+async function traerTodo<T>(armarConsulta: (desde: number, hasta: number) => any): Promise<T[]> {
+  const filas: T[] = [];
+  for (let desde = 0; ; desde += TAMANO_PAGINA) {
+    const { data, error } = await armarConsulta(desde, desde + TAMANO_PAGINA - 1);
+    if (error) throw error;
+    const pagina = (data || []) as T[];
+    filas.push(...pagina);
+    if (pagina.length < TAMANO_PAGINA) break;
+  }
+  return filas;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -55,11 +76,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: microcursos } = await supabase
-      .from('microcursos')
-      .select('id, titulo')
-      .eq('cuenta_id', cuenta.id)
-      .eq('estado', 'aprobado');
+    const microcursos = await traerTodo<{ id: string; titulo: string }>((desde, hasta) =>
+      supabase
+        .from('microcursos')
+        .select('id, titulo')
+        .eq('cuenta_id', cuenta.id)
+        .eq('estado', 'aprobado')
+        .order('id', { ascending: true })
+        .range(desde, hasta)
+    );
 
     const idsPropios = (microcursos || []).map((m) => m.id);
     if (idsPropios.length === 0) {
@@ -68,10 +93,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: preguntasIA } = await supabase
-      .from('preguntas_ia')
-      .select('microcurso_id, pregunta')
-      .in('microcurso_id', idsPropios);
+    const preguntasIA: { microcurso_id: string; pregunta: string }[] = [];
+    for (let i = 0; i < idsPropios.length; i += IDS_POR_TANDA) {
+      const tanda = idsPropios.slice(i, i + IDS_POR_TANDA);
+      const filas = await traerTodo<{ microcurso_id: string; pregunta: string }>((desde, hasta) =>
+        supabase
+          .from('preguntas_ia')
+          .select('microcurso_id, pregunta')
+          .in('microcurso_id', tanda)
+          // Orden estable (id desempata) para que las páginas no se pisen
+          // ni salteen filas; las más recientes primero, así los ejemplos
+          // que ve el dueño son las preguntas más nuevas.
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(desde, hasta)
+      );
+      preguntasIA.push(...filas);
+    }
 
     const tituloPorCurso: Record<string, string> = {};
     (microcursos || []).forEach((m) => (tituloPorCurso[m.id] = m.titulo));
@@ -99,7 +137,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {
+    return new Response(JSON.stringify({ error: 'No pudimos cargar las preguntas de tus empleados.', detalle: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

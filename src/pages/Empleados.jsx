@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
@@ -56,6 +56,72 @@ function formatoWhatsApp(telefono) {
   const soloDigitos = (telefono || '').replace(/\D/g, '');
   if (!soloDigitos) return null;
   return soloDigitos.startsWith('54') ? soloDigitos : `549${soloDigitos}`;
+}
+
+// Link corto (/e?c=...) que redirige al link real del empleado. Mismo
+// formato que usa Progreso.jsx.
+function linkAccesoEmpleado(empleado) {
+  if (!empleado?.token_acceso) return null;
+  return `${window.location.origin}/e?c=${empleado.token_acceso.slice(0, 10)}`;
+}
+
+// Mensaje listo para mandar por WhatsApp o pegar donde sea. El mismo
+// texto en el botón de copiar y en el de WhatsApp.
+function mensajeAccesoEmpleado(empleado) {
+  const link = linkAccesoEmpleado(empleado);
+  if (!link) return null;
+  return `¡Hola ${empleado.nombre}! Entrá a este link para hacer tus cursos: ${link} Tu PIN es ${empleado.pin}.`;
+}
+
+// PIN nuevo de 4 cifras con el generador seguro del navegador (no
+// Math.random, que es predecible). La primera cifra va de 1 a 9: si la
+// columna pin fuera numérica, un PIN que empieza con 0 se guardaría con 3
+// cifras y el empleado no podría entrar.
+function generarPinAleatorio() {
+  const valores = new Uint32Array(4);
+  crypto.getRandomValues(valores);
+  const primera = 1 + (valores[0] % 9);
+  const resto = Array.from(valores.slice(1), (v) => v % 10).join('');
+  return `${primera}${resto}`;
+}
+
+// Copia al portapapeles. navigator.clipboard necesita https y a veces no
+// está (navegadores viejos o dentro de otra app); ahí se usa el método
+// viejo con un textarea escondido.
+async function copiarAlPortapapeles(texto) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  } catch {
+    // sigue con el método viejo
+  }
+  try {
+    const area = document.createElement('textarea');
+    area.value = texto;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function IconLlave(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="m10.7 12.3 9.8-9.8" />
+      <path d="m16 7 3 3" />
+      <path d="m14 9 2 2" />
+    </svg>
+  );
 }
 
 function IconEmpleadosMini(props) {
@@ -296,6 +362,22 @@ export default function Empleados({ session }) {
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
 
+  // Antes, si fallaba el alta, la baja, la edición o la subida de la
+  // foto, el error quedaba solo en la consola y en pantalla no pasaba
+  // nada. Ahora cada uno se muestra donde se hizo la acción.
+  const [errorAlta, setErrorAlta] = useState(null);
+  const [errorEdicion, setErrorEdicion] = useState(null);
+  const [errorGeneral, setErrorGeneral] = useState(null);
+
+  // Panel de "link y PIN" de cada empleado activo. Antes solo se podía
+  // mandar justo después del alta o desde Progreso mientras tuviera
+  // cursos pendientes; ahora se abre desde su fila cuando haga falta.
+  const [accesoAbiertoId, setAccesoAbiertoId] = useState(null);
+  const [copiadoId, setCopiadoId] = useState(null);
+  const [confirmandoPinId, setConfirmandoPinId] = useState(null);
+  const [generandoPinId, setGenerandoPinId] = useState(null);
+  const [errorAcceso, setErrorAcceso] = useState(null); // { id, mensaje }
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -347,14 +429,20 @@ export default function Empleados({ session }) {
 
   async function handleFotoChange(e) {
     const file = e.target.files[0];
+    // Se limpia el input para que elegir la misma foto de nuevo vuelva a
+    // disparar el cambio.
+    e.target.value = '';
     if (!file) return;
     setProcesandoFoto(true);
+    setErrorAlta(null);
     try {
       const blob = await recortarACuadrado(file);
+      if (!blob) throw new Error('sin blob');
       setFotoBlob(blob);
       setFotoPreview(URL.createObjectURL(blob));
     } catch (err) {
       console.error(err);
+      setErrorAlta('No se pudo leer esa foto. Probá con otra.');
     }
     setProcesandoFoto(false);
   }
@@ -370,6 +458,7 @@ export default function Empleados({ session }) {
     setFotoBlob(null);
     setFotoPreview(null);
     setErrorCupoEmpleados(null);
+    setErrorAlta(null);
   }
 
   async function handleCrearEmpleado(e) {
@@ -389,13 +478,14 @@ export default function Empleados({ session }) {
     const activosActuales = empleados.filter((emp) => !emp.fecha_baja).length;
     if (activosActuales >= limiteEmpleados(cuenta)) {
       setErrorCupoEmpleados(
-        `Llegaste al límite de ${limiteEmpleados(cuenta)} empleados activos incluido en tu plan actual. Comunicate con nosotros si necesitás sumar más.`
+        `Llegaste al límite de ${limiteEmpleados(cuenta)} empleados activos de tu plan. Escribinos si necesitás sumar más.`
       );
       return;
     }
 
     setCreando(true);
     setUltimoCreado(null);
+    setErrorAlta(null);
 
     let fotoUrl = null;
     if (fotoBlob) {
@@ -408,7 +498,12 @@ export default function Empleados({ session }) {
         const { data: urlData } = supabase.storage.from('fotos-empleados').getPublicUrl(nombreArchivo);
         fotoUrl = urlData.publicUrl;
       } else {
+        // Frenamos acá (sin crear al empleado) para que no quede cargado
+        // sin foto sin que el dueño se entere.
         console.error('No se pudo subir la foto:', uploadError);
+        setErrorAlta('No se pudo subir la foto. Probá de nuevo, o sacala y dalo de alta sin foto.');
+        setCreando(false);
+        return;
       }
     }
 
@@ -426,8 +521,9 @@ export default function Empleados({ session }) {
       .single();
 
     setCreando(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorAlta('No se pudo dar de alta al empleado. Revisá tu conexión y probá de nuevo.');
       return;
     }
 
@@ -445,18 +541,64 @@ export default function Empleados({ session }) {
 
   async function handleBaja(empleadoId) {
     setConfirmandoBajaId(null);
+    setErrorGeneral(null);
 
+    const fechaBaja = new Date().toISOString();
     const { error } = await supabase
       .from('empleados')
-      .update({ fecha_baja: new Date().toISOString() })
+      .update({ fecha_baja: fechaBaja })
       .eq('id', empleadoId);
     if (error) {
       console.error(error);
+      setErrorGeneral('No se pudo dar de baja al empleado. Probá de nuevo.');
       return;
     }
-    setEmpleados(
-      empleados.map((e) => (e.id === empleadoId ? { ...e, fecha_baja: new Date().toISOString() } : e))
-    );
+    setEmpleados(empleados.map((e) => (e.id === empleadoId ? { ...e, fecha_baja: fechaBaja } : e)));
+  }
+
+  function toggleAcceso(empleadoId) {
+    setAccesoAbiertoId(accesoAbiertoId === empleadoId ? null : empleadoId);
+    setConfirmandoPinId(null);
+    setErrorAcceso(null);
+    setCopiadoId(null);
+  }
+
+  async function handleCopiarMensaje(empleado) {
+    const mensaje = mensajeAccesoEmpleado(empleado);
+    if (!mensaje) return;
+    const ok = await copiarAlPortapapeles(mensaje);
+    if (ok) {
+      setErrorAcceso(null);
+      setCopiadoId(empleado.id);
+      setTimeout(() => setCopiadoId((actual) => (actual === empleado.id ? null : actual)), 2500);
+    } else {
+      setErrorAcceso({ id: empleado.id, mensaje: 'No se pudo copiar. Mantené apretado el mensaje de abajo para copiarlo a mano.' });
+    }
+  }
+
+  // No existía forma de cambiar el PIN: si un empleado lo perdía o se lo
+  // pasaba a otro, había que darlo de baja y de alta de nuevo.
+  async function handleGenerarPin(empleado) {
+    setConfirmandoPinId(null);
+    setErrorAcceso(null);
+    setGenerandoPinId(empleado.id);
+    const pinNuevo = generarPinAleatorio();
+    const { data, error } = await supabase
+      .from('empleados')
+      // También se destraba si estaba bloqueado por PIN mal puesto
+      // (columnas de supabase/sql/2026-09-24-empleados-seguridad.sql).
+      .update({ pin: pinNuevo, pin_intentos_fallidos: 0, pin_bloqueado_hasta: null })
+      .eq('id', empleado.id)
+      .select()
+      .single();
+    setGenerandoPinId(null);
+    if (error || !data) {
+      console.error(error);
+      setErrorAcceso({ id: empleado.id, mensaje: 'No se pudo cambiar el PIN. Probá de nuevo.' });
+      return;
+    }
+    setEmpleados(empleados.map((e) => (e.id === empleado.id ? data : e)));
+    if (ultimoCreado?.id === empleado.id) setUltimoCreado(data);
   }
 
   function abrirEdicion(e) {
@@ -467,6 +609,7 @@ export default function Empleados({ session }) {
       return;
     }
     setEditandoId(e.id);
+    setErrorEdicion(null);
     const puestoActual = e.puesto || '';
     const estaEnCatalogo = puestosDisponibles.includes(puestoActual);
     setEditForm({
@@ -483,14 +626,18 @@ export default function Empleados({ session }) {
 
   async function handleEditFotoChange(ev) {
     const file = ev.target.files[0];
+    ev.target.value = '';
     if (!file) return;
     setEditProcesandoFoto(true);
+    setErrorEdicion(null);
     try {
       const blob = await recortarACuadrado(file);
+      if (!blob) throw new Error('sin blob');
       setEditFotoBlob(blob);
       setEditFotoPreview(URL.createObjectURL(blob));
     } catch (err) {
       console.error(err);
+      setErrorEdicion('No se pudo leer esa foto. Probá con otra.');
     }
     setEditProcesandoFoto(false);
   }
@@ -502,6 +649,7 @@ export default function Empleados({ session }) {
     }
 
     setGuardandoEdit(true);
+    setErrorEdicion(null);
 
     // Si eligió una foto nueva, la subimos igual que en el alta. Si no
     // tocó la foto, se mantiene la que ya tenía (editForm.foto_url).
@@ -517,6 +665,9 @@ export default function Empleados({ session }) {
         fotoUrl = urlData.publicUrl;
       } else {
         console.error('No se pudo subir la foto:', uploadError);
+        setErrorEdicion('No se pudo subir la foto nueva. Probá de nuevo.');
+        setGuardandoEdit(false);
+        return;
       }
     }
 
@@ -535,8 +686,9 @@ export default function Empleados({ session }) {
       .single();
 
     setGuardandoEdit(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorEdicion('No se pudieron guardar los cambios. Revisá tu conexión y probá de nuevo.');
       return;
     }
     setEmpleados(
@@ -548,7 +700,7 @@ export default function Empleados({ session }) {
   }
 
   function nombreNegocio(negocioId) {
-    return negocios.find((n) => n.id === negocioId)?.nombre || '—';
+    return negocios.find((n) => n.id === negocioId)?.nombre || 'Sin sucursal';
   }
 
   if (loading) {
@@ -582,15 +734,21 @@ export default function Empleados({ session }) {
   const topeEmpleados = limiteEmpleados(cuenta);
   const limiteEmpleadosAlcanzado = activos.length >= topeEmpleados;
 
+  // Se llama como función (FilaEmpleado({ e })) y no como <FilaEmpleado />:
+  // al estar definida adentro del componente, como etiqueta React la
+  // desmontaba en cada tecla y los inputs de edición perdían el foco.
   function FilaEmpleado({ e }) {
     const abierto = editandoId === e.id;
+    const accesoAbierto = accesoAbiertoId === e.id;
+    const mensaje = mensajeAccesoEmpleado(e);
+    const telefonoWa = formatoWhatsApp(e.telefono);
     return (
       <div className="border-b border-[#EDE0C8] pb-2 last:border-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
             <Avatar e={e} />
-            <div>
-              <p className="text-sm font-semibold text-[#2C2C2A]">{e.nombre}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#2C2C2A] break-words">{e.nombre}</p>
               {e.puesto && (
                 <span
                   className="text-[10px] font-bold uppercase tracking-wide bg-[#6B655A] text-white px-2 py-0.5 rounded-full inline-block mt-0.5"
@@ -606,8 +764,19 @@ export default function Empleados({ session }) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              type="button"
+              onClick={() => toggleAcceso(e.id)}
+              title="Link y PIN"
+              aria-label="Ver link y PIN"
+              className="w-8 h-8 rounded-full bg-[#7C8B6F] text-white flex items-center justify-center"
+            >
+              <IconLlave />
+            </button>
+            <button
+              type="button"
               onClick={() => abrirEdicion(e)}
               title="Editar"
+              aria-label="Editar"
               className="w-8 h-8 rounded-full bg-[#6B655A] text-white flex items-center justify-center"
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -615,8 +784,10 @@ export default function Empleados({ session }) {
               </svg>
             </button>
             <button
+              type="button"
               onClick={() => setConfirmandoBajaId(e.id)}
               title="Dar de baja"
+              aria-label="Dar de baja"
               className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -631,8 +802,7 @@ export default function Empleados({ session }) {
         {confirmandoBajaId === e.id && (
           <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
             <p className="font-semibold text-[#2C2C2A]">
-              Vas a dar de baja a este empleado. Se pierde el acceso a su información (progreso,
-              cursos, historial). ¿Confirmás?
+              Va a dejar de ver sus cursos y su progreso. ¿Lo das de baja?
             </p>
             <div className="flex gap-2">
               <button
@@ -651,6 +821,81 @@ export default function Empleados({ session }) {
                 Sí, dar de baja
               </button>
             </div>
+          </div>
+        )}
+
+        {accesoAbierto && (
+          <div className="mt-2 bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] space-y-2">
+            {mensaje ? (
+              <>
+                <p className="text-xs font-semibold">Link y PIN para mandarle:</p>
+                <p className="text-xs bg-white border border-[#BFE0CE] rounded-lg px-3 py-2 break-words select-all">
+                  {mensaje}
+                </p>
+                <p className="text-xs">
+                  PIN: <span className="font-bold text-[#C1502E]">{e.pin}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopiarMensaje(e)}
+                    className="min-h-[40px] text-xs font-bold tracking-wide text-white bg-[#4A453D] rounded-full px-4 py-2"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    {copiadoId === e.id ? '¡Copiado!' : 'Copiar mensaje'}
+                  </button>
+                  {telefonoWa && (
+                    <a
+                      href={`https://wa.me/${telefonoWa}?text=${encodeURIComponent(mensaje)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-h-[40px] inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                    >
+                      <IconWhatsApp />
+                      Enviar por WhatsApp
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoPinId(e.id)}
+                    disabled={generandoPinId === e.id}
+                    className="min-h-[40px] text-xs font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8] rounded-full px-4 py-2 disabled:opacity-60"
+                  >
+                    {generandoPinId === e.id ? 'Generando...' : 'Generar PIN nuevo'}
+                  </button>
+                </div>
+                {confirmandoPinId === e.id && (
+                  <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
+                    <p className="font-semibold text-[#2C2C2A]">
+                      El PIN de ahora deja de funcionar y vas a tener que mandarle el nuevo. ¿Lo cambiás?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoPinId(null)}
+                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-[#2C2C2A] bg-[#EDE0C8]"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerarPin(e)}
+                        className="flex-1 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                      >
+                        Sí, cambiarlo
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-xs">Este empleado todavía no tiene link. Recargá la página y probá de nuevo.</p>
+            )}
+            {errorAcceso?.id === e.id && (
+              <p className="text-xs font-semibold text-[#C1502E]">{errorAcceso.mensaje}</p>
+            )}
           </div>
         )}
 
@@ -723,7 +968,7 @@ export default function Empleados({ session }) {
                 type="text"
                 value={editForm.puestoCustom}
                 onChange={(ev) => setEditForm({ ...editForm, puestoCustom: ev.target.value })}
-                placeholder="Especificá el puesto"
+                placeholder="Escribí el puesto"
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
             )}
@@ -744,8 +989,10 @@ export default function Empleados({ session }) {
               placeholder="Mail (opcional)"
               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
             />
+            {errorEdicion && <p className="text-xs font-semibold text-[#C1502E]">{errorEdicion}</p>}
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => handleGuardarEdicion(e.id)}
                 disabled={guardandoEdit || !editForm.telefono.trim()}
                 className="text-xs font-bold tracking-wide text-white bg-[#2C2C2A] rounded-full px-4 py-1.5 disabled:opacity-60"
@@ -754,6 +1001,7 @@ export default function Empleados({ session }) {
                 {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setEditandoId(null);
                   setEditFotoBlob(null);
@@ -792,8 +1040,8 @@ export default function Empleados({ session }) {
             </p>
           ) : limiteEmpleadosAlcanzado ? (
             <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] font-semibold tracking-wide">
-              Llegaste al límite de {topeEmpleados} empleados activos incluido en tu plan actual.
-              Comunicate con nosotros si necesitás sumar más.
+              Llegaste al límite de {topeEmpleados} empleados activos de tu plan. Escribinos si
+              necesitás sumar más.
             </div>
           ) : !mostrandoFormAlta ? (
             <button
@@ -803,11 +1051,12 @@ export default function Empleados({ session }) {
               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
             >
               <IconPersonaMas width="26" height="26" />
-              ALTA EMPLEADO NUEVO
+              Sumar empleado
             </button>
           ) : (
             <form onSubmit={handleCrearEmpleado} className="space-y-2">
               {errorCupoEmpleados && <p className="text-xs text-[#C1502E]">{errorCupoEmpleados}</p>}
+              {errorAlta && <p className="text-xs font-semibold text-[#C1502E]">{errorAlta}</p>}
               <div className="flex items-center gap-3 mb-1">
                 <input
                   type="file"
@@ -887,7 +1136,7 @@ export default function Empleados({ session }) {
                   onChange={(e) => setPuestoCustom(e.target.value)}
                   onInvalid={validarCampo}
                   onInput={limpiarValidacion}
-                  placeholder="Especificá el puesto"
+                  placeholder="Escribí el puesto"
                   className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
                 />
               )}
@@ -939,35 +1188,58 @@ export default function Empleados({ session }) {
           )}
 
           {ultimoCreado && (
-            <div className="mt-4 bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm">
-              <p className="text-[#2C2C2A] font-semibold">{ultimoCreado.nombre} fue dado de alta.</p>
-              {formatoWhatsApp(ultimoCreado.telefono) ? (
-                <a
-                  href={`https://wa.me/${formatoWhatsApp(ultimoCreado.telefono)}?text=${encodeURIComponent(
-                    `Hola ${ultimoCreado.nombre}! Para hacer tus cursos de capacitación entrá a este link: ${window.location.origin}/e?c=${ultimoCreado.token_acceso.slice(0, 10)} y usá el PIN ${ultimoCreado.pin}.`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-3 py-1.5"
-                >
-                  <IconWhatsApp />
-                  Enviar por WhatsApp
-                </a>
-              ) : (
-                <p className="text-[10px] text-[#8a8471] mt-1">
-                  El link y el PIN de acceso los encontrás en{' '}
-                  <a href="/progreso" className="underline text-[#C1502E]">
-                    Progreso
-                  </a>
-                  , mientras tenga cursos pendientes.
-                </p>
+            <div className="mt-4 bg-[#EDE0C8] border border-[#EFDDCE] rounded-lg p-3 text-sm space-y-2">
+              <p className="text-[#2C2C2A] font-semibold">Listo, {ultimoCreado.nombre} ya está cargado.</p>
+              {mensajeAccesoEmpleado(ultimoCreado) && (
+                <>
+                  <p className="text-xs text-[#3d382c] bg-white rounded-lg px-3 py-2 break-words select-all">
+                    {mensajeAccesoEmpleado(ultimoCreado)}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopiarMensaje(ultimoCreado)}
+                      className="min-h-[40px] text-xs font-bold tracking-wide text-white bg-[#4A453D] rounded-full px-4 py-2"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                    >
+                      {copiadoId === ultimoCreado.id ? '¡Copiado!' : 'Copiar mensaje'}
+                    </button>
+                    {formatoWhatsApp(ultimoCreado.telefono) && (
+                      <a
+                        href={`https://wa.me/${formatoWhatsApp(ultimoCreado.telefono)}?text=${encodeURIComponent(
+                          mensajeAccesoEmpleado(ultimoCreado)
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-h-[40px] inline-flex items-center gap-1.5 text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                      >
+                        <IconWhatsApp />
+                        Enviar por WhatsApp
+                      </a>
+                    )}
+                  </div>
+                  {errorAcceso?.id === ultimoCreado.id && (
+                    <p className="text-xs font-semibold text-[#C1502E]">{errorAcceso.mensaje}</p>
+                  )}
+                </>
               )}
+              <p className="text-xs text-[#8a8471]">
+                Si lo necesitás más adelante, tocá el botón verde con la llave en su fila para ver
+                el link y el PIN de nuevo.
+              </p>
             </div>
           )}
         </div>
 
+        {errorGeneral && (
+          <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm font-semibold text-[#C1502E]">
+            {errorGeneral}
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
             <h2 className="font-semibold text-[#2C2C2A]">Activos {activos.length}</h2>
             <div className="flex gap-1 bg-[#EDE0C8] rounded-lg p-1">
               <button
@@ -994,7 +1266,7 @@ export default function Empleados({ session }) {
           ) : vista === 'alfabetico' ? (
             <div className="space-y-2">
               {activos.map((e) => (
-                <FilaEmpleado key={e.id} e={e} />
+                <Fragment key={e.id}>{FilaEmpleado({ e })}</Fragment>
               ))}
             </div>
           ) : (
@@ -1009,7 +1281,7 @@ export default function Empleados({ session }) {
                     </p>
                     <div className="space-y-2">
                       {deEstaSucursal.map((e) => (
-                        <FilaEmpleado key={e.id} e={e} />
+                        <Fragment key={e.id}>{FilaEmpleado({ e })}</Fragment>
                       ))}
                     </div>
                   </div>
@@ -1031,8 +1303,8 @@ export default function Empleados({ session }) {
               {dadosDeBaja.map((e) => (
                 <div key={e.id} className="flex items-center gap-3 border-b border-[#EDE0C8] pb-2 last:border-0">
                   <Avatar e={e} size={28} />
-                  <div className="flex-1 flex items-center justify-between">
-                    <p className="text-sm text-[#8a8471]">{e.nombre}</p>
+                  <div className="flex-1 min-w-0 flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm text-[#8a8471] break-words">{e.nombre}</p>
                     <p className="text-xs text-[#8a8471]">baja {new Date(e.fecha_baja).toLocaleDateString('es-AR')}</p>
                   </div>
                 </div>

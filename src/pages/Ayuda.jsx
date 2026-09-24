@@ -99,6 +99,9 @@ function IconAyuda(props) {
   );
 }
 
+// Textos revisados contra lo que hace la app de verdad (lib/acceso.js,
+// Dashboard.jsx, Empleados.jsx, etc.). Si cambia una regla (días de
+// prueba, topes, qué pide suscripción), hay que actualizarlo acá también.
 const SECCIONES = [
   {
     id: 'suscripcion',
@@ -106,7 +109,7 @@ const SECCIONES = [
     path: '/',
     Icon: IconSuscripcion,
     texto:
-      'Es la pantalla de inicio. Acá ves el estado de tu plan (prueba gratis, activa, pago pendiente, etc.) y el precio según cuántas sucursales tenés. Desde acá te suscribís cuando termina la prueba gratis y también podés cancelar la suscripción si hace falta.',
+      'Es la pantalla de inicio. Acá ves cómo está tu plan (prueba gratis, activo, pago pendiente) y cuánto pagás según tus sucursales. Desde acá te suscribís y, si hace falta, cancelás. La prueba gratis dura 7 días: podés cargar 1 sucursal y hasta 20 empleados por sucursal, pero no podés armar cursos ni procedimientos con IA, leer fotos de carteles ni usar el chat de dudas de los empleados. Todo eso se habilita cuando te suscribís.',
   },
   {
     id: 'sucursales',
@@ -114,7 +117,7 @@ const SECCIONES = [
     path: '/sucursales',
     Icon: IconSucursales,
     texto:
-      'Cargá el nombre de tu negocio y la dirección de cada sucursal (localidad, código postal, teléfono, mail). Acá también agregás sucursales nuevas cuando tu negocio crece: la que agregues se suma a tu plan a partir del próximo cobro.',
+      'Cargás los datos de cada sucursal: dirección, localidad, teléfono y mail. Podés cargar tantas como tenga tu plan. Si ya estás suscripto y necesitás una más, la sumás desde acá y se agrega a tu plan desde el próximo cobro.',
   },
   {
     id: 'empleados',
@@ -122,7 +125,7 @@ const SECCIONES = [
     path: '/empleados',
     Icon: IconEmpleados,
     texto:
-      'Das de alta a tu equipo: nombre, puesto y sucursal. Cada empleado no necesita usuario ni contraseña propia. Accede con un link y un PIN de 4 dígitos, que encontrás en Progreso. Si alguien deja de trabajar con vos, lo das de baja desde acá.',
+      'Sumás a tu equipo con nombre, puesto, sucursal y teléfono. Nadie necesita usuario ni contraseña: cada uno entra con un link y un PIN de 4 números. Con el botón verde de la llave ves su link y su PIN, se los copiás o mandás por WhatsApp y, si lo perdió, le generás un PIN nuevo. Si alguien deja de trabajar con vos, lo das de baja desde acá.',
   },
   {
     id: 'contenido',
@@ -130,7 +133,7 @@ const SECCIONES = [
     path: '/contenido',
     Icon: IconContenido,
     texto:
-      'Subís el material de capacitación que ya tenés: manuales en PDF o Word, apuntes de texto, fotos de carteles o instructivos, notas de voz grabadas ahí mismo o audios ya grabados. Lo aprobás y la IA arma un curso corto con pasos y una evaluación. Después lo revisás, elegís a qué puesto le aplica y lo publicás.',
+      'Subís lo que ya usás para explicar: manuales en PDF o Word, texto, fotos de carteles o instructivos, o notas de voz (las grabás ahí mismo o subís un audio). Video no se puede. Lo marcás como aprobado, la IA arma un curso corto con una evaluación, lo revisás, lo publicás y elegís a qué puestos le toca. También tenés cursos ya armados para sumar, como el de seguridad e higiene.',
   },
   {
     id: 'procedimientos',
@@ -138,7 +141,7 @@ const SECCIONES = [
     path: '/procedimientos',
     Icon: IconProcedimientos,
     texto:
-      'A partir del mismo contenido que ya aprobaste en la biblioteca, generás procedimientos (instructivos paso a paso): objetivo, qué necesitás a mano, pasos numerados y qué hacer ante excepciones. Los revisás, aprobás y podés descargarlos en PDF para imprimir o compartir con tu equipo.',
+      'Con el mismo contenido que ya aprobaste, la IA arma instructivos paso a paso: para qué sirve, qué necesitás a mano, los pasos en orden y qué hacer si algo sale mal. Los revisás, los aprobás y los bajás en PDF para imprimir.',
   },
   {
     id: 'checklists',
@@ -146,7 +149,7 @@ const SECCIONES = [
     path: '/checklists',
     Icon: IconChecklist,
     texto:
-      'Es para tareas operativas que se repiten, como apertura, cierre, limpieza o caja. Armás un checklist, elegís si es diario, semanal o mensual y a qué puesto le aplica (por ejemplo, que "Cierre de caja" solo lo vea el cajero). Tu equipo lo completa desde el celular con el mismo link de siempre y vos ves el historial y quién cumple.',
+      'Para tareas que se repiten, como apertura, cierre, limpieza o caja. Armás la lista, elegís si es diaria, semanal o mensual y a qué puestos le toca (por ejemplo, que "Cierre de caja" solo lo vea el cajero). Tu equipo la marca desde el celular, con el mismo link de los cursos. Vos ves quién la completó y cada cuánto se cumple.',
   },
   {
     id: 'progreso',
@@ -154,7 +157,7 @@ const SECCIONES = [
     path: '/progreso',
     Icon: IconProgreso,
     texto:
-      'Es el panel de seguimiento de tu equipo: ranking, qué cursos completó cada uno, certificados descargables y si confirmaron el acuse de recibido de Seguridad e Higiene. Desde acá también conseguís el link, el PIN y el código QR de acceso de cada empleado.',
+      'Acá seguís a tu equipo: quién arrancó, quién va más adelantado, qué cursos completó cada uno, los certificados para descargar y si confirmaron que recibieron el curso de seguridad e higiene. A quien todavía tiene cursos pendientes le podés mandar el link por WhatsApp o mostrarle el código QR.',
   },
   {
     id: 'configuracion',
@@ -162,7 +165,7 @@ const SECCIONES = [
     path: '/configuracion',
     Icon: IconConfiguracion,
     texto:
-      'Se accede con el ícono de engranaje al lado de tu mail, arriba a la derecha (no está en este menú). Ahí elegís qué funciones aparecen para tu equipo: si tu negocio no usa Procedimientos o Checklists, los podés sacar del menú y volver a activarlos cuando quieras.',
+      'Entrás con el engranaje de arriba a la derecha, al lado de tu mail (no está en este menú). Ahí elegís qué secciones usás: si tu negocio no usa Procedimientos o Checklists, los apagás, salen del menú y quedan desactivados hasta que los vuelvas a prender.',
   },
 ];
 
@@ -235,7 +238,7 @@ export default function Ayuda({ session }) {
 
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-2xl p-6">
           <p className="text-sm font-semibold tracking-wide text-[#2C2C2A]">
-            Una guía rápida de qué encontrás en cada sección del menú y para qué sirve.
+            Qué hay en cada sección del menú y para qué sirve.
           </p>
         </div>
 
@@ -246,7 +249,7 @@ export default function Ayuda({ session }) {
             data-seccion-id={id}
             className="bg-white rounded-2xl border border-[#EFDDCE] p-6"
           >
-            <a href={path} className="flex items-center gap-3 mb-2 w-fit">
+            <a href={path} className="flex items-center gap-3 mb-2 w-fit min-h-[40px]">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                   activo === id ? 'bg-[#C1502E] text-white' : 'bg-[#EDE0C8] text-[#C1502E]'

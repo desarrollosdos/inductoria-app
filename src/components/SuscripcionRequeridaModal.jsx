@@ -9,12 +9,12 @@
 // aclara eso en vez de sonar a "no podés usar nada".
 const COPY = {
   general: {
-    titulo: 'Activá tu suscripción para seguir usando Inductoria',
-    texto: 'Podés seguir mirando la app, pero para crear, generar o publicar contenido real necesitás una suscripción activa.',
+    titulo: 'Suscribite para seguir usando Inductoria',
+    texto: 'Podés seguir mirando la app, pero para crear, generar o publicar contenido tenés que suscribirte.',
   },
   ia: {
     titulo: 'Suscribite para usar las funciones con IA',
-    texto: 'Generar o actualizar cursos, generar procedimientos, o leer imágenes con inteligencia artificial son funciones pagas. Podés seguir usando el resto de Inductoria (empleados, biblioteca de cursos, progreso) durante tu prueba gratis.',
+    texto: 'Generar o actualizar cursos, generar procedimientos y leer imágenes con IA se habilitan cuando te suscribís. Mientras tanto, podés seguir usando el resto de Inductoria (empleados, biblioteca de cursos, progreso) durante tu prueba gratis.',
   },
 };
 

@@ -14,6 +14,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Mismo valor por defecto que crear-suscripcion, agregar-sucursal-plan y
+// PRECIO_BASE_POR_DEFECTO en src/lib/precio.js, para que la landing y la
+// app nunca muestren precios distintos si falta la fila de configuración.
+const PRECIO_BASE_POR_DEFECTO = 12000;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -33,7 +38,7 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    return new Response(JSON.stringify({ precio_base: data?.precio_base || 12000 }), {
+    return new Response(JSON.stringify({ precio_base: data?.precio_base || PRECIO_BASE_POR_DEFECTO }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

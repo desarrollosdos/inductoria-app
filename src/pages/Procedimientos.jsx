@@ -164,6 +164,9 @@ export default function Procedimientos({ session }) {
   const [guardando, setGuardando] = useState(false);
   const [procesandoId, setProcesandoId] = useState(null);
   const [errorEstado, setErrorEstado] = useState(null);
+  // Errores de eliminar (se muestra arriba de la lista). Antes quedaban
+  // solo en la consola y parecía que el botón no hacía nada.
+  const [errorGeneral, setErrorGeneral] = useState(null);
 
   const [mostrarSuscripcion, setMostrarSuscripcion] = useState(false);
   const [varianteSuscripcion, setVarianteSuscripcion] = useState('general');
@@ -278,6 +281,7 @@ export default function Procedimientos({ session }) {
   async function handleGuardar(id) {
     if (!form) return;
     setGuardando(true);
+    setErrorEstado(null);
 
     // Comparamos contra el procedimiento tal como estaba antes de abrir el
     // formulario, para decidir si esto fue un cambio chico (sube la versión
@@ -315,8 +319,9 @@ export default function Procedimientos({ session }) {
       .single();
 
     setGuardando(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorEstado('No se pudieron guardar los cambios. Revisá tu conexión y probá de nuevo.');
       return;
     }
     setProcedimientos(procedimientos.map((p) => (p.id === id ? data : p)));
@@ -344,12 +349,11 @@ export default function Procedimientos({ session }) {
     setProcesandoId(null);
     if (error) {
       // Antes esto solo quedaba en la consola del navegador y en
-      // pantalla no pasaba nada — ahora se muestra el motivo real
-      // (por ejemplo, un problema de permisos en Supabase) en vez de
-      // que parezca que el botón "no hace nada".
+      // pantalla no pasaba nada. El detalle técnico (en inglés) va a la
+      // consola; en pantalla, un mensaje que el dueño entienda.
       console.error(error);
       setErrorEstado(
-        `No se pudo ${nuevoEstado === 'aprobado' ? 'aprobar' : 'volver a borrador'} el procedimiento: ${error.message}`
+        `No se pudo ${nuevoEstado === 'aprobado' ? 'aprobar' : 'volver a borrador'} el procedimiento. Probá de nuevo.`
       );
       return;
     }
@@ -358,9 +362,11 @@ export default function Procedimientos({ session }) {
 
   async function handleEliminar(id) {
     setConfirmandoEliminarId(null);
+    setErrorGeneral(null);
     const { error } = await supabase.from('procedimientos').delete().eq('id', id);
     if (error) {
       console.error(error);
+      setErrorGeneral('No se pudo eliminar el procedimiento. Probá de nuevo.');
       return;
     }
     setAbiertoId(null);
@@ -410,16 +416,16 @@ export default function Procedimientos({ session }) {
           }
         />
         <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-xl p-4 text-sm text-[#2C4A3A] font-medium">
-          Acá podés generar <strong>procedimientos (SOPs)</strong> a partir del mismo contenido que
-          ya cargaste en la biblioteca: objetivo, alcance, qué necesitás a mano, pasos numerados y
-          qué hacer ante excepciones. Listo para revisar, ajustar, aprobar y descargar en PDF
-          para imprimir o compartir con tu equipo.
+          Acá armás <strong>procedimientos (instructivos paso a paso)</strong> con el mismo
+          contenido que ya cargaste: para qué sirve, a quién le toca, qué necesitás a mano, los
+          pasos en orden y qué hacer si algo sale mal. Después lo revisás y lo bajás en PDF para
+          imprimir.
         </div>
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
           <h2 className="font-semibold text-[#2C2C2A] mb-1">Generar procedimiento con IA</h2>
           <p className="text-xs text-[#8a8471] mb-3">
-            Elegí un contenido ya aprobado en la biblioteca. Podés generar un procedimiento y un
+            Elegí un contenido que ya aprobaste. Podés generar un procedimiento y un
             curso a partir del mismo contenido, no hace falta elegir uno solo. Un contenido que ya
             tiene un procedimiento generado deja de aparecer acá hasta que lo elimines.
           </p>
@@ -464,6 +470,7 @@ export default function Procedimientos({ session }) {
               {procedimientos.length}
             </span>
           </div>
+          {errorGeneral && <p className="text-xs font-semibold text-[#C1502E] mb-3">{errorGeneral}</p>}
           {procedimientos.length === 0 ? (
             <p className="text-sm text-[#6b6455]">Todavía no generaste ningún procedimiento.</p>
           ) : (
@@ -586,7 +593,7 @@ export default function Procedimientos({ session }) {
 
                         <div className="border-t border-[#F3EAD9] pt-3">
                           <p className="text-[11px] font-bold uppercase tracking-wide text-[#C1502E] mb-2">
-                            Objetivo y alcance
+                            Para qué sirve y a quién le toca
                           </p>
                           <div className="space-y-2">
                             <div>
@@ -639,13 +646,13 @@ export default function Procedimientos({ session }) {
                             </div>
                             <div>
                               <label className="text-xs font-semibold text-[#8a8471]">
-                                Excepciones — una por línea, formato "condición :: qué hacer"
+                                Qué hacer si algo sale mal (una por línea, así: situación :: qué hacer)
                               </label>
                               <textarea
                                 value={form.excepcionesTexto}
                                 onChange={(e) => setForm({ ...form, excepcionesTexto: e.target.value })}
                                 rows={3}
-                                placeholder="ej: falta un producto en el conteo :: avisar al encargado antes de cerrar caja"
+                                placeholder="Ej: falta un producto en el conteo :: avisar al encargado antes de cerrar caja"
                                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none mt-1"
                               />
                             </div>

@@ -88,6 +88,37 @@ function IconSpinner(props) {
 // por debajo de eso).
 const DURACION_MAX_GRABACION_SEG = 5 * 60;
 
+// Mismos topes que extraer-texto-archivo: 10 MB en general, y para
+// imágenes lo que acepta Anthropic (5 MB medidos en base64, o sea unos
+// 3,75 MB del archivo real). Se chequea acá antes de subir para no hacer
+// esperar al dueño y que después falle igual.
+const TAMANO_MAX_ARCHIVO = 10 * 1024 * 1024;
+const TAMANO_MAX_IMAGEN = Math.floor((5 * 1024 * 1024 * 3) / 4);
+
+// Si un contenido sigue en "generando" después de esto, el proceso en el
+// servidor se cortó (la generación normal tarda uno o dos minutos) y lo
+// mostramos como fallido, con opción de reintentar o eliminar.
+const LIMITE_GENERACION_MS = 10 * 60 * 1000;
+const INTERVALO_CONSULTA_GENERACION_MS = 4000;
+
+// supabase.functions.invoke devuelve data=null cuando la función responde
+// con un error (4xx/5xx), y el mensaje real queda adentro de
+// error.context. Esto lo rescata para mostrarle al dueño el motivo real
+// (por ejemplo "El contenido es muy largo, dividilo en partes").
+async function leerErrorFuncion(error, data, mensajePorDefecto) {
+  if (data?.error) return { mensaje: data.error, detalle: data.detalle };
+  try {
+    const ctx = error?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      const cuerpo = await ctx.json();
+      if (cuerpo?.error) return { mensaje: cuerpo.error, detalle: cuerpo.detalle };
+    }
+  } catch {
+    // sin cuerpo legible, usamos el mensaje por defecto
+  }
+  return { mensaje: mensajePorDefecto, detalle: null };
+}
+
 const ESTADO_INFO = {
   pendiente: { bg: '#6B655A', color: '#ffffff', label: 'Pendiente', nitida: true },
   aprobado: { bg: '#7C8B6F', color: '#ffffff', label: 'Aprobado', nitida: true },
@@ -100,6 +131,8 @@ const ESTADO_INFO = {
   // sencillamente el paso previo a "Curso generado" para el mismo
   // contenido.
   generando: { bg: '#FCF3DD', color: '#8a6d1f', label: 'Generando...' },
+  // Estado solo visual: quedó en "generando" más de LIMITE_GENERACION_MS.
+  fallido: { bg: '#C1502E', color: '#ffffff', label: 'Falló', nitida: true },
   // 2026-09-07, a pedido de Roberto: el violeta no pega con el resto de
   // la paleta (terracota, verde salvia, marrón oliva, crema). Usamos el
   // mismo dorado/crema que ya usa "preguntas frecuentes" (#FCF3DD /
@@ -211,14 +244,37 @@ export default function Contenido({ session }) {
   // ver handleActualizarPublicado y handlePublicarRevision más abajo).
   const [cursosEnRevision, setCursosEnRevision] = useState([]);
   const [publicandoRevisionId, setPublicandoRevisionId] = useState(null);
+  const [errorPublicar, setErrorPublicar] = useState(null); // { id, mensaje }
 
   const [abiertoId, setAbiertoId] = useState(null);
   const [tituloEdit, setTituloEdit] = useState('');
   const [textoEdit, setTextoEdit] = useState('');
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
-  const [generandoId, setGenerandoId] = useState(null);
-  const [errorGenerar, setErrorGenerar] = useState(null);
+  // Generación con IA: puede haber varios contenidos generándose a la
+  // vez, así que llevamos un conjunto de ids (antes era un solo
+  // generandoId compartido, y generar un segundo contenido pisaba el
+  // estado del primero).
+  const [generandoIds, setGenerandoIds] = useState(() => new Set());
+  // Ids que quedaron trabados en "generando" (ver LIMITE_GENERACION_MS).
+  const [trabadosIds, setTrabadosIds] = useState(() => new Set());
+  const trabadosRef = useRef(new Set());
+  // Un solo poller por contenido: cargarTodo y handleGenerarCurso los
+  // arrancaban los dos y quedaban consultas duplicadas.
+  const pollersRef = useRef(new Set());
+  const montadoRef = useRef(true);
+  // Valor actual de abiertoId para usar desde el poller (que vive varios
+  // renders y vería un valor viejo si lo leyera del closure).
+  const abiertoIdRef = useRef(null);
+  const cargoUnaVezRef = useRef(false);
+  const [errorGenerar, setErrorGenerar] = useState(null); // { id, mensaje }
+  const [errorItem, setErrorItem] = useState(null); // { id, mensaje }
+  const [errorCarga, setErrorCarga] = useState(null);
+  const [errorSubir, setErrorSubir] = useState(null);
+  const [errorBase, setErrorBase] = useState(null); // { id, mensaje }
+  const [errorAprobar, setErrorAprobar] = useState(null);
+  const [errorPuestos, setErrorPuestos] = useState(null);
+  const [okActualizar, setOkActualizar] = useState(null);
 
   const [borrador, setBorrador] = useState(null); // { microcurso, pasos }
   const [cargandoBorrador, setCargandoBorrador] = useState(false);
@@ -293,9 +349,18 @@ export default function Contenido({ session }) {
   }
 
   useEffect(() => {
+    montadoRef.current = true;
     cargarTodo();
+    return () => {
+      // Corta los pollers si el dueño se va de la pantalla.
+      montadoRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    abiertoIdRef.current = abiertoId;
+  }, [abiertoId]);
 
   // Si el dueño se va de la pantalla mientras está grabando (cambia de
   // pestaña, navega a otro lado), cortamos el micrófono y el timer en
@@ -344,63 +409,86 @@ export default function Contenido({ session }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grabando]);
 
+  // Solo la primera carga muestra "Cargando..." a pantalla completa. Las
+  // recargas posteriores (después de generar, publicar, etc.) actualizan
+  // los datos sin tapar la pantalla ni perder lo que el dueño tiene abierto.
   async function cargarTodo() {
-    setLoading(true);
-    const { data: cuentaData } = await supabase
+    if (!cargoUnaVezRef.current) setLoading(true);
+    setErrorCarga(null);
+    const { data: cuentaData, error: cuentaError } = await supabase
       .from('cuentas')
       .select('*')
       .eq('owner_id', session.user.id)
       .maybeSingle();
+    if (cuentaError) {
+      console.error(cuentaError);
+      setErrorCarga('No pudimos cargar tus datos. Revisá la conexión y probá de nuevo.');
+      setLoading(false);
+      return;
+    }
     setCuenta(cuentaData);
 
     if (cuentaData) {
-      const { data: publicadosData } = await supabase
+      const { data: publicadosData, error: publicadosError } = await supabase
         .from('microcursos')
         .select('id, titulo, created_at, puestos_aplicables, origen_base_id, version')
         .eq('cuenta_id', cuentaData.id)
         .eq('estado', 'aprobado')
         .order('created_at', { ascending: false });
-      setCursosPublicados(publicadosData || []);
+      if (publicadosError) console.error(publicadosError);
+      if (!publicadosError) setCursosPublicados(publicadosData || []);
 
       // Cursos propios a los que se les cambió el contenido (ver
       // handleActualizarPublicado): dejan de estar "aprobado" mientras se
       // revisa la versión nueva, así que no aparecen en "Cursos
       // disponibles" ni los ven los empleados hasta que el dueño confirma
-      // la publicación desde acá abajo.
-      const { data: revisionData } = await supabase
+      // la publicación desde acá abajo. select('*') para leer
+      // revision_con_cambios sin romper si esa columna todavía no existe.
+      const { data: revisionData, error: revisionError } = await supabase
         .from('microcursos')
-        .select('id, titulo, version')
+        .select('*')
         .eq('cuenta_id', cuentaData.id)
         .eq('estado', 'en_revision')
         .order('created_at', { ascending: false });
-      setCursosEnRevision(revisionData || []);
+      if (revisionError) console.error(revisionError);
+      if (!revisionError) setCursosEnRevision(revisionData || []);
 
       const idsPublicados = new Set((publicadosData || []).map((m) => m.id));
 
-      const { data: contenidosData } = await supabase
+      const { data: contenidosData, error: contenidosError } = await supabase
         .from('contenidos')
         .select('*')
         .eq('cuenta_id', cuentaData.id)
         .order('created_at', { ascending: false });
+      if (contenidosError || publicadosError || revisionError) {
+        if (contenidosError) console.error(contenidosError);
+        setErrorCarga('No pudimos cargar todo tu contenido. Revisá la conexión y probá de nuevo.');
+      }
 
       // Los contenidos cuyo curso ya quedó publicado (aprobado) salen de la
       // lista editable: ya están en "Cursos disponibles para tus empleados",
       // de solo lectura.
-      setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
+      // Si la consulta falló no pisamos la lista que ya se veía.
+      if (!contenidosError && !publicadosError) {
+        setContenidos((contenidosData || []).filter((c) => !(c.microcurso_id && idsPublicados.has(c.microcurso_id))));
+      }
 
       // Si algún contenido quedó en "generando" (por ejemplo porque se
-      // arrancó la generación, se cerró la pestaña o se cortó el
-      // celular, y recién ahora se vuelve a abrir la página), el trabajo
-      // real puede seguir corriendo en el servidor sin que nadie lo esté
-      // mirando. Retomamos la consulta periódica automáticamente acá, sin
-      // que haga falta apretar el botón de nuevo.
+      // arrancó la generación y se cerró la pestaña), el trabajo real
+      // puede seguir corriendo en el servidor. Retomamos la consulta
+      // periódica acá (esperarResultadoGeneracion ignora los que ya tienen
+      // un poller andando), salvo que ya haya pasado el límite: esos se
+      // muestran directamente como fallidos.
       (contenidosData || [])
         .filter((c) => c.estado === 'generando')
         .forEach((c) => {
-          esperarResultadoGeneracion(c.id);
+          if (generacionVencida(c)) marcarTrabado(c.id);
+          else esperarResultadoGeneracion(c.id, c.generando_desde);
         });
 
       supabase.functions.invoke('gaps-conocimiento', { method: 'GET' }).then(({ data, error }) => {
+        // No es crítico: si falla, simplemente no se muestran las
+        // preguntas frecuentes.
         if (error || !data?.gaps) return;
         const mapa = {};
         data.gaps.forEach((g) => (mapa[g.microcurso_id] = g));
@@ -408,13 +496,35 @@ export default function Contenido({ session }) {
       });
     }
 
-    const { data: baseData } = await supabase
+    const { data: baseData, error: baseError } = await supabase
       .from('cursos_base')
       .select('*')
       .order('orden', { ascending: true });
+    if (baseError) console.error(baseError);
     setCursosBase(baseData || []);
 
+    cargoUnaVezRef.current = true;
     setLoading(false);
+  }
+
+  function generacionVencida(c) {
+    if (!c.generando_desde) return false;
+    const desde = new Date(c.generando_desde).getTime();
+    return Number.isFinite(desde) && Date.now() - desde > LIMITE_GENERACION_MS;
+  }
+
+  function marcarTrabado(id) {
+    trabadosRef.current.add(id);
+    setTrabadosIds(new Set(trabadosRef.current));
+  }
+
+  function desmarcarTrabado(id) {
+    trabadosRef.current.delete(id);
+    setTrabadosIds(new Set(trabadosRef.current));
+  }
+
+  function estaTrabado(c) {
+    return c.estado === 'generando' && (trabadosIds.has(c.id) || generacionVencida(c));
   }
 
   function abrirSeleccionBase(cursoId) {
@@ -443,6 +553,7 @@ export default function Contenido({ session }) {
     if (!esSegHig && puestosBiblioteca.length === 0) return;
 
     setAgregandoBaseId(curso.id);
+    setErrorBase(null);
 
     // Los cursos de biblioteca ya vienen armados (pasos y preguntas
     // redactados a mano), así que se publican directo, sin pasar por
@@ -467,6 +578,7 @@ export default function Contenido({ session }) {
     if (error || !microcurso) {
       console.error(error);
       setAgregandoBaseId(null);
+      setErrorBase({ id: curso.id, mensaje: 'No se pudo agregar el curso. Probá de nuevo.' });
       return;
     }
 
@@ -478,7 +590,15 @@ export default function Contenido({ session }) {
     }));
     if (pasosAInsertar.length > 0) {
       const { error: pasosError } = await supabase.from('pasos').insert(pasosAInsertar);
-      if (pasosError) console.error(pasosError);
+      if (pasosError) {
+        // Sin pasos el curso quedaría publicado pero vacío para los
+        // empleados: lo sacamos y avisamos.
+        console.error(pasosError);
+        await supabase.from('microcursos').delete().eq('id', microcurso.id);
+        setAgregandoBaseId(null);
+        setErrorBase({ id: curso.id, mensaje: 'No se pudo agregar el curso completo. Probá de nuevo.' });
+        return;
+      }
     }
 
     setAgregandoBaseId(null);
@@ -498,6 +618,7 @@ export default function Contenido({ session }) {
     }
 
     setSubiendo(true);
+    setErrorSubir(null);
 
     const { data, error } = await supabase
       .from('contenidos')
@@ -514,6 +635,7 @@ export default function Contenido({ session }) {
     setSubiendo(false);
     if (error) {
       console.error(error);
+      setErrorSubir('No se pudo guardar el contenido. Probá de nuevo.');
       return;
     }
     setContenidos([data, ...contenidos]);
@@ -544,6 +666,15 @@ export default function Contenido({ session }) {
 
     if (!esTxt && !esPdf && !esDocx && !esImagen && !esAudio) {
       setErrorArchivo('Solo se aceptan archivos .txt, .pdf, .docx, imágenes o audio. Video no está soportado.');
+      return;
+    }
+
+    if (file.size > TAMANO_MAX_ARCHIVO) {
+      setErrorArchivo('El archivo pesa más de 10 MB. Probá con uno más liviano o dividilo en partes.');
+      return;
+    }
+    if (esImagen && file.size > TAMANO_MAX_IMAGEN) {
+      setErrorArchivo('La imagen pesa demasiado (el máximo es de unos 3,5 MB). Probá con una captura o una foto más liviana.');
       return;
     }
 
@@ -850,17 +981,30 @@ export default function Contenido({ session }) {
     handleArchivo(e.dataTransfer.files?.[0]);
   }
 
-  async function abrirItem(c) {
+  // Abre o cierra un contenido de la lista (toque sobre la tarjeta).
+  function abrirItem(c) {
     if (abiertoId === c.id) {
       setAbiertoId(null);
       setBorrador(null);
       setPuestosNuevoCurso([]);
       return;
     }
+    abrirContenido(c);
+  }
+
+  // Abre SIEMPRE (nunca cierra) un contenido y, si ya tiene un curso
+  // generado, carga el borrador. Se separó de abrirItem porque el poller
+  // llamaba a abrirItem con un abiertoId viejo del closure: si el dueño
+  // tenía abierto ese mismo contenido, abrirItem lo interpretaba como un
+  // segundo toque y cerraba el panel justo cuando terminaba de generarse.
+  async function abrirContenido(c) {
     setAbiertoId(c.id);
+    abiertoIdRef.current = c.id;
     setTituloEdit(c.archivo_original || '');
     setTextoEdit(c.texto_procesado || '');
     setErrorGenerar(null);
+    setErrorItem(null);
+    setErrorAprobar(null);
     setErrorDescartar(null);
     setConfirmandoQuitarVinculado(false);
     setBorrador(null);
@@ -874,21 +1018,28 @@ export default function Contenido({ session }) {
         .eq('id', c.microcurso_id)
         .maybeSingle();
 
+      let pasos = [];
       if (microcurso) {
-        const { data: pasos } = await supabase
+        const { data } = await supabase
           .from('pasos')
           .select('*')
           .eq('microcurso_id', microcurso.id)
           .order('orden', { ascending: true });
-        setBorrador({ microcurso, pasos: pasos || [] });
+        pasos = data || [];
       }
-      setCargandoBorrador(false);
+      // Si mientras cargaba el dueño abrió otro contenido, no pisamos lo
+      // que está viendo.
+      if (abiertoIdRef.current === c.id) {
+        setBorrador(microcurso ? { microcurso, pasos } : null);
+        setCargandoBorrador(false);
+      }
     }
   }
 
   async function handleGuardarEdit(id) {
     if (!tituloEdit.trim() || !textoEdit.trim()) return;
     setGuardandoEdit(true);
+    setErrorItem(null);
     const { data, error } = await supabase
       .from('contenidos')
       .update({ archivo_original: capitalizarPrimeraLetra(tituloEdit.trim()), texto_procesado: textoEdit.trim() })
@@ -899,6 +1050,7 @@ export default function Contenido({ session }) {
     setGuardandoEdit(false);
     if (error) {
       console.error(error);
+      setErrorItem({ id, mensaje: 'No se pudieron guardar los cambios. Probá de nuevo.' });
       return;
     }
     setContenidos(contenidos.map((c) => (c.id === id ? data : c)));
@@ -907,6 +1059,7 @@ export default function Contenido({ session }) {
 
   async function handleCambiarEstado(id, estadoActual) {
     const nuevoEstado = estadoActual === 'aprobado' ? 'pendiente' : 'aprobado';
+    setErrorItem(null);
     const { data, error } = await supabase
       .from('contenidos')
       .update({ estado: nuevoEstado })
@@ -916,6 +1069,7 @@ export default function Contenido({ session }) {
 
     if (error) {
       console.error(error);
+      setErrorItem({ id, mensaje: 'No se pudo cambiar el estado. Probá de nuevo.' });
       return;
     }
     setContenidos(contenidos.map((c) => (c.id === id ? data : c)));
@@ -930,30 +1084,20 @@ export default function Contenido({ session }) {
       // seguía ahí, y volvía a aparecer en la próxima recarga sin ningún
       // aviso de que el borrado nunca se hizo.
       console.error(error);
-      setErrorEliminar(error.message || 'No se pudo eliminar. Probá de nuevo.');
+      setErrorEliminar('No se pudo eliminar. Probá de nuevo.');
       return;
     }
     setConfirmandoEliminarId(null);
     setContenidos(contenidos.filter((c) => c.id !== id));
+    desmarcarTrabado(id);
     setAbiertoId(null);
   }
 
-  // Rediseño 2026-08-26 (tercera vuelta sobre este bug): las dos vueltas
-  // anteriores intentaban detectar cuándo se cortaba la conexión del
-  // celular durante la espera. El cartel que le apareció a Roberto
-  // confirmó que la conexión SÍ se corta de verdad — no hay try/catch del
-  // lado del cliente que arregle eso, porque el problema no es el manejo
-  // de errores, es que la pestaña deja de estar viva para recibir la
-  // respuesta.
-  //
-  // La solución de fondo es no depender de que la pestaña siga viva:
-  // ahora procesar-contenido responde CASI AL INSTANTE (marca el
-  // contenido como "generando" y devuelve), y el trabajo pesado (llamar a
-  // la IA, armar el curso) sigue en el SERVIDOR en segundo plano,
-  // completamente independiente de si el celular sigue conectado, la
-  // pestaña se recarga, se cierra la app o se apaga la pantalla. El
-  // frontend después solo pregunta cada pocos segundos "¿ya terminó?" en
-  // vez de mantener una sola conexión larga y frágil abierta.
+  // Rediseño 2026-08-26: procesar-contenido responde CASI AL INSTANTE
+  // (marca el contenido como "generando" y devuelve), y el trabajo pesado
+  // sigue en el SERVIDOR en segundo plano, independiente de si el celular
+  // sigue conectado. El frontend solo pregunta cada pocos segundos "¿ya
+  // terminó?" (esperarResultadoGeneracion).
   async function handleGenerarCurso(id) {
     if (!puedeUsarIA(cuenta, session.user.email)) {
       setVarianteSuscripcion('ia');
@@ -961,7 +1105,7 @@ export default function Contenido({ session }) {
       return;
     }
 
-    setGenerandoId(id);
+    setGenerandoIds((prev) => new Set(prev).add(id));
     setErrorGenerar(null);
 
     try {
@@ -971,79 +1115,119 @@ export default function Contenido({ session }) {
       });
 
       if (error || data?.error) {
-        // 2026-08-26: si el servidor manda un `detalle` (el motivo técnico
-        // exacto, por ejemplo un error de base de datos), lo mostramos
-        // junto al mensaje para no tener que ir a buscar logs de Supabase
-        // a mano cada vez que algo falla acá.
-        const base = data?.error || 'No se pudo iniciar la generación. Probá de nuevo.';
-        setErrorGenerar(data?.detalle ? `${base} (${data.detalle})` : base);
-        setGenerandoId(null);
+        const { mensaje, detalle } = await leerErrorFuncion(
+          error,
+          data,
+          'No se pudo iniciar la generación. Probá de nuevo.'
+        );
+        // Si el servidor manda un `detalle` (el motivo técnico exacto),
+        // lo mostramos junto al mensaje para no tener que ir a buscar
+        // logs de Supabase cada vez que algo falla acá.
+        setErrorGenerar({ id, mensaje: detalle ? `${mensaje} (${detalle})` : mensaje });
+        setGenerandoIds((prev) => {
+          const n = new Set(prev);
+          n.delete(id);
+          return n;
+        });
         return;
       }
-      // Si llegamos acá, el servidor ya marcó el contenido como
-      // "generando" y sigue trabajando solo, tengamos o no la pestaña
-      // abierta. cargarTodo() ya lo va a mostrar como "Generando...".
-      await cargarTodo();
-      await esperarResultadoGeneracion(id);
     } catch (err) {
+      // Puede que no haya llegado a arrancar, o que la respuesta se haya
+      // cortado justo al volver (y sí haya arrancado). En vez de asumir,
+      // preguntamos el estado real con el poller de abajo.
       console.error(err);
-      // Si esto explotó, puede ser que ni siquiera haya llegado a
-      // arrancar del lado del servidor, o puede ser que la respuesta se
-      // haya cortado justo al volver (y sí haya arrancado). En vez de
-      // asumir nada, preguntamos.
-      await cargarTodo();
-      await esperarResultadoGeneracion(id);
     }
+    // cargarTodo ya arranca el poller si lo ve en "generando"; la llamada
+    // explícita cubre el caso en que todavía no se veía así. El poller
+    // ignora la segunda llamada si ya hay uno andando.
+    await cargarTodo();
+    esperarResultadoGeneracion(id);
+  }
+
+  // Reintentar una generación que quedó trabada: la devolvemos a
+  // "aprobado" (así procesar-contenido la acepta) y arrancamos de nuevo.
+  async function handleReintentarGeneracion(c) {
+    setErrorGenerar(null);
+    const { error } = await supabase
+      .from('contenidos')
+      .update({ estado: 'aprobado', error_generacion: null })
+      .eq('id', c.id);
+    if (error) {
+      console.error(error);
+      setErrorGenerar({ id: c.id, mensaje: 'No se pudo reintentar. Probá de nuevo o eliminá el contenido.' });
+      return;
+    }
+    desmarcarTrabado(c.id);
+    await handleGenerarCurso(c.id);
   }
 
   // Consulta el estado real cada pocos segundos hasta que el contenido
   // deje de estar "generando" (pasó a "procesado" = éxito, o volvió a
-  // "aprobado" = terminó con error). Como cada consulta es corta,
-  // aguanta bien que el celular pierda señal un rato: la próxima consulta
-  // simplemente lo intenta de nuevo. También se llama sola al cargar la
-  // página si encuentra algo que quedó "generando" de una visita anterior
-  // (ver cargarTodo), así que sobrevive incluso a un cierre completo de
-  // la pestaña mientras tanto.
-  async function esperarResultadoGeneracion(id) {
-    const INTERVALO_MS = 4000;
-    const MAX_INTENTOS = 60; // ~4 minutos de margen
+  // "aprobado" = terminó con error). Hay UN solo poller por contenido
+  // (pollersRef), y si pasa LIMITE_GENERACION_MS sin terminar se marca
+  // como trabado para ofrecer reintentar o eliminar.
+  async function esperarResultadoGeneracion(id, generandoDesde) {
+    if (pollersRef.current.has(id)) return;
+    pollersRef.current.add(id);
+    setGenerandoIds((prev) => new Set(prev).add(id));
 
-    setGenerandoId(id);
+    let inicio = generandoDesde ? new Date(generandoDesde).getTime() : Date.now();
+    if (!Number.isFinite(inicio)) inicio = Date.now();
 
-    for (let intento = 0; intento < MAX_INTENTOS; intento++) {
-      await new Promise((resolve) => setTimeout(resolve, INTERVALO_MS));
+    try {
+      while (montadoRef.current) {
+        if (Date.now() - inicio > LIMITE_GENERACION_MS) {
+          marcarTrabado(id);
+          return;
+        }
 
-      const { data: actual, error } = await supabase
-        .from('contenidos')
-        .select('estado, microcurso_id, error_generacion')
-        .eq('id', id)
-        .maybeSingle();
+        await new Promise((resolve) => setTimeout(resolve, INTERVALO_CONSULTA_GENERACION_MS));
+        if (!montadoRef.current) return;
 
-      if (error || !actual) continue; // problema de red puntual, seguimos intentando
+        const { data: actual, error } = await supabase
+          .from('contenidos')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
 
-      if (actual.estado === 'procesado' && actual.microcurso_id) {
-        await cargarTodo();
-        setAbiertoId(id);
-        abrirItem({ id, estado: 'procesado', microcurso_id: actual.microcurso_id });
-        setGenerandoId(null);
-        return;
+        if (error) continue; // problema de red puntual, seguimos intentando
+        if (!actual) return; // lo eliminaron mientras tanto
+
+        if (actual.estado === 'procesado' && actual.microcurso_id) {
+          await cargarTodo();
+          // Abrimos el borrador si el dueño tenía abierto este contenido
+          // o no tenía ninguno abierto. Si está mirando otro, no se lo
+          // cambiamos de golpe: lo va a ver como "Curso generado".
+          const abiertoAhora = abiertoIdRef.current;
+          if (abiertoAhora === id || abiertoAhora === null) {
+            await abrirContenido(actual);
+          }
+          return;
+        }
+
+        if (actual.estado !== 'generando') {
+          // Volvió a "aprobado" sin quedar procesado: el trabajo en el
+          // servidor terminó, pero con error (queda en error_generacion y
+          // se muestra en la tarjeta).
+          await cargarTodo();
+          return;
+        }
+
+        if (actual.generando_desde) {
+          const desde = new Date(actual.generando_desde).getTime();
+          if (Number.isFinite(desde)) inicio = desde;
+        }
       }
-
-      if (actual.estado === 'aprobado') {
-        // Volvió a "aprobado" sin quedar procesado: el trabajo en el
-        // servidor terminó, pero con error.
-        await cargarTodo();
-        setErrorGenerar(actual.error_generacion || 'No se pudo generar el curso. Probá de nuevo.');
-        setGenerandoId(null);
-        return;
+    } finally {
+      pollersRef.current.delete(id);
+      if (montadoRef.current) {
+        setGenerandoIds((prev) => {
+          const n = new Set(prev);
+          n.delete(id);
+          return n;
+        });
       }
-      // Sigue en "generando", seguimos esperando.
     }
-
-    setErrorGenerar(
-      'La generación está tardando más de lo normal. Podés cerrar esta pantalla: cuando termine vas a verlo como "Curso generado" al volver a entrar.'
-    );
-    setGenerandoId(null);
   }
 
   async function handleAprobarCurso() {
@@ -1057,11 +1241,19 @@ export default function Contenido({ session }) {
     }
 
     setProcesandoAccion(true);
-    await supabase
+    setErrorAprobar(null);
+    const { error } = await supabase
       .from('microcursos')
       .update({ estado: 'aprobado', puestos_aplicables: puestosNuevoCurso })
       .eq('id', borrador.microcurso.id);
     setProcesandoAccion(false);
+    if (error) {
+      // Antes no se miraba el error: el panel se cerraba igual y el curso
+      // parecía publicado aunque no lo estaba.
+      console.error(error);
+      setErrorAprobar('No se pudo publicar el curso. Probá de nuevo.');
+      return;
+    }
     setAbiertoId(null);
     setBorrador(null);
     setPuestosNuevoCurso([]);
@@ -1072,13 +1264,9 @@ export default function Contenido({ session }) {
     if (!borrador) return;
 
     // 2026-09-07: si el curso enlazado a este contenido YA está
-    // publicado (o en medio de un cambio de versión), no lo borramos.
-    // Antes esto borraba cualquier curso enlazado sin distinguir un
-    // borrador sin usar de un curso real y ya completado por
-    // empleados — y como un contenido nunca se marca como "ya usado"
-    // después de aprobarse, podía seguir apuntando a ese curso real
-    // mucho después, así que "Descartar" acá terminaba borrando algo
-    // que no era un simple borrador.
+    // publicado (o en medio de un cambio de versión), no lo borramos:
+    // podría ser un curso real ya completado por empleados, no un simple
+    // borrador.
     if (borrador.microcurso.estado === 'aprobado' || borrador.microcurso.estado === 'en_revision') {
       setConfirmandoDescartar(false);
       setErrorDescartar(
@@ -1089,12 +1277,23 @@ export default function Contenido({ session }) {
 
     setConfirmandoDescartar(false);
     setProcesandoAccion(true);
-    await supabase.from('microcursos').delete().eq('id', borrador.microcurso.id);
-    await supabase
+    const { error: borrarError } = await supabase.from('microcursos').delete().eq('id', borrador.microcurso.id);
+    if (borrarError) {
+      console.error(borrarError);
+      setProcesandoAccion(false);
+      setErrorDescartar('No se pudo descartar el curso. Probá de nuevo.');
+      return;
+    }
+    const { error: contenidoError } = await supabase
       .from('contenidos')
       .update({ estado: 'aprobado', microcurso_id: null })
       .eq('id', abiertoId);
     setProcesandoAccion(false);
+    if (contenidoError) {
+      console.error(contenidoError);
+      setErrorDescartar('El curso se descartó, pero no se pudo actualizar el contenido. Recargá la página.');
+      return;
+    }
     setAbiertoId(null);
     setBorrador(null);
     cargarTodo();
@@ -1115,7 +1314,7 @@ export default function Contenido({ session }) {
     setProcesandoAccion(false);
     if (error) {
       console.error(error);
-      setErrorDescartar(error.message || 'No se pudo quitar. Probá de nuevo.');
+      setErrorDescartar('No se pudo quitar. Probá de nuevo.');
       return;
     }
     setAbiertoId(null);
@@ -1125,18 +1324,18 @@ export default function Contenido({ session }) {
 
   // Desde "Cursos disponibles" solo pide confirmación. El curso todavía
   // está publicado en este momento, así que acá no hay nada para
-  // mostrar u ocultar — eso pasa recién al confirmar.
+  // mostrar u ocultar: eso pasa recién al confirmar.
   function abrirEdicionPublicado(microcursoId) {
     setErrorCambiarVersion(null);
     setConfirmandoVersionId(microcursoId);
   }
 
-  // 2026-09-07, a pedido de Roberto: al confirmar "Cambiar versión", el
-  // curso sale de "Cursos disponibles" AL TOQUE (pasa a estado
-  // 'en_revision', el mismo que ya usaba "Contenido cargado" para
-  // cursos con la versión nueva lista) y se gestiona desde ahí como uno
-  // más de los contenidos — no hace falta esperar a escribir nada ni a
-  // que la IA regenere el curso para que deje de estar "Disponible".
+  // Al confirmar "Cambiar versión", el curso sale de "Cursos
+  // disponibles" al toque (pasa a 'en_revision') y se gestiona desde
+  // "Contenido cargado". Esto NO cambia microcursos.version: la versión
+  // sube recién al volver a publicar, y solo si la IA le cambió algo (lo
+  // hace un trigger en la base, ver
+  // supabase/sql/2026-09-24-cursos-versiones.sql).
   async function confirmarEdicionPublicado(microcursoId) {
     setErrorCambiarVersion(null);
 
@@ -1147,38 +1346,21 @@ export default function Contenido({ session }) {
 
     if (error) {
       // No cerramos el cartel de confirmación: si lo cerráramos acá, esto
-      // se ve exactamente como "no pasa nada" y invita a tocar "Sí,
-      // continuar" una y otra vez sin que nunca funcione.
+      // se ve exactamente como "no pasa nada".
       console.error(error);
-      setErrorCambiarVersion(error.message || 'No se pudo cambiar de versión. Probá de nuevo.');
+      setErrorCambiarVersion('No se pudo cambiar de versión. Probá de nuevo.');
       return;
     }
 
     setConfirmandoVersionId(null);
+    setAccionesVisiblesId(null);
     await cargarTodo();
     await abrirEdicionEnRevision(microcursoId);
   }
 
-  // Abre (o cierra) el panel de edición de un curso que ya está en
-  // revisión, trayendo su contenido actual (pasos + preguntas) para que
-  // el dueño lo vea antes de indicar qué modificar o agregar. También
-  // sirve para RETOMAR la edición si el dueño salió de la pantalla a
-  // mitad de camino (el curso se mantiene en "Contenido cargado" hasta
-  // que se publique una versión, tenga o no cambios todavía).
-  async function abrirEdicionEnRevision(microcursoId) {
-    if (editandoPublicadoId === microcursoId) {
-      setEditandoPublicadoId(null);
-      setTextoNuevoPublicado('');
-      setErrorActualizar(null);
-      setContenidoActualEditando(null);
-      return;
-    }
-    setEditandoPublicadoId(microcursoId);
-    setTextoNuevoPublicado('');
-    setErrorActualizar(null);
-    setContenidoActualEditando(null);
+  // Trae el contenido actual (pasos + preguntas) de un curso en revisión.
+  async function cargarContenidoActual(microcursoId) {
     setCargandoContenidoActual(true);
-
     const { data: microcurso } = await supabase
       .from('microcursos')
       .select('*')
@@ -1192,11 +1374,34 @@ export default function Contenido({ session }) {
         .eq('microcurso_id', microcursoId)
         .order('orden', { ascending: true });
       setContenidoActualEditando({ microcurso, pasos: pasos || [] });
+    } else {
+      setContenidoActualEditando(null);
     }
     setCargandoContenidoActual(false);
   }
 
+  // Abre (o cierra) el panel de edición de un curso que ya está en
+  // revisión, trayendo su contenido actual para que el dueño lo vea antes
+  // de pedir cambios. También sirve para RETOMAR la edición si el dueño
+  // salió de la pantalla a mitad de camino.
+  async function abrirEdicionEnRevision(microcursoId) {
+    setOkActualizar(null);
+    if (editandoPublicadoId === microcursoId) {
+      setEditandoPublicadoId(null);
+      setTextoNuevoPublicado('');
+      setErrorActualizar(null);
+      setContenidoActualEditando(null);
+      return;
+    }
+    setEditandoPublicadoId(microcursoId);
+    setTextoNuevoPublicado('');
+    setErrorActualizar(null);
+    setContenidoActualEditando(null);
+    await cargarContenidoActual(microcursoId);
+  }
+
   function abrirEdicionPuestos(microcurso) {
+    setErrorPuestos(null);
     if (editandoPuestosId === microcurso.id) {
       setEditandoPuestosId(null);
       return;
@@ -1207,6 +1412,7 @@ export default function Contenido({ session }) {
 
   async function handleGuardarPuestos(microcursoId) {
     setGuardandoPuestos(true);
+    setErrorPuestos(null);
     // Sin nada tildado, queda "sin definir" (invisible para empleados)
     // hasta que el dueño elija explícitamente Todos o puestos puntuales.
     const valor = puestosSeleccionados.length > 0 ? puestosSeleccionados : null;
@@ -1219,6 +1425,7 @@ export default function Contenido({ session }) {
     setGuardandoPuestos(false);
     if (error) {
       console.error(error);
+      setErrorPuestos('No se pudieron guardar los puestos. Probá de nuevo.');
       return;
     }
     setCursosPublicados(
@@ -1227,6 +1434,10 @@ export default function Contenido({ session }) {
     setEditandoPuestosId(null);
   }
 
+  // Regenera con IA un curso que está en revisión. NO toca la versión:
+  // actualizar-curso-ia solo marca revision_con_cambios, y la versión
+  // sube una sola vez cuando el dueño publica (handlePublicarRevision),
+  // aunque haya pedido varios cambios con IA en la misma revisión.
   async function handleActualizarPublicado(microcursoId) {
     if (!puedeUsarIA(cuenta, session.user.email)) {
       setVarianteSuscripcion('ia');
@@ -1237,60 +1448,81 @@ export default function Contenido({ session }) {
 
     setActualizandoId(microcursoId);
     setErrorActualizar(null);
+    setOkActualizar(null);
 
-    const { data, error } = await supabase.functions.invoke('actualizar-curso-ia', {
-      method: 'POST',
-      body: { microcurso_id: microcursoId, texto_nuevo: textoNuevoPublicado.trim() },
-    });
+    let resultado;
+    try {
+      resultado = await supabase.functions.invoke('actualizar-curso-ia', {
+        method: 'POST',
+        body: { microcurso_id: microcursoId, texto_nuevo: textoNuevoPublicado.trim() },
+      });
+    } catch (err) {
+      console.error(err);
+      setActualizandoId(null);
+      setErrorActualizar('No se pudo conectar con el servidor. Probá de nuevo.');
+      return;
+    }
+    const { data, error } = resultado;
 
     if (error || data?.error) {
+      const { mensaje } = await leerErrorFuncion(error, data, 'No se pudo actualizar el curso. Probá de nuevo.');
       setActualizandoId(null);
-      setErrorActualizar(data?.error || 'No se pudo actualizar el curso. Probá de nuevo.');
+      setErrorActualizar(mensaje);
       return;
     }
 
-    // 2026-09-06, a pedido de Roberto: cambiar el contenido de un curso ya
-    // publicado ya no lo deja disponible al toque. actualizar-curso-ia ya
-    // regeneró el contenido (pasos/preguntas) con la IA; acá lo sacamos de
-    // "aprobado" y le subimos el número de versión, así el curso deja de
-    // estar en "Cursos disponibles" (los empleados no lo ven más) hasta
-    // que el dueño confirme la nueva versión desde "Contenido cargado"
-    // con handlePublicarRevision. Esto también deja un número de versión
-    // real para comparar contra la que completó cada empleado (ver
-    // version_completada en Progreso.jsx).
-    const { data: microcursoActual } = await supabase
-      .from('microcursos')
-      .select('version')
-      .eq('id', microcursoId)
-      .maybeSingle();
-    const nuevaVersion = (microcursoActual?.version || 1) + 1;
-    await supabase
-      .from('microcursos')
-      .update({ estado: 'en_revision', version: nuevaVersion })
-      .eq('id', microcursoId);
-
+    // Dejamos el panel abierto con el contenido nuevo, así el dueño lo
+    // revisa y decide si publica o pide otro cambio.
     setActualizandoId(null);
-    setEditandoPublicadoId(null);
     setTextoNuevoPublicado('');
-    setContenidoActualEditando(null);
+    setOkActualizar('Listo, el curso se actualizó. Revisalo acá arriba y, si está bien, publicalo.');
     await cargarTodo();
+    await cargarContenidoActual(microcursoId);
   }
 
   // Confirma la nueva versión de un curso propio y lo vuelve a publicar
-  // (sale de "en revisión", vuelve a estar en "Cursos disponibles").
+  // (sale de "en revisión", vuelve a estar en "Cursos disponibles"). El
+  // trigger de la base sube microcursos.version en 1 en este momento si
+  // hubo cambios con IA durante la revisión.
   async function handlePublicarRevision(microcursoId) {
     setPublicandoRevisionId(microcursoId);
+    setErrorPublicar(null);
     const { error } = await supabase.from('microcursos').update({ estado: 'aprobado' }).eq('id', microcursoId);
     setPublicandoRevisionId(null);
     if (error) {
       console.error(error);
+      setErrorPublicar({ id: microcursoId, mensaje: 'No se pudo publicar. Probá de nuevo.' });
       return;
+    }
+    if (editandoPublicadoId === microcursoId) {
+      setEditandoPublicadoId(null);
+      setContenidoActualEditando(null);
+      setOkActualizar(null);
     }
     await cargarTodo();
   }
 
   if (loading) {
     return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
+  }
+
+  if (!cuenta && errorCarga) {
+    return (
+      <div>
+        <DashboardNav userEmail={session.user.email} />
+        <div className="text-center mt-12 px-4">
+          <p className="text-[#C1502E] font-semibold mb-3">{errorCarga}</p>
+          <button
+            type="button"
+            onClick={cargarTodo}
+            className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!cuenta) {
@@ -1318,6 +1550,19 @@ export default function Contenido({ session }) {
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
         <TrialBanner cuenta={cuenta} />
+        {errorCarga && (
+          <div className="bg-[#FBEAE3] border border-[#F0C9B8] rounded-xl p-3 text-sm text-[#C1502E] font-semibold flex items-center justify-between gap-3 flex-wrap">
+            <span>{errorCarga}</span>
+            <button
+              type="button"
+              onClick={cargarTodo}
+              className="text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
         <EstadoBar
           icon={IconContenidoMini}
           label="Contenido"
@@ -1386,6 +1631,9 @@ export default function Contenido({ session }) {
                           : 'Agregar a los cursos'}
                       </button>
                     </div>
+                    {errorBase?.id === curso.id && (
+                      <p className="px-4 pb-3 text-xs font-semibold text-[#C1502E]">{errorBase.mensaje}</p>
+                    )}
                     {!esSegHig && seleccionando && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
                         <p className="text-xs text-[#8a8471]">
@@ -1558,6 +1806,7 @@ export default function Contenido({ session }) {
             >
               {subiendo ? 'Guardando...' : 'Guardar contenido'}
             </button>
+            {errorSubir && <p className="text-xs font-semibold text-[#C1502E]">{errorSubir}</p>}
           </form>
         </div>
 
@@ -1586,13 +1835,20 @@ export default function Contenido({ session }) {
                   arrepintió y no cambió nada). */}
               {cursosEnRevision.map((m) => {
                 const editando = editandoPublicadoId === m.id;
+                // La versión sube al publicar, y solo si la IA le cambió
+                // algo en esta revisión (ver handlePublicarRevision).
+                const versionActual = m.version || 1;
+                const conCambios = !!m.revision_con_cambios;
+                const versionAPublicar = conCambios ? versionActual + 1 : versionActual;
                 return (
                   <div key={m.id} className="border border-[#F0DFC4] bg-[#FDF6ED] rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-[#2C2C2A]">{m.titulo}</p>
                         <p className="text-[10px] font-semibold text-[#8a8471]">
-                          Versión {m.version} · en revisión, todavía no la ven tus empleados
+                          {conCambios
+                            ? `Versión ${versionAPublicar} en revisión, con cambios sin publicar. Tus empleados todavía ven la versión ${versionActual}.`
+                            : `Versión ${versionActual} en revisión, todavía no la ven tus empleados.`}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -1611,10 +1867,17 @@ export default function Contenido({ session }) {
                           className="text-xs font-bold tracking-wide text-white bg-[#7C8B6F] rounded-full px-4 py-2 disabled:opacity-60"
                           style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                         >
-                          {publicandoRevisionId === m.id ? 'Publicando...' : `Publicar versión ${m.version}`}
+                          {publicandoRevisionId === m.id
+                            ? 'Publicando...'
+                            : conCambios
+                            ? `Publicar versión ${versionAPublicar}`
+                            : 'Volver a publicar sin cambios'}
                         </button>
                       </div>
                     </div>
+                    {errorPublicar?.id === m.id && (
+                      <p className="text-xs font-semibold text-[#C1502E]">{errorPublicar.mensaje}</p>
+                    )}
 
                     {editando && (
                       <div className="border-t border-[#F0DFC4] pt-3 space-y-3">
@@ -1624,7 +1887,9 @@ export default function Contenido({ session }) {
                           <>
                             <div className="bg-[#F5F1E6] rounded-lg p-3 space-y-2 max-h-72 overflow-y-auto">
                               <p className="text-[10px] font-bold uppercase tracking-wide text-[#8a8471]">
-                                Contenido actual (versión {contenidoActualEditando.microcurso.version || 1})
+                                {contenidoActualEditando.microcurso.revision_con_cambios
+                                  ? `Contenido nuevo (versión ${(contenidoActualEditando.microcurso.version || 1) + 1}, sin publicar)`
+                                  : `Contenido actual (versión ${contenidoActualEditando.microcurso.version || 1})`}
                               </p>
                               {contenidoActualEditando.pasos.map((p) => (
                                 <div key={p.id} className="border border-[#EDE0C8] bg-white rounded-lg p-2.5">
@@ -1646,16 +1911,18 @@ export default function Contenido({ session }) {
                                 </div>
                               ))}
                             </div>
+                            {okActualizar && (
+                              <p className="text-xs font-semibold text-[#5C6B4F]">{okActualizar}</p>
+                            )}
                             <p className="text-xs font-semibold text-[#2C2C2A]">
-                              Indicá puntualmente qué necesitás modificar o agregar sobre el
-                              contenido de arriba: se va a regenerar el curso completo combinando
-                              lo que ya tenía con esto.
+                              Contá qué querés cambiar o agregar. Se arma el curso de nuevo sumando
+                              esto a lo que ya tenía.
                             </p>
                             <textarea
                               value={textoNuevoPublicado}
                               onChange={(e) => setTextoNuevoPublicado(e.target.value)}
                               rows={5}
-                              placeholder="Ej: agregar un paso sobre el cierre de caja los fines de semana, o corregir el horario del paso 2..."
+                              placeholder="Por ejemplo: sumá un paso sobre el cierre de caja de los fines de semana, o corregí el horario del paso 2"
                               className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
                             />
                             {errorActualizar && <p className="text-xs text-[#C1502E]">{errorActualizar}</p>}
@@ -1687,7 +1954,18 @@ export default function Contenido({ session }) {
             <div className="space-y-3">
               {contenidos.map((c) => {
                 const abierto = abiertoId === c.id;
-                const estadoInfo = ESTADO_INFO[c.estado] || ESTADO_INFO.pendiente;
+                const trabado = estaTrabado(c);
+                const estadoInfo = trabado ? ESTADO_INFO.fallido : ESTADO_INFO[c.estado] || ESTADO_INFO.pendiente;
+                const generandoEste = generandoIds.has(c.id);
+                // Se puede eliminar todo lo que no tiene un curso generado
+                // colgando, incluidas las generaciones trabadas o fallidas.
+                const puedeEliminar = c.estado === 'pendiente' || c.estado === 'aprobado' || trabado;
+                const mensajeErrorGenerar =
+                  errorGenerar?.id === c.id
+                    ? errorGenerar.mensaje
+                    : c.estado === 'aprobado' && c.error_generacion
+                    ? c.error_generacion
+                    : null;
                 return (
                   <div key={c.id} className="border border-[#EDE0C8] rounded-xl overflow-hidden">
                     <div className="p-4">
@@ -1708,9 +1986,14 @@ export default function Contenido({ session }) {
                           </span>
                         </div>
                         {!abierto && <p className="text-xs text-[#6b6455] line-clamp-2">{c.texto_procesado}</p>}
+                        {!abierto && mensajeErrorGenerar && (
+                          <p className="text-xs font-semibold text-[#C1502E] mt-1">
+                            No se pudo generar el curso: {mensajeErrorGenerar}
+                          </p>
+                        )}
                       </button>
                       {!abierto &&
-                        (c.estado === 'pendiente' || c.estado === 'aprobado') &&
+                        puedeEliminar &&
                         (confirmandoEliminarId === c.id ? (
                           <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
                             <p className="font-semibold text-[#2C2C2A]">
@@ -1741,30 +2024,87 @@ export default function Contenido({ session }) {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex justify-end mt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setErrorEliminar(null);
-                                setConfirmandoEliminarId(c.id);
-                              }}
-                              title="Eliminar"
-                              className="w-8 h-8 rounded-full bg-[#C1502E] text-white flex items-center justify-center"
-                            >
-                              <IconBorrar />
-                            </button>
+                          <div className="mt-2 space-y-2">
+                            {trabado && (
+                              <p className="text-xs font-semibold text-[#C1502E]">
+                                La generación se trabó y no terminó. Podés reintentar o eliminar este
+                                contenido.
+                              </p>
+                            )}
+                            {trabado && errorGenerar?.id === c.id && (
+                              <p className="text-xs text-[#C1502E]">{errorGenerar.mensaje}</p>
+                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              {trabado && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReintentarGeneracion(c)}
+                                  disabled={generandoEste}
+                                  className="h-10 text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 disabled:opacity-60"
+                                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                                >
+                                  {generandoEste ? 'Reintentando...' : 'Reintentar'}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setErrorEliminar(null);
+                                  setConfirmandoEliminarId(c.id);
+                                }}
+                                title="Eliminar"
+                                aria-label="Eliminar"
+                                className="w-10 h-10 rounded-full bg-[#C1502E] text-white flex items-center justify-center flex-shrink-0"
+                              >
+                                <IconBorrar />
+                              </button>
+                            </div>
                           </div>
                         ))}
                     </div>
 
-                    {abierto && c.estado === 'generando' && (
+                    {abierto && c.estado === 'generando' && !trabado && (
                       <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3">
                         <p className="text-sm text-[#8a6d1f]">
                           Generando el curso con inteligencia artificial. Puede tardar uno o dos
-                          minutos — podés cerrar esta pantalla o incluso el celular, el trabajo
-                          sigue solo en el servidor y cuando termine lo vas a ver acá como "Curso
-                          generado".
+                          minutos. Podés cerrar esta pantalla o el celular, sigue solo y cuando
+                          termine lo vas a ver acá como "Curso generado".
                         </p>
+                      </div>
+                    )}
+
+                    {abierto && trabado && (
+                      <div className="px-4 pb-4 border-t border-[#EDE0C8] pt-3 space-y-2">
+                        <p className="text-sm font-semibold text-[#C1502E]">
+                          La generación se trabó y no terminó. Podés reintentar o eliminar este
+                          contenido.
+                        </p>
+                        {errorGenerar?.id === c.id && (
+                          <p className="text-xs text-[#C1502E]">{errorGenerar.mensaje}</p>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleReintentarGeneracion(c)}
+                            disabled={generandoEste}
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2 disabled:opacity-60"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                          >
+                            {generandoEste ? 'Reintentando...' : 'Reintentar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAbiertoId(null);
+                              setErrorEliminar(null);
+                              setConfirmandoEliminarId(c.id);
+                            }}
+                            className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#C1502E] rounded-full px-4 py-2"
+                            style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -1784,7 +2124,10 @@ export default function Contenido({ session }) {
                           rows={6}
                           className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none resize-none"
                         />
-                        {errorGenerar && <p className="text-xs text-[#C1502E]">{errorGenerar}</p>}
+                        {mensajeErrorGenerar && <p className="text-xs text-[#C1502E]">{mensajeErrorGenerar}</p>}
+                        {errorItem?.id === c.id && (
+                          <p className="text-xs font-semibold text-[#C1502E]">{errorItem.mensaje}</p>
+                        )}
                         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                           {c.estado !== 'aprobado' && (
                             <button
@@ -1812,17 +2155,17 @@ export default function Contenido({ session }) {
                             }`}
                             style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                           >
-                            {c.estado === 'aprobado' ? 'Marcar como PENDIENTE' : 'Marcar como APROBADO'}
+                            {c.estado === 'aprobado' ? 'Marcar como pendiente' : 'Marcar como aprobado'}
                           </button>
                           {c.estado === 'aprobado' && (
                             <button
                               type="button"
                               onClick={() => handleGenerarCurso(c.id)}
-                              disabled={generandoId === c.id}
+                              disabled={generandoEste}
                               className="w-full sm:w-auto flex items-center justify-center text-xs font-bold tracking-wide text-white bg-[#6B655A] border border-[#6B655A] rounded-full px-4 py-2 disabled:opacity-60"
                               style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
                             >
-                              {generandoId === c.id ? 'Generando...' : 'Generar curso con IA'}
+                              {generandoEste ? 'Generando...' : 'Generar curso con IA'}
                             </button>
                           )}
                           <button
@@ -1907,7 +2250,7 @@ export default function Contenido({ session }) {
                                     <p className="text-xs text-[#6b6455]">
                                       Esto borra solo el texto original que subiste para este
                                       contenido. El curso publicado, sus pasos/preguntas y el
-                                      historial de tus empleados NO se tocan.
+                                      historial de tus empleados no se tocan.
                                     </p>
                                     <div className="flex gap-2">
                                       <button
@@ -1956,6 +2299,9 @@ export default function Contenido({ session }) {
                                   </button>
                                 </div>
                               </div>
+                            )}
+                            {errorAprobar && (
+                              <p className="text-xs font-semibold text-[#C1502E]">{errorAprobar}</p>
                             )}
                             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
                               <button
@@ -2075,8 +2421,7 @@ export default function Contenido({ session }) {
                       {confirmandoAccionesId === m.id && (
                         <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
                           <p className="font-semibold text-[#2C2C2A]">
-                            ¿Seguro que querés modificar alguna característica de este curso que
-                            ya fue aprobado?
+                            Este curso ya está aprobado. ¿Querés cambiarlo?
                           </p>
                           <div className="flex gap-2">
                             <button
@@ -2146,11 +2491,11 @@ export default function Contenido({ session }) {
                       {confirmandoVersionId === m.id && (
                         <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2 mt-2">
                           <p className="font-semibold text-[#2C2C2A]">
-                            Este curso sale de "Disponible" ahora mismo y pasa a gestionarse desde
-                            "Contenido cargado", donde vas a poder ver el contenido actual e
-                            indicarle a la IA qué modificar o agregar. Los empleados que ya lo
-                            completaron van a ver un aviso para volver a hacerlo recién cuando
-                            publiques la versión nueva. ¿Querés continuar?
+                            Este curso sale de "Disponible" ahora mismo y pasa a "Contenido
+                            cargado". Ahí vas a ver el contenido actual y le vas a poder pedir
+                            cambios a la IA. Si lo cambiás, los empleados que ya lo completaron lo
+                            van a tener que volver a hacer recién cuando publiques la versión
+                            nueva. ¿Querés seguir?
                           </p>
                           {errorCambiarVersion && (
                             <p className="text-xs font-semibold text-[#C1502E]">{errorCambiarVersion}</p>
@@ -2180,8 +2525,8 @@ export default function Contenido({ session }) {
                       {gapAbiertoId === m.id && gapsPorCurso[m.id] && (
                         <div className="mt-2 bg-[#FCF3DD] rounded-lg p-3 space-y-1">
                           <p className="text-[10px] font-semibold text-[#8a6d1f] mb-1">
-                            Preguntas que hicieron tus empleados sobre este curso — puede ser señal
-                            de que algún paso no quedó claro:
+                            Preguntas que hicieron tus empleados sobre este curso. Capaz que algún
+                            paso no quedó claro:
                           </p>
                           {gapsPorCurso[m.id].ejemplos.map((ej, i) => (
                             <p key={i} className="text-xs text-[#6b6455] italic">
@@ -2212,6 +2557,7 @@ export default function Contenido({ session }) {
                         >
                           {guardandoPuestos ? 'Guardando...' : 'Guardar puestos'}
                         </button>
+                        {errorPuestos && <p className="text-xs font-semibold text-[#C1502E]">{errorPuestos}</p>}
                       </div>
                     )}
                   </div>

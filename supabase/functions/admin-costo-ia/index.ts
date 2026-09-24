@@ -1,22 +1,56 @@
 // Inductoria · Edge Function: admin-costo-ia
 // ---------------------------------------------
 // Devuelve el costo real de IA (tokens reales, no estimado) acumulado,
-// total y del mes en curso, y desglosado por cuenta. Solo el admin.
+// total y del mes en curso, y desglosado por cuenta. Solo administradores
+// (tabla `administradores`, ver _shared/admin.ts).
 //
 // También devuelve estadísticas de transcripción de audio (Groq): no es
 // costo real en USD (Groq es gratis dentro de su límite diario), pero
 // desde que se habilitó en trial (2026-08-17) sirve tener visibilidad
 // del volumen acá, por si algún día conviene revisar si sigue siendo
 // gratis a esa escala.
+//
+// "Hoy" y "este mes" se calculan en hora de Argentina, y las lecturas
+// van paginadas para no cortar en 1000 filas sin avisar.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import {
+  esAdministrador,
+  traerTodasLasFilas,
+  inicioDelDiaArgentina,
+  inicioDelMesArgentina,
+} from '../_shared/admin.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
+interface RegistroCosto {
+  cuenta_id: string | null;
+  costo_usd: number | string | null;
+  created_at: string;
+  // Según cómo infiera el tipo Supabase, la relación viene como objeto o
+  // como array de un elemento; contemplamos las dos.
+  cuentas: { nombre: string | null } | { nombre: string | null }[] | null;
+}
+
+interface RegistroAudio {
+  plan_al_momento: string | null;
+  duracion_segundos: number | string | null;
+  created_at: string;
+}
+
+interface CostoPorCuenta {
+  nombre: string;
+  usd: number;
+  generaciones: number;
+}
+
+function nombreDeCuenta(r: RegistroCosto): string {
+  const rel = Array.isArray(r.cuentas) ? r.cuentas[0] : r.cuentas;
+  return rel?.nombre || 'Cuenta eliminada';
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -24,26 +58,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseUser.auth.getUser();
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'No autorizado' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (user.email !== ADMIN_EMAIL) {
+    if (!(await esAdministrador(req.headers.get('Authorization')))) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,22 +70,23 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: registros, error } = await supabase
-      .from('ai_usage_log')
-      .select('cuenta_id, costo_usd, created_at, cuentas(nombre)');
+    const registros = await traerTodasLasFilas<RegistroCosto>((desde, hasta) =>
+      supabase
+        .from('ai_usage_log')
+        .select('cuenta_id, costo_usd, created_at, cuentas(nombre)')
+        .order('created_at', { ascending: true })
+        .range(desde, hasta)
+    );
 
-    if (error) throw error;
-
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
+    const inicioMes = inicioDelMesArgentina();
+    const inicioHoy = inicioDelDiaArgentina();
 
     let totalUsd = 0;
     let totalUsdMes = 0;
     let generaciones = 0;
-    const porCuentaMapa = {};
+    const porCuentaMapa: Record<string, CostoPorCuenta> = {};
 
-    (registros || []).forEach((r) => {
+    registros.forEach((r) => {
       const costo = Number(r.costo_usd) || 0;
       totalUsd += costo;
       generaciones += 1;
@@ -78,9 +94,8 @@ Deno.serve(async (req) => {
         totalUsdMes += costo;
       }
       const clave = r.cuenta_id || 'sin_cuenta';
-      const nombre = r.cuentas?.nombre || 'Cuenta eliminada';
       if (!porCuentaMapa[clave]) {
-        porCuentaMapa[clave] = { nombre, usd: 0, generaciones: 0 };
+        porCuentaMapa[clave] = { nombre: nombreDeCuenta(r), usd: 0, generaciones: 0 };
       }
       porCuentaMapa[clave].usd += costo;
       porCuentaMapa[clave].generaciones += 1;
@@ -89,17 +104,16 @@ Deno.serve(async (req) => {
     const porCuenta = Object.values(porCuentaMapa).sort((a, b) => b.usd - a.usd);
 
     // Estadísticas de transcripción de audio (Groq), separado del costo
-    // real de arriba porque no tiene costo en USD. Ahora también suma la
+    // real de arriba porque no tiene costo en USD. También suma la
     // duración real de cada audio (duracion_segundos), para poder
     // comparar el uso diario contra el límite gratis real de Groq.
-    const { data: audios, error: errorAudios } = await supabase
-      .from('audio_transcripciones_log')
-      .select('plan_al_momento, duracion_segundos, created_at');
-
-    if (errorAudios) throw errorAudios;
-
-    const inicioHoy = new Date();
-    inicioHoy.setHours(0, 0, 0, 0);
+    const audios = await traerTodasLasFilas<RegistroAudio>((desde, hasta) =>
+      supabase
+        .from('audio_transcripciones_log')
+        .select('plan_al_momento, duracion_segundos, created_at')
+        .order('created_at', { ascending: true })
+        .range(desde, hasta)
+    );
 
     let audioTotal = 0;
     let audioHoy = 0;
@@ -110,7 +124,7 @@ Deno.serve(async (req) => {
     let segundosMes = 0;
     let segundosTrial = 0;
 
-    (audios || []).forEach((a) => {
+    audios.forEach((a) => {
       const duracion = Number(a.duracion_segundos) || 0;
       const enTrial = a.plan_al_momento === 'trial';
       const fecha = new Date(a.created_at);
@@ -135,7 +149,9 @@ Deno.serve(async (req) => {
 
     // Límite gratis real de Groq para whisper-large-v3-turbo: 8hs (28.800
     // segundos) de audio por día. Mandamos el % ya calculado para no
-    // duplicar el número mágico en el frontend.
+    // duplicar el número mágico en el frontend. OJO: "hoy" es el día de
+    // Argentina; Groq puede contar su día en otro huso, así que el % es
+    // una referencia, no el número exacto de Groq.
     const LIMITE_SEGUNDOS_GROQ_DIA = 28800;
     const porcentajeLimiteHoy = Math.min(
       999,

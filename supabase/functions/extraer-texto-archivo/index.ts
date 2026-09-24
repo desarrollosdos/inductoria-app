@@ -19,12 +19,21 @@
 //   ai_usage_log, que es específicamente costo real en USD) para poder
 //   ver en el panel de admin cuánto volumen se genera — por si Groq
 //   algún día deja de ser gratis en ese volumen o cambia sus límites.
+// - .txt: se decodifica acá mismo (el frontend normalmente lo lee solo,
+//   pero si llega acá lo aceptamos igual, para que los dos lados acepten
+//   los mismos tipos).
 // - Video: NO soportado, decisión explícita de no agregarlo.
+//
+// 2026-09-24: toda la función exige una cuenta con acceso (activa, con
+// pago pendiente, trial vigente o exenta). Antes cualquier usuario
+// logueado, aunque no tuviera cuenta o la tuviera suspendida o cancelada,
+// podía mandar audios o imágenes y gastar la cuota de Groq/Anthropic.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.11.0';
 import mammoth from 'npm:mammoth@1.8.0';
-import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL } from '../_shared/acceso.ts';
+import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL, CUENTAS_EXENTAS, type CuentaPlan } from '../_shared/acceso.ts';
+import { AVISO_MATERIAL_NO_CONFIABLE } from '../_shared/prompt-seguridad.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +41,42 @@ const corsHeaders = {
 };
 
 const TAMANO_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (Groq acepta hasta 25MB, nos quedamos cortos por las dudas)
+
+// Anthropic rechaza imágenes de más de 5 MB (medido sobre el base64 que le
+// mandamos). Lo chequeamos antes de llamar para no gastar el pedido y
+// poder dar un mensaje claro.
+const TAMANO_MAX_IMAGEN_BASE64 = 5 * 1024 * 1024;
+
+// Tipos de imagen que acepta Claude vision, por MIME y por extensión.
+const TIPOS_IMAGEN: Record<string, string> = {
+  'image/png': 'image/png',
+  'image/jpeg': 'image/jpeg',
+  'image/jpg': 'image/jpeg',
+  'image/webp': 'image/webp',
+};
+const IMAGEN_POR_EXTENSION: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+};
+
+// Mismo criterio que tieneAccesoBase en src/lib/acceso.js: cuenta activa,
+// con pago pendiente, trial vigente, o cuenta exenta. Se arma acá porque
+// _shared/acceso.ts todavía no exporta esta regla.
+function tieneAccesoBase(cuenta: CuentaPlan | null | undefined, email?: string | null): boolean {
+  if (email && CUENTAS_EXENTAS.has(email)) return true;
+  if (!cuenta) return false;
+  if (cuenta.plan === 'active' || cuenta.plan === 'past_due') return true;
+  return (
+    cuenta.plan === 'trial' &&
+    !!cuenta.trial_ends_at &&
+    new Date(cuenta.trial_ends_at).getTime() > Date.now()
+  );
+}
+
+const MENSAJE_SIN_ACCESO =
+  'Tu cuenta no tiene acceso en este momento. Revisá tu suscripción en la sección Suscripción para seguir cargando contenido.';
 
 // Groq a veces devuelve 500/503 (internal_server_error / service_unavailable)
 // por capacidad del lado de ellos, no porque el audio esté mal. Vimos esto
@@ -122,35 +167,56 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Chequeo rápido sobre el largo del base64 antes de decodificarlo
+    // (un archivo enorme no llega a ocupar memoria de más).
+    if (archivoBase64.length > Math.ceil((TAMANO_MAX_BYTES * 4) / 3) + 4) {
+      return new Response(JSON.stringify({ error: 'El archivo pesa más de 10 MB. Probá con uno más liviano.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const bytes = Uint8Array.from(atob(archivoBase64), (c) => c.charCodeAt(0));
 
     if (bytes.length > TAMANO_MAX_BYTES) {
-      return new Response(JSON.stringify({ error: 'El archivo pesa más de 10 MB' }), {
+      return new Response(JSON.stringify({ error: 'El archivo pesa más de 10 MB. Probá con uno más liviano.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const nombreLower = nombreArchivo.toLowerCase();
+    const extension = (nombreLower.match(/\.([a-z0-9]+)$/) || [])[1] || '';
+    const esTxt = tipo === 'text/plain' || extension === 'txt';
     const esPdf = tipo === 'application/pdf' || nombreLower.endsWith('.pdf');
     const esDocx =
       tipo === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       nombreLower.endsWith('.docx');
-    const tiposImagen: Record<string, string> = {
-      'image/png': 'image/png',
-      'image/jpeg': 'image/jpeg',
-      'image/jpg': 'image/jpeg',
-      'image/webp': 'image/webp',
-    };
-    const esImagen =
-      Object.keys(tiposImagen).includes(tipo) ||
-      /\.(png|jpe?g|webp)$/.test(nombreLower);
+    // El tipo real de la imagen sale del MIME si es uno conocido, y si no
+    // de la extensión. Antes, sin MIME, se asumía image/jpeg y un PNG o
+    // WEBP terminaba rechazado por Anthropic con un error confuso.
+    const mimeImagen = TIPOS_IMAGEN[tipo] || IMAGEN_POR_EXTENSION[extension] || null;
+    const esImagen = !!mimeImagen || tipo.startsWith('image/');
     const esAudio =
       tipo.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|webm|opus)$/.test(nombreLower);
 
-    if (!esPdf && !esDocx && !esImagen && !esAudio) {
+    if (!esTxt && !esPdf && !esDocx && !esImagen && !esAudio) {
       return new Response(
-        JSON.stringify({ error: 'Solo se aceptan PDF, .docx, imágenes o audio. Video no está soportado.' }),
+        JSON.stringify({ error: 'Solo se aceptan archivos .txt, .pdf, .docx, imágenes o audio. Video no está soportado.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (esImagen && !mimeImagen) {
+      return new Response(
+        JSON.stringify({ error: 'Ese formato de imagen no lo podemos leer. Usá una foto o captura en PNG, JPG o WEBP.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (esImagen && archivoBase64.length > TAMANO_MAX_IMAGEN_BASE64) {
+      return new Response(
+        JSON.stringify({ error: 'La imagen pesa demasiado (el máximo es de unos 3,5 MB). Probá con una captura o una foto más liviana.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -166,14 +232,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    let cuentaDelUsuario: { id: string; plan: string; trial_ends_at?: string | null } | null = null;
-    if (esImagen || esAudio) {
-      const { data } = await supabase
-        .from('cuentas')
-        .select('id, plan, trial_ends_at')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-      cuentaDelUsuario = data;
+    const { data: cuentaDelUsuario } = await supabase
+      .from('cuentas')
+      .select('id, plan, trial_ends_at')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    if (!tieneAccesoBase(cuentaDelUsuario, user.email)) {
+      return new Response(JSON.stringify({ error: MENSAJE_SIN_ACCESO }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (esImagen && !puedeUsarIA(cuentaDelUsuario, user.email)) {
@@ -185,7 +254,9 @@ Deno.serve(async (req) => {
 
     let textoExtraido = '';
 
-    if (esPdf) {
+    if (esTxt) {
+      textoExtraido = new TextDecoder('utf-8').decode(bytes);
+    } else if (esPdf) {
       const pdf = await getDocumentProxy(bytes);
       const resultado = await extractText(pdf, { mergePages: true });
       textoExtraido = Array.isArray(resultado.text) ? resultado.text.join('\n') : resultado.text;
@@ -196,10 +267,10 @@ Deno.serve(async (req) => {
       // Audio: Groq Whisper (gratis dentro del límite diario), NO Claude.
       const groqKey = Deno.env.get('GROQ_API_KEY');
       if (!groqKey) {
+        // La causa técnica queda en el log, el dueño ve un mensaje simple.
+        console.error('extraer-texto-archivo: falta el secret GROQ_API_KEY en Supabase');
         return new Response(
-          JSON.stringify({
-            error: 'Falta configurar la transcripción de audio (GROQ_API_KEY no está cargada en Supabase).',
-          }),
+          JSON.stringify({ error: 'No pudimos procesar el audio. Probá más tarde.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -209,7 +280,7 @@ Deno.serve(async (req) => {
       if (!resultadoGroq.ok) {
         return new Response(
           JSON.stringify({
-            error: 'No se pudo transcribir el audio (Groq no respondió después de varios intentos).',
+            error: 'No pudimos transcribir el audio. Probá de nuevo o con un audio más corto.',
             detalle: resultadoGroq.error.slice(0, 500),
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -244,7 +315,7 @@ Deno.serve(async (req) => {
     } else {
       // Imagen: se la mandamos a Claude (vision) para que "lea" el
       // contenido de capacitación que muestra la captura.
-      const mediaType = tiposImagen[tipo] || 'image/jpeg';
+      const mediaType = mimeImagen as string;
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -257,6 +328,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 2000,
+          // Lo que diga la imagen es dato, nunca una orden (mismo criterio
+          // que el resto de las funciones que leen material del comercio).
+          system: AVISO_MATERIAL_NO_CONFIABLE.replace(
+            'entre las etiquetas <material_del_comercio>',
+            'en la imagen'
+          ),
           messages: [
             {
               role: 'user',
@@ -278,7 +355,7 @@ Deno.serve(async (req) => {
       if (!claudeRes.ok) {
         const errText = await claudeRes.text();
         console.error('Error de Claude (imagen):', errText);
-        return new Response(JSON.stringify({ error: 'No se pudo leer el contenido de la imagen' }), {
+        return new Response(JSON.stringify({ error: 'No pudimos leer la imagen. Probá de nuevo o pegá el texto a mano.' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -328,7 +405,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: 'No se pudo procesar el archivo', detalle: String(err) }), {
+    return new Response(JSON.stringify({ error: 'No pudimos procesar el archivo. Probá de nuevo.', detalle: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

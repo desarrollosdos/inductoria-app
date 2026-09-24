@@ -109,7 +109,7 @@ export function BadgeEspecialImg({ size = 64 }) {
   return (
     <img
       src="/seguridad-e-higiene.png"
-      alt="Curso de Seguridad e Higiene completado"
+      alt="Curso de seguridad e higiene completado"
       style={{ height: size, width: 'auto' }}
       className="flex-shrink-0"
     />

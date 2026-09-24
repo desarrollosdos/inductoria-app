@@ -65,16 +65,26 @@ export async function instalarApp() {
   if (!eventoDiferido) return null;
   const evento = eventoDiferido;
   eventoDiferido = null;
-  evento.prompt();
-  return evento.userChoice;
+  try {
+    evento.prompt();
+    return await evento.userChoice;
+  } catch {
+    // El navegador puede rechazar el prompt (por ejemplo, si ya se usó):
+    // no hay nada más que hacer, el cartel se cierra igual.
+    return null;
+  }
 }
 
 export function appYaInstalada() {
   if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia?.('(display-mode: standalone)')?.matches ||
-    window.navigator.standalone === true
-  );
+  try {
+    return (
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.navigator.standalone === true
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function yaSePregunto() {

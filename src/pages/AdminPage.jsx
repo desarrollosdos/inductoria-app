@@ -31,6 +31,15 @@ function ordenarPorPlan(cuentas) {
   return [...cuentas].sort((a, b) => rangoPlan(a.plan) - rangoPlan(b.plan));
 }
 
+// Montos en dólares con el formato argentino (coma decimal, punto de
+// miles), en vez de toFixed(2), que muestra "12.50".
+function formatUsd(valor) {
+  return `US$ ${(Number(valor) || 0).toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function formatUltimaConexion(fecha) {
   if (!fecha) return 'Nunca se conectó';
   const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (1000 * 60 * 60 * 24));
@@ -290,7 +299,7 @@ export default function AdminPage({ session }) {
 
     setCargando(false);
 
-    if (error) {
+    if (error || data?.error) {
       setError('No se pudieron cargar las métricas.');
       return;
     }
@@ -712,8 +721,8 @@ export default function AdminPage({ session }) {
             ) : costoIA ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  <Tarjeta label="Costo IA (mes actual)" valor={`US$ ${costoIA.totalUsdMes.toFixed(2)}`} />
-                  <Tarjeta label="Costo IA (total)" valor={`US$ ${costoIA.totalUsd.toFixed(2)}`} />
+                  <Tarjeta label="Costo IA (mes actual)" valor={formatUsd(costoIA.totalUsdMes)} />
+                  <Tarjeta label="Costo IA (total)" valor={formatUsd(costoIA.totalUsd)} />
                 </div>
                 <p className="text-xs text-[#8a8471]">
                   {costoIA.generaciones} curso{costoIA.generaciones === 1 ? '' : 's'} generado
@@ -726,15 +735,16 @@ export default function AdminPage({ session }) {
                     <h2 className="font-semibold text-[#2C2C2A] mb-1">Transcripción de audio (Groq)</h2>
                     <p className="text-xs text-[#8a8471] mb-4">
                       No suma al costo de arriba: Groq es gratis mientras no se supere su límite
-                      diario (8hs de audio/día). Está habilitado también durante el trial, así que
-                      vale la pena mirar este número de tanto en tanto — si crece mucho, conviene
-                      revisar el uso real en console.groq.com por si conviniera ponerle un límite.
+                      diario (8hs de audio por día). También se puede usar durante la prueba gratis,
+                      así que vale la pena mirar este número de tanto en tanto. Si crece mucho,
+                      conviene revisar el uso real en console.groq.com por si hace falta ponerle un
+                      límite.
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                       <Tarjeta label="Transcripciones hoy" valor={costoIA.audio.hoy} />
                       <Tarjeta label="Este mes" valor={costoIA.audio.mes} />
                       <Tarjeta label="Total histórico" valor={costoIA.audio.total} />
-                      <Tarjeta label="En trial (total)" valor={costoIA.audio.enTrial} />
+                      <Tarjeta label="En prueba gratis (total)" valor={costoIA.audio.enTrial} />
                     </div>
 
                     {/* Tiempo real de audio usado, que es lo que en verdad
@@ -744,7 +754,7 @@ export default function AdminPage({ session }) {
                       <Tarjeta label="Tiempo usado hoy" valor={formatearDuracionAudio(costoIA.audio.segundosHoy)} />
                       <Tarjeta label="Tiempo este mes" valor={formatearDuracionAudio(costoIA.audio.segundosMes)} />
                       <Tarjeta label="Tiempo total" valor={formatearDuracionAudio(costoIA.audio.segundosTotal)} />
-                      <Tarjeta label="Tiempo en trial" valor={formatearDuracionAudio(costoIA.audio.segundosTrial)} />
+                      <Tarjeta label="Tiempo en prueba gratis" valor={formatearDuracionAudio(costoIA.audio.segundosTrial)} />
                     </div>
 
                     <div>
@@ -782,8 +792,8 @@ export default function AdminPage({ session }) {
                       </div>
                       {costoIA.audio.porcentajeLimiteHoy >= 50 && (
                         <p className="text-xs text-[#8a8471] mt-1.5">
-                          Ya se usó {costoIA.audio.porcentajeLimiteHoy}% del límite gratis de hoy —
-                          si sigue subiendo, vale la pena revisar console.groq.com.
+                          Ya se usó {costoIA.audio.porcentajeLimiteHoy}% del límite gratis de hoy. Si
+                          sigue subiendo, vale la pena revisar console.groq.com.
                         </p>
                       )}
                     </div>
@@ -804,7 +814,7 @@ export default function AdminPage({ session }) {
                               {c.generaciones} generación{c.generaciones === 1 ? '' : 'es'}
                             </p>
                           </div>
-                          <span className="text-sm font-semibold text-[#C1502E]">US$ {c.usd.toFixed(2)}</span>
+                          <span className="text-sm font-semibold text-[#C1502E]">{formatUsd(c.usd)}</span>
                         </div>
                       ))}
                     </div>

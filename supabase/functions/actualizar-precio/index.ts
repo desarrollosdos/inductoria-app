@@ -1,17 +1,23 @@
 // Inductoria · Edge Function: actualizar-precio
 // -----------------------------------------------
-// Solo el admin puede cambiar el precio base (1 sucursal). El resto de
-// las proporciones por volumen (2-4, 5-9, 10+) se calculan en el
-// frontend a partir de este único valor, ver src/lib/precio.js.
+// Solo administradores (tabla `administradores`, ver _shared/admin.ts)
+// pueden cambiar el precio base (1 sucursal). El resto de las
+// proporciones por volumen (2-4, 5-9, 10+) se calculan a partir de este
+// único valor, ver src/lib/precio.js (y su copia en crear-suscripcion y
+// agregar-sucursal-plan).
+//
+// Si la fila de configuracion_precio no existe o viene vacía, todos los
+// lugares que leen el precio caen en el mismo valor por defecto: 12000
+// (precio-publico, crear-suscripcion, agregar-sucursal-plan y
+// PRECIO_BASE_POR_DEFECTO en src/lib/precio.js).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { obtenerAdministrador } from '../_shared/admin.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,38 +25,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseUser.auth.getUser();
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'No autorizado' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Mismo criterio que admin-metrics.
-    if (user.email !== ADMIN_EMAIL) {
+    const admin = await obtenerAdministrador(req.headers.get('Authorization'));
+    if (!admin) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const body = await req.json();
-    const precioBase = Number(body.precio_base);
+    const body = await req.json().catch(() => ({}));
+    const precioBase = Number(body?.precio_base);
 
-    if (!precioBase || precioBase <= 0) {
-      return new Response(JSON.stringify({ error: 'Precio inválido' }), {
+    if (!Number.isFinite(precioBase) || precioBase <= 0) {
+      return new Response(JSON.stringify({ error: 'Ese precio no es válido. Ingresá un número mayor a cero.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -66,7 +53,7 @@ Deno.serve(async (req) => {
       .update({
         precio_base: precioBase,
         actualizado_at: new Date().toISOString(),
-        actualizado_por: user.email,
+        actualizado_por: admin.email,
       })
       .eq('id', 1)
       .select()

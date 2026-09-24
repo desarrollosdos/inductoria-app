@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
+function LogoContenedor({ href, children }) {
+  const clases = 'flex items-center gap-2 sm:gap-3 flex-shrink-0';
+  if (!href) return <div className={clases}>{children}</div>;
+  return (
+    <a href={href} className={clases}>
+      {children}
+    </a>
+  );
+}
+
 function IconPersona(props) {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -56,12 +66,27 @@ function ChipEmailMobile({ email }) {
         <IconPersona />
       </button>
       {abierto && (
-        <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 whitespace-nowrap">
+        <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 max-w-[calc(100vw-2rem)] break-all">
           <p className="text-xs font-semibold text-[#2C2C2A]">{email}</p>
         </div>
       )}
     </div>
   );
+}
+
+// Pantallas del empleado (sin sesión de Supabase, entra con token + PIN).
+// Mismas rutas públicas que define App.jsx.
+const RUTAS_EMPLEADO = ['/empleado', '/curso', '/checklist', '/e'];
+
+// A dónde lleva el logo. Antes siempre iba a "/", y en las pantallas del
+// empleado eso lo mandaba al login del dueño (que no le sirve de nada).
+// Ahora, si es empleado, vuelve a su pantalla de cursos con su mismo
+// token; si no hay token en la URL, el logo no es un link.
+function destinoLogo() {
+  const path = window.location.pathname;
+  if (!RUTAS_EMPLEADO.includes(path)) return '/';
+  const token = new URLSearchParams(window.location.search).get('token');
+  return token ? `/empleado?token=${encodeURIComponent(token)}` : null;
 }
 
 export default function Header({ session, empleadoNombre }) {
@@ -96,9 +121,9 @@ export default function Header({ session, empleadoNombre }) {
 
   return (
     <header className="bg-[#2C2C2A]">
-      <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-3">
-          <svg width="44" height="44" viewBox="0 0 120 120" aria-hidden="true">
+      <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <LogoContenedor href={destinoLogo()}>
+          <svg width="44" height="44" viewBox="0 0 120 120" aria-hidden="true" className="w-9 h-9 sm:w-11 sm:h-11">
             <rect x="15" y="10" width="90" height="100" rx="14" fill="#FBF3EC" transform="rotate(-3 60 60)" />
             <circle cx="60" cy="33" r="14" fill="#C1502E" transform="rotate(-3 60 60)" />
             <rect x="40" y="57" width="40" height="6" rx="3" fill="#C1502E" transform="rotate(-3 60 60)" />
@@ -106,11 +131,11 @@ export default function Header({ session, empleadoNombre }) {
           </svg>
           <span
             style={{ fontFamily: "'Fredoka', sans-serif", fontWeight: 600 }}
-            className="text-2xl text-[#FBF3EC]"
+            className="text-xl sm:text-2xl text-[#FBF3EC]"
           >
             inductoria
           </span>
-        </a>
+        </LogoContenedor>
 
         {session && (
           <div className="flex items-center gap-2 sm:gap-3">
@@ -162,7 +187,7 @@ export default function Header({ session, empleadoNombre }) {
         {/* El empleado no tiene sesión de Supabase (entra por token), así
             que solo le mostramos su nombre, sin botón de salir. */}
         {empleadoNombre && (
-          <span className="text-sm font-semibold text-[#FBF3EC]">{empleadoNombre}</span>
+          <span className="text-sm font-semibold text-[#FBF3EC] min-w-0 truncate">{empleadoNombre}</span>
         )}
       </div>
     </header>

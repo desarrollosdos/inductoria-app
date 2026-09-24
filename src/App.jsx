@@ -19,6 +19,62 @@ import RedirigirEmpleado from './pages/RedirigirEmpleado';
 import AdminPage from './pages/AdminPage';
 import Ayuda from './pages/Ayuda';
 import Configuracion from './pages/Configuracion';
+import DashboardNav from './components/DashboardNav';
+import PageShell from './components/PageShell';
+
+// Procedimientos y Checklists se pueden apagar desde Configuración.
+// Antes eso solo ocultaba la pestaña del menú, pero entrando directo a
+// /procedimientos o /checklists la sección seguía funcionando igual.
+// Ahora, si está apagada, se muestra un aviso en vez de la sección.
+// Mismo criterio que DashboardNav: solo cuenta como apagada si el campo
+// vale false (null o sin cuenta todavía = se deja pasar, y la página
+// resuelve el caso de "primero cargá tu negocio").
+function SeccionOpcional({ session, campo, children }) {
+  const [estado, setEstado] = useState('cargando'); // 'cargando' | 'activa' | 'apagada'
+
+  useEffect(() => {
+    let vigente = true;
+    supabase
+      .from('cuentas')
+      .select(campo)
+      .eq('owner_id', session.user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!vigente) return;
+        // Si la consulta falla no bloqueamos: mejor mostrar la sección
+        // que dejar al dueño afuera por un error de red.
+        setEstado(!error && data && data[campo] === true ? 'activa' : 'apagada');
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [session.user.id, campo]);
+
+  if (estado === 'cargando') {
+    return <p className="text-center mt-24 text-[#6b6455]">Cargando...</p>;
+  }
+  if (estado === 'apagada') {
+    return (
+      <div>
+        <DashboardNav userEmail={session.user.email} />
+        <PageShell>
+          <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6 text-center">
+            <p className="text-sm font-semibold text-[#2C2C2A] mb-1">Esta sección está desactivada.</p>
+            <p className="text-sm text-[#6b6455] mb-4">Si la querés usar, activala en Configuración.</p>
+            <a
+              href="/configuracion"
+              className="inline-block px-5 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E]"
+              style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+            >
+              Ir a Configuración
+            </a>
+          </div>
+        </PageShell>
+      </div>
+    );
+  }
+  return children;
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -175,7 +231,9 @@ export default function App() {
       return (
         <>
           <Header session={session} />
-          <Procedimientos session={session} />
+          <SeccionOpcional session={session} campo="procedimientos_habilitado">
+            <Procedimientos session={session} />
+          </SeccionOpcional>
         </>
       );
     }
@@ -193,7 +251,9 @@ export default function App() {
       return (
         <>
           <Header session={session} />
-          <Checklists session={session} />
+          <SeccionOpcional session={session} campo="checklists_habilitado">
+            <Checklists session={session} />
+          </SeccionOpcional>
         </>
       );
     }

@@ -1,15 +1,31 @@
 // Inductoria · Edge Function: admin-visitas
 // ---------------------------------------------
-// Totales de visitas (landing y app) para el panel de Admin. Solo el admin.
+// Totales de visitas (landing y app) para el panel de Admin. Solo
+// administradores (tabla `administradores`, ver _shared/admin.ts).
+//
+// "Hoy", "este mes" y el desglose por día usan la fecha de Argentina, no
+// la de UTC: si no, las visitas de 21 a 24 hs caían en el día siguiente.
+// Antes esto traía como mucho 20000 filas (y Supabase igual cortaba en
+// 1000 sin avisar); ahora pagina hasta traer todo.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import {
+  esAdministrador,
+  traerTodasLasFilas,
+  fechaArgentina,
+  inicioDelDiaArgentina,
+  inicioDelMesArgentina,
+} from '../_shared/admin.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ADMIN_EMAIL = 'desarrollosdos@gmail.com';
+interface Visita {
+  created_at: string;
+  origen: string | null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,19 +33,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseUser.auth.getUser();
-
-    if (userError || !user || user.email !== ADMIN_EMAIL) {
+    if (!(await esAdministrador(req.headers.get('Authorization')))) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -41,20 +45,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: visitas, error } = await supabase
-      .from('landing_visitas')
-      .select('created_at, origen')
-      .order('created_at', { ascending: false })
-      .limit(20000);
+    const visitas = await traerTodasLasFilas<Visita>((desde, hasta) =>
+      supabase
+        .from('landing_visitas')
+        .select('created_at, origen')
+        .order('created_at', { ascending: false })
+        .range(desde, hasta)
+    );
 
-    if (error) throw error;
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
+    const hoy = inicioDelDiaArgentina();
+    const inicioMes = inicioDelMesArgentina();
 
     const contadores = {
       landing: { total: 0, hoy: 0, mes: 0 },
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
     const porDiaMapa: Record<string, { landing: number; app: number }> = {};
 
-    (visitas || []).forEach((v) => {
+    visitas.forEach((v) => {
       const origen = v.origen === 'app' ? 'app' : 'landing';
       const fecha = new Date(v.created_at);
 
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       if (fecha >= hoy) contadores[origen].hoy++;
       if (fecha >= inicioMes) contadores[origen].mes++;
 
-      const clave = fecha.toISOString().slice(0, 10);
+      const clave = fechaArgentina(fecha);
       if (!porDiaMapa[clave]) porDiaMapa[clave] = { landing: 0, app: 0 };
       porDiaMapa[clave][origen]++;
     });

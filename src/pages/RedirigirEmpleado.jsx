@@ -6,31 +6,56 @@ import { supabase } from '../supabaseClient';
 // vez de mostrar el token entero (48 caracteres) como texto plano en el
 // chat, se manda un código corto (los primeros 10 caracteres de ese
 // mismo token). Acá se busca qué empleado tiene un token que empieza
-// con ese código y se redirige al link real y completo.
+// con ese código y se redirige al link real y completo (que igual pide
+// el PIN antes de mostrar nada).
+//
+// 2026-09-24: el código se valida acá también (10 caracteres de letras,
+// números, guion o guion bajo) para no llamar al servidor con cualquier
+// cosa, y un error de red ya no deja la pantalla en "Redirigiendo..."
+// para siempre.
+const FORMATO_CODIGO = /^[A-Za-z0-9_-]{10}$/;
+
 export default function RedirigirEmpleado() {
-  const [estado, setEstado] = useState('buscando'); // buscando | error
+  const [estado, setEstado] = useState('buscando'); // buscando | invalido | error
 
   useEffect(() => {
-    const codigo = new URLSearchParams(window.location.search).get('c');
-    if (!codigo) {
-      setEstado('error');
+    const codigo = (new URLSearchParams(window.location.search).get('c') || '').trim();
+    if (!FORMATO_CODIGO.test(codigo)) {
+      setEstado('invalido');
       return;
     }
     supabase.functions
       .invoke('redirigir-empleado', { method: 'POST', body: { codigo } })
       .then(({ data, error }) => {
-        if (error || !data?.token_acceso) {
+        if (error) {
+          console.error(error);
           setEstado('error');
           return;
         }
-        window.location.replace(`/empleado?token=${data.token_acceso}`);
+        if (!data?.token_acceso) {
+          setEstado('invalido');
+          return;
+        }
+        window.location.replace(`/empleado?token=${encodeURIComponent(data.token_acceso)}`);
+      })
+      .catch((err) => {
+        console.error(err);
+        setEstado('error');
       });
   }, []);
+
+  if (estado === 'invalido') {
+    return (
+      <p className="text-center mt-24 text-[#6b6455] px-4">
+        Este link no funciona. Pedile uno nuevo a tu encargado.
+      </p>
+    );
+  }
 
   if (estado === 'error') {
     return (
       <p className="text-center mt-24 text-[#6b6455] px-4">
-        Este link no es válido. Pedile a tu empleador que te lo vuelva a enviar.
+        No pudimos abrir tu link. Revisá tu conexión y volvé a tocarlo.
       </p>
     );
   }

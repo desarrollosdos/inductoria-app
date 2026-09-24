@@ -145,9 +145,9 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
           },
         }
       );
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || 'No se pudo actualizar el plan. Intentá de nuevo.');
+        setError(data.error || 'No se pudo actualizar el plan. Probá de nuevo.');
         setLoading(false);
         return;
       }
@@ -157,7 +157,7 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
       onAgregada?.();
     } catch (err) {
       console.error(err);
-      setError('Error de conexión. Intentá de nuevo.');
+      setError('No se pudo conectar. Revisá tu conexión y probá de nuevo.');
       setLoading(false);
     }
   }
@@ -166,10 +166,10 @@ function AgregarSucursalPlan({ cuenta, negocios, precioBase, onAgregada }) {
 
   if (!confirmando) {
     return (
-      <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3">
+      <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3 flex-wrap">
         <span className="font-semibold tracking-wide">
-          Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
-          {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Podés sumar una más ahora mismo.
+          Contrataste tu plan para {cuenta.sucursales_contratadas} sucursal
+          {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Si querés, podés sumar una más ahora.
         </span>
         <button
           type="button"
@@ -242,6 +242,11 @@ export default function Dashboard({ session }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [creandoNegocio, setCreandoNegocio] = useState(false);
   const [errorCupo, setErrorCupo] = useState(null);
+  // Antes, si fallaba crear la cuenta o guardar una sucursal, el error
+  // quedaba solo en la consola y el botón volvía a su estado normal como
+  // si nada. Ahora se muestra en pantalla.
+  const [errorCuenta, setErrorCuenta] = useState(null);
+  const [errorEdicion, setErrorEdicion] = useState(null);
   // Alta de sucursal (formulario simple, dentro del cupo ya contratado): 3 pasos
   // con opción de cancelar en cualquiera de ellos. 'inicial' = cartel verde con el
   // botón "Agregar sucursal"; 'confirmar' = "¿estás seguro?"; 'validar' = tipear
@@ -298,6 +303,7 @@ export default function Dashboard({ session }) {
     e.preventDefault();
     if (!nombreCuenta.trim()) return;
     setCreandoCuenta(true);
+    setErrorCuenta(null);
 
     // Cuenta nueva arranca en trial: TRIAL_DIAS días de acceso completo,
     // sin tope de empleados, pero SÍ con tope de 1 sucursal durante el
@@ -324,8 +330,9 @@ export default function Dashboard({ session }) {
       .single();
 
     setCreandoCuenta(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorCuenta('No se pudo crear tu cuenta. Revisá tu conexión y probá de nuevo.');
       return;
     }
     setCuenta(data);
@@ -344,9 +351,9 @@ export default function Dashboard({ session }) {
       setErrorCupo(
         trialActivo(cuenta) && !CUENTAS_EXENTAS.includes(session.user.email)
           ? 'Durante la prueba gratis podés cargar 1 sucursal. Suscribite para cargar el resto que declaraste.'
-          : `Informaste en tu plan que tendrías ${cuenta.sucursales_contratadas} sucursal${
+          : `Contrataste tu plan para ${cuenta.sucursales_contratadas} sucursal${
               cuenta.sucursales_contratadas === 1 ? '' : 'es'
-            }. Comunicate con nosotros si necesitás agregar más.`
+            }. Escribinos si necesitás sumar más.`
       );
       return;
     }
@@ -358,8 +365,10 @@ export default function Dashboard({ session }) {
       !form.provincia.trim() ||
       !form.telefono.trim() ||
       !form.mail.trim()
-    )
+    ) {
+      setErrorCupo('Completá todos los datos de la sucursal (el código postal es opcional).');
       return;
+    }
 
     setCreandoNegocio(true);
     const { data, error } = await supabase
@@ -378,8 +387,9 @@ export default function Dashboard({ session }) {
       .single();
 
     setCreandoNegocio(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorCupo('No se pudo guardar la sucursal. Revisá tu conexión y probá de nuevo.');
       return;
     }
     setNegocios([...negocios, data]);
@@ -404,6 +414,7 @@ export default function Dashboard({ session }) {
 
   function confirmarEdicion(n) {
     setConfirmandoEdicionId(null);
+    setErrorEdicion(null);
     setEditandoId(n.id);
     setFormEdit({
       nombre: n.nombre || '',
@@ -423,6 +434,7 @@ export default function Dashboard({ session }) {
     }
 
     setGuardandoEdit(true);
+    setErrorEdicion(null);
     const { data, error } = await supabase
       .from('negocios')
       .update({
@@ -439,8 +451,9 @@ export default function Dashboard({ session }) {
       .single();
 
     setGuardandoEdit(false);
-    if (error) {
+    if (error || !data) {
       console.error(error);
+      setErrorEdicion('No se pudieron guardar los cambios. Revisá tu conexión y probá de nuevo.');
       return;
     }
     setNegocios(negocios.map((n) => (n.id === id ? data : n)));
@@ -479,10 +492,11 @@ export default function Dashboard({ session }) {
                 className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
               />
               <p className="text-xs text-[#8a8471] mt-1">
-                Define el precio de tu plan. Durante la prueba gratis podés cargar 1 sucursal;
-                cuando te suscribas se cobra por esta cantidad.
+                Con esto se calcula el precio de tu plan. Durante la prueba gratis podés cargar 1
+                sucursal. Cuando te suscribas, se cobra por esta cantidad.
               </p>
             </div>
+            {errorCuenta && <p className="text-xs font-semibold text-[#C1502E]">{errorCuenta}</p>}
             <button
               type="submit"
               disabled={creandoCuenta}
@@ -517,7 +531,7 @@ export default function Dashboard({ session }) {
           }
         />
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
-          <h1 className="text-2xl font-bold text-[#C1502E]">{cuenta.nombre}</h1>
+          <h1 className="text-2xl font-bold text-[#C1502E] break-words">{cuenta.nombre}</h1>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#EFDDCE] p-6">
@@ -545,7 +559,7 @@ export default function Dashboard({ session }) {
                   className="w-full text-left p-4"
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-[#C1502E]">{n.nombre}</p>
+                    <p className="text-sm font-semibold text-[#C1502E] min-w-0 break-words">{n.nombre}</p>
                     <span className="text-xs font-semibold text-white bg-[#C1502E] rounded-full px-3 py-1 flex-shrink-0 ml-2">
                       {editandoId === n.id ? 'Cerrar' : 'Editar'}
                     </span>
@@ -563,7 +577,7 @@ export default function Dashboard({ session }) {
                         <p className="text-xs font-medium text-[#3d382c]">{n.provincia}</p>
                       )}
                       <p className="text-xs font-medium text-[#3d382c]">Argentina</p>
-                      <p className="text-xs text-[#6b6455] mt-1">
+                      <p className="text-xs text-[#6b6455] mt-1 break-words">
                         {n.telefono} · {n.mail}
                       </p>
                     </>
@@ -576,8 +590,8 @@ export default function Dashboard({ session }) {
                   <div className="px-4 pb-4">
                     <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
                       <p className="font-semibold text-[#2C2C2A]">
-                        ¿Estás seguro que querés modificar los datos de esta sucursal? Es un dato
-                        asociado a muchas cosas.
+                        ¿Seguro que querés cambiar los datos de esta sucursal? Se usan en varios
+                        lados.
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -603,6 +617,7 @@ export default function Dashboard({ session }) {
                 {editandoId === n.id && (
                   <div className="px-4 pb-4 space-y-2 border-t border-[#EDE0C8] pt-3">
                     <CamposDireccion form={formEdit} setForm={setFormEdit} />
+                    {errorEdicion && <p className="text-xs font-semibold text-[#C1502E]">{errorEdicion}</p>}
                     <button
                       type="button"
                       onClick={() => handleGuardarEdicion(n.id)}
@@ -619,7 +634,7 @@ export default function Dashboard({ session }) {
           </div>
 
           {!hasAccess ? (
-            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] flex items-center justify-between gap-3">
+            <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] flex items-center justify-between gap-3 flex-wrap">
               <span>Necesitás una suscripción activa para cargar sucursales.</span>
               <button
                 type="button"
@@ -645,7 +660,7 @@ export default function Dashboard({ session }) {
               }}
             />
           ) : cupoLleno && esTrialConTope ? (
-            <div className="bg-[#DCEEF7] border border-[#B8DCEC] rounded-lg p-3 text-sm text-[#1B6E8C] flex items-center justify-between gap-3">
+            <div className="bg-[#DCEEF7] border border-[#B8DCEC] rounded-lg p-3 text-sm text-[#1B6E8C] flex items-center justify-between gap-3 flex-wrap">
               <span>
                 Durante la prueba gratis podés cargar 1 sucursal. Suscribite para cargar
                 {cuenta.sucursales_contratadas > 1
@@ -663,12 +678,12 @@ export default function Dashboard({ session }) {
             </div>
           ) : cupoLleno ? (
             <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] font-semibold tracking-wide">
-              Informaste en tu plan que tendrías {cuenta.sucursales_contratadas} sucursal
-              {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Comunicate con nosotros si
-              necesitás sumar más.
+              Contrataste tu plan para {cuenta.sucursales_contratadas} sucursal
+              {cuenta.sucursales_contratadas === 1 ? '' : 'es'}. Escribinos si necesitás sumar
+              más.
             </div>
           ) : pasoAltaSucursal === 'inicial' ? (
-            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3">
+            <div className="bg-[#F3F9F5] border border-[#BFE0CE] rounded-lg p-3 text-sm text-[#2C4A3A] flex items-center justify-between gap-3 flex-wrap">
               <span className="font-semibold tracking-wide">
                 Podés cargar una sucursal más cuando lo necesites.
               </span>
@@ -684,10 +699,16 @@ export default function Dashboard({ session }) {
           ) : pasoAltaSucursal === 'confirmar' ? (
             <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-lg p-3 text-sm text-[#6b6455] space-y-2">
               {errorCupo && <p className="text-xs text-[#C1502E]">{errorCupo}</p>}
-              <p>Agregar una sucursal nueva tiene un costo asociado a tu plan.</p>
-              <p className="font-semibold text-[#2C2C2A]">
-                ¿Estás seguro que querés dar de alta una sucursal más?
+              {/* Acá todavía hay lugar dentro de lo contratado (si no, se
+                  muestra AgregarSucursalPlan), así que cargarla no cambia lo
+                  que se paga: crear-suscripcion cobra por el mayor entre
+                  sucursales cargadas y contratadas. */}
+              <p>
+                Tu plan incluye {cuenta.sucursales_contratadas} sucursal
+                {cuenta.sucursales_contratadas === 1 ? '' : 'es'}, así que cargar esta no cambia lo
+                que pagás por mes.
               </p>
+              <p className="font-semibold text-[#2C2C2A]">¿Seguro que querés sumar una sucursal?</p>
               <div className="flex gap-2">
                 <button
                   type="button"

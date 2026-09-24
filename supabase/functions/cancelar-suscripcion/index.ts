@@ -59,12 +59,12 @@ Deno.serve(async (req) => {
 
     const { data: cuenta, error: cuentaError } = await supabase
       .from('cuentas')
-      .select('id, plan, mp_preapproval_id')
+      .select('id, plan, mp_preapproval_id, cancelacion_pendiente')
       .eq('owner_id', userData.user.id)
       .maybeSingle();
 
     if (cuentaError || !cuenta) {
-      return new Response(JSON.stringify({ error: 'Cuenta no encontrada' }), {
+      return new Response(JSON.stringify({ error: 'No encontramos tu cuenta.' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -72,14 +72,23 @@ Deno.serve(async (req) => {
 
     if (cuenta.plan !== 'active') {
       return new Response(
-        JSON.stringify({ error: 'Solo se puede cancelar una suscripción activa' }),
+        JSON.stringify({ error: 'Solo podés cancelar una suscripción que esté activa.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Ya cancelada: no volvemos a pedirle a MercadoPago que cancele ni
+    // pisamos el acceso_hasta que ya quedó guardado.
+    if (cuenta.cancelacion_pendiente) {
+      return new Response(
+        JSON.stringify({ error: 'Ya cancelaste tu suscripción. Seguís con acceso hasta el final del período que pagaste.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!cuenta.mp_preapproval_id) {
       return new Response(
-        JSON.stringify({ error: 'Esta cuenta no tiene una suscripción de MercadoPago asociada' }),
+        JSON.stringify({ error: 'No encontramos tu suscripción en Mercado Pago. Escribinos y lo vemos.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -126,7 +135,7 @@ Deno.serve(async (req) => {
       const detalle = await mpRes.text();
       console.error('Error cancelando en MercadoPago:', detalle);
       return new Response(
-        JSON.stringify({ error: 'No se pudo cancelar en MercadoPago', detalle }),
+        JSON.stringify({ error: 'No pudimos cancelar en Mercado Pago. Probá de nuevo en un rato.', detalle }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

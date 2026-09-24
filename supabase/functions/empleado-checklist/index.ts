@@ -17,18 +17,31 @@
 // No hay estado por ítem persistido: el empleado tilda todos los ítems en
 // la pantalla y al enviar se guarda una sola fila en checklist_runs por
 // checklist por día, marcando que se completó y quién lo hizo.
+//
+// 2026-09-24: valida token + PIN en cada pedido (el mismo PIN de Mi
+// perfil, en el header x-empleado-pin, ver _shared/empleado-auth.ts), usa
+// la fecha de Argentina para el período, y si dos personas envían el
+// mismo checklist a la vez el índice único (checklist_id, fecha) frena el
+// duplicado y se responde 409.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  ahoraArgentina,
+  aplicaAlPuesto,
+  autenticarEmpleado,
+  corsEmpleado,
+  leerPin,
+  respuestaError,
+  respuestaErrorServidor,
+  respuestaJson,
+} from '../_shared/empleado-auth.ts';
 
 // Mismo cálculo de "ancla de período" que usa Checklists.jsx (pantalla del
 // dueño), para que ambos lados coincidan en qué fecha representa "ya
 // completado en el período actual": el día exacto si es diario, el lunes
 // de esa semana si es semanal, o el día 1 del mes si es mensual.
+// `base` tiene que venir ya corrida a hora de Argentina (ver
+// anclaActual): se lee con los getters UTC.
 function fechaAncla(periodicidad: string, base: Date) {
   if (periodicidad === 'semanal') {
     const dia = base.getUTCDay(); // 0 = domingo
@@ -43,32 +56,20 @@ function fechaAncla(periodicidad: string, base: Date) {
   return base.toISOString().slice(0, 10);
 }
 
+// 2026-09-24: el "hoy" es el de Argentina. Antes se usaba la fecha UTC,
+// así que a partir de las 21 hs el checklist de hoy ya contaba como el de
+// mañana (y un cierre de caja hecho a la noche quedaba en el día que no era).
 function anclaActual(periodicidad: string) {
-  return fechaAncla(periodicidad, new Date());
+  return fechaAncla(periodicidad, ahoraArgentina());
 }
 
-// Mismo criterio que empleado-info usa para microcursos.puestos_aplicables.
-function aplicaAlPuesto(puestos: string[] | null, puestoEmpleado: string | null) {
-  if (!puestos || puestos.length === 0) return false;
-  if (puestos.includes('TODOS')) return true;
-  return !!puestoEmpleado && puestos.includes(puestoEmpleado);
-}
-
-async function cargarEmpleado(supabase: any, token: string) {
-  const { data: empleado, error: empleadoError } = await supabase
-    .from('empleados')
-    .select('id, nombre, puesto, negocio_id, fecha_baja')
-    .eq('token_acceso', token)
-    .maybeSingle();
-
-  if (empleadoError) throw empleadoError;
-  if (!empleado || empleado.fecha_baja) return null;
-  return empleado;
+function etiquetaDePeriodo(periodicidad: string) {
+  return periodicidad === 'semanal' ? 'esta semana' : periodicidad === 'mensual' ? 'este mes' : 'hoy';
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsEmpleado });
   }
 
   const supabase = createClient(
@@ -80,20 +81,10 @@ Deno.serve(async (req) => {
     if (req.method === 'GET') {
       const url = new URL(req.url);
       const token = url.searchParams.get('token');
-      if (!token) {
-        return new Response(JSON.stringify({ error: 'Falta el token' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
 
-      const empleado = await cargarEmpleado(supabase, token);
-      if (!empleado) {
-        return new Response(JSON.stringify({ error: 'Link no válido o de baja' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const auth = await autenticarEmpleado(supabase, token, leerPin(req));
+      if (auth.error) return respuestaError(auth.error);
+      const empleado = auth.empleado;
 
       const { data: negocio } = await supabase
         .from('negocios')
@@ -108,9 +99,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!cuenta?.checklists_habilitado) {
-        return new Response(JSON.stringify({ checklists: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return respuestaJson({ checklists: [] });
       }
 
       const { data: checklistsNegocio, error: checklistsError } = await supabase
@@ -126,9 +115,7 @@ Deno.serve(async (req) => {
       );
 
       if (checklistsDelPuesto.length === 0) {
-        return new Response(JSON.stringify({ checklists: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return respuestaJson({ checklists: [] });
       }
 
       // Cada checklist puede tener su propia periodicidad, así que la
@@ -162,28 +149,19 @@ Deno.serve(async (req) => {
         };
       });
 
-      return new Response(JSON.stringify({ checklists }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return respuestaJson({ checklists });
     }
 
     if (req.method === 'POST') {
-      const body = await req.json();
-      const { token, checklist_id } = body;
+      const body = await req.json().catch(() => ({}));
+      const { token, checklist_id } = body || {};
 
-      if (!token || !checklist_id) {
-        return new Response(JSON.stringify({ error: 'Faltan datos' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const auth = await autenticarEmpleado(supabase, token, leerPin(req));
+      if (auth.error) return respuestaError(auth.error);
+      const empleado = auth.empleado;
 
-      const empleado = await cargarEmpleado(supabase, token);
-      if (!empleado) {
-        return new Response(JSON.stringify({ error: 'Link no válido o de baja' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (!checklist_id) {
+        return respuestaJson({ error: 'No encontramos ese checklist. Volvé a Mi perfil y probá de nuevo.' }, 400);
       }
 
       const { data: checklist, error: checklistError } = await supabase
@@ -192,38 +170,51 @@ Deno.serve(async (req) => {
         .eq('id', checklist_id)
         .maybeSingle();
 
-      if (checklistError) throw checklistError;
+      if (checklistError) console.error('empleado-checklist:', checklistError);
       if (
+        checklistError ||
         !checklist ||
         checklist.negocio_id !== empleado.negocio_id ||
         !checklist.activo ||
         !aplicaAlPuesto(checklist.puestos_aplicables, empleado.puesto)
       ) {
-        return new Response(JSON.stringify({ error: 'Checklist no encontrado' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return respuestaJson({ error: 'Este checklist ya no está disponible para vos.' }, 404);
       }
 
       const periodicidad = checklist.periodicidad || 'diario';
       const fecha = anclaActual(periodicidad);
-      const etiquetaPeriodo =
-        periodicidad === 'semanal' ? 'esta semana' : periodicidad === 'mensual' ? 'este mes' : 'hoy';
+      const etiquetaPeriodo = etiquetaDePeriodo(periodicidad);
 
-      const { data: yaCompletado } = await supabase
+      // Las filas de checklist_runs son una por checklist por período (no
+      // por empleado): si otro compañero ya lo completó, no se duplica.
+      async function respuestaYaCompletado() {
+        const { data: yaCompletado } = await supabase
+          .from('checklist_runs')
+          .select('empleado_nombre')
+          .eq('checklist_id', checklist_id)
+          .eq('fecha', fecha)
+          .limit(1);
+        const quien = yaCompletado?.[0]?.empleado_nombre;
+        return respuestaJson(
+          {
+            error: quien
+              ? `Este checklist ya lo completó ${quien} ${etiquetaPeriodo}.`
+              : `Este checklist ya está completado ${etiquetaPeriodo}.`,
+            ya_completado: true,
+          },
+          409
+        );
+      }
+
+      const { data: existentes } = await supabase
         .from('checklist_runs')
-        .select('empleado_nombre')
+        .select('checklist_id')
         .eq('checklist_id', checklist_id)
         .eq('fecha', fecha)
-        .maybeSingle();
+        .limit(1);
 
-      if (yaCompletado) {
-        return new Response(
-          JSON.stringify({
-            error: `Este checklist ya lo completó ${yaCompletado.empleado_nombre} ${etiquetaPeriodo}.`,
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (existentes && existentes.length > 0) {
+        return await respuestaYaCompletado();
       }
 
       const ahora = new Date().toISOString();
@@ -237,22 +228,18 @@ Deno.serve(async (req) => {
         completado_en: ahora,
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        // 23505 = violación del índice único (checklist_id, fecha): dos
+        // envíos casi al mismo tiempo, el otro ganó.
+        if (insertError.code === '23505') return await respuestaYaCompletado();
+        throw insertError;
+      }
 
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return respuestaJson({ ok: true });
     }
 
-    return new Response(JSON.stringify({ error: 'Método no permitido' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return respuestaJson({ error: 'Método no permitido.' }, 405);
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: 'Error inesperado', detalle: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return respuestaErrorServidor(err);
   }
 });

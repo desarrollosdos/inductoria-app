@@ -4,22 +4,14 @@
 //
 // - capitalizarPalabras: pone en mayúscula la primera letra de CADA
 //   palabra, preservando los espacios tal cual estén ("juan perez" ->
-//   "Juan Perez"). Es la que se usa en TODOS los campos de entrada libre
-//   que son nombres/identificadores cortos, no oraciones: nombre de
-//   empleado, nombre de sucursal, localidad, provincia, país, dirección,
-//   y los títulos de Contenido/Procedimientos/Checklists.
-//
-//   2026-08-28: antes los títulos usaban capitalizarPrimeraLetra, porque
-//   en español no es lo más prolijo poner en mayúscula cada palabra de
-//   una oración ("Manipulación De Alimentos" en vez de "Manipulación de
-//   alimentos"). Roberto pidió explícitamente el mismo criterio de "cada
-//   palabra en mayúscula" para todos los campos de entrada de la app,
-//   títulos incluidos, así que ahora también usan capitalizarPalabras.
+//   "Juan Perez"). Solo para nombres propios cortos: nombre de empleado,
+//   nombre de sucursal, localidad, provincia, puesto personalizado.
 //
 // - capitalizarPrimeraLetra: pone en mayúscula solo la primera letra de
-//   TODO el texto, sin tocar el resto de las palabras. Ya no se usa en
-//   ningún lado por ahora, queda disponible por si hace falta en el
-//   futuro para un campo de una sola oración larga.
+//   TODO el texto, sin tocar el resto. Es la que va en títulos y frases
+//   (cursos, procedimientos, checklists y sus ítems): en español se
+//   escribe "Contar la caja", no "Contar La Caja". Antes los títulos
+//   usaban capitalizarPalabras y quedaban con cada palabra en mayúscula.
 //
 // Ninguna de las dos toca el resto de cada palabra (no fuerza minúsculas):
 // si alguien ya escribió "JUAN", queda "JUAN", solo se asegura que la
