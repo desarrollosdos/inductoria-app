@@ -1,11 +1,21 @@
 import { trialActivo, textoTrialRestante } from '../lib/acceso';
+import PrecioCambioBanner from './PrecioCambioBanner';
 
 // Aviso liviano de "te quedan X de prueba", visible en las pantallas
 // principales mientras la cuenta está en trial. No bloquea nada, solo
 // recuerda y ofrece el atajo a Suscripción.
+// Desde 2026-09-25 también muestra, debajo, el aviso de cambio de precio
+// programado (PrecioCambioBanner), así aparece en las mismas pantallas.
 export default function TrialBanner({ cuenta }) {
-  if (!trialActivo(cuenta)) return null;
+  return (
+    <>
+      {trialActivo(cuenta) && <AvisoTrial cuenta={cuenta} />}
+      <PrecioCambioBanner cuenta={cuenta} />
+    </>
+  );
+}
 
+function AvisoTrial({ cuenta }) {
   const tiempoRestante = textoTrialRestante(cuenta);
 
   return (

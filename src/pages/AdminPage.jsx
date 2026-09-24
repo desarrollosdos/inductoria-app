@@ -178,6 +178,40 @@ const SUB_TABS = [
   { id: 'administradores', label: 'Administradores', Icon: IconAdministradores },
 ];
 
+// Fecha sugerida para un cambio de precio: el 1 del mes que viene, o el
+// del mes siguiente si faltan menos de `diasAviso` días (hora Argentina).
+function fechaVigenciaSugerida(diasAviso) {
+  const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const minimo = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate() + diasAviso));
+  let fecha = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 1, 1));
+  if (fecha < minimo) fecha = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 2, 1));
+  return fecha.toISOString().slice(0, 10);
+}
+
+function hoyArgentinaISO() {
+  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function formatearFechaPrecio(iso) {
+  if (!iso) return '';
+  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+// supabase.functions.invoke deja data en null cuando la función responde
+// con error (400/500): el mensaje real viene en error.context.
+async function leerErrorFuncion(error) {
+  try {
+    const cuerpo = await error.context.json();
+    return cuerpo?.error || null;
+  } catch {
+    return null;
+  }
+}
+
 function Tarjeta({ label, valor }) {
   return (
     <div className="bg-white rounded-2xl border border-[#EFDDCE] p-5">
@@ -205,6 +239,14 @@ export default function AdminPage({ session }) {
   const [precioInput, setPrecioInput] = useState('');
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
   const [mensajePrecio, setMensajePrecio] = useState(null);
+  // Cambio de precio programado (tabla precio_cambios, ver actualizar-precio
+  // y aplicar-cambio-precio). Mismo mecanismo que Repunte.
+  const [precioPendiente, setPrecioPendiente] = useState(null);
+  const [historialPrecio, setHistorialPrecio] = useState([]);
+  const [diasAvisoPrecio, setDiasAvisoPrecio] = useState(5);
+  const [fechaVigencia, setFechaVigencia] = useState(fechaVigenciaSugerida(5));
+  const [sinAviso, setSinAviso] = useState(false);
+  const [cancelandoCambio, setCancelandoCambio] = useState(false);
 
   // Estado de la nueva pestaña "Administradores": lista de mails
   // habilitados para ver esta sección (tabla `administradores` en
@@ -246,11 +288,26 @@ export default function AdminPage({ session }) {
     setVisitas(data);
   }
 
+  function aplicarEstadoPrecio(data) {
+    setPrecioBase(data.precio_base);
+    setPrecioPendiente(data.pendiente || null);
+    setHistorialPrecio(data.historial || []);
+    if (data.dias_aviso) setDiasAvisoPrecio(data.dias_aviso);
+  }
+
   async function cargarPrecio() {
-    const { data } = await supabase.from('configuracion_precio').select('precio_base').eq('id', 1).maybeSingle();
-    if (data) {
-      setPrecioBase(data.precio_base);
+    const { data, error } = await supabase.functions.invoke('actualizar-precio', { method: 'GET' });
+    if (!error && data && !data.error) {
+      aplicarEstadoPrecio(data);
       setPrecioInput(String(data.precio_base));
+      setFechaVigencia(fechaVigenciaSugerida(data.dias_aviso || 5));
+      return;
+    }
+    // Si la función todavía no responde, al menos mostramos el precio actual.
+    const { data: config } = await supabase.from('configuracion_precio').select('precio_base').eq('id', 1).maybeSingle();
+    if (config) {
+      setPrecioBase(config.precio_base);
+      setPrecioInput(String(config.precio_base));
     }
   }
 
@@ -276,19 +333,52 @@ export default function AdminPage({ session }) {
       return;
     }
 
+    if (sinAviso) {
+      const seguro = window.confirm(
+        'El precio nuevo se aplica ya, también a los que ya pagan, sin aviso previo. Usalo solo si todavía no tenés clientes reales. ¿Seguís?'
+      );
+      if (!seguro) return;
+    }
+
     setGuardandoPrecio(true);
     const { data, error } = await supabase.functions.invoke('actualizar-precio', {
       method: 'POST',
-      body: { precio_base: valor },
+      body: { precio_base: valor, vigente_desde: fechaVigencia, sin_aviso: sinAviso },
     });
     setGuardandoPrecio(false);
 
-    if (error || data?.error) {
-      setMensajePrecio({ tipo: 'error', texto: data?.error || 'No se pudo actualizar el precio.' });
+    const mensajeError = data?.error || (error ? await leerErrorFuncion(error) : null);
+    if (mensajeError) {
+      setMensajePrecio({ tipo: 'error', texto: mensajeError || 'No se pudo guardar el cambio de precio.' });
       return;
     }
-    setPrecioBase(data.precio_base);
-    setMensajePrecio({ tipo: 'ok', texto: 'Precio actualizado.' });
+    aplicarEstadoPrecio(data);
+    setSinAviso(false);
+    setMensajePrecio({
+      tipo: 'ok',
+      texto: data.pendiente
+        ? `Cambio programado. Tus clientes ya ven el aviso y el precio nuevo rige desde el ${formatearFechaPrecio(data.pendiente.vigente_desde)}.`
+        : 'Precio aplicado. Ya se actualizó en la landing, para los clientes nuevos y en las suscripciones de Mercado Pago.',
+    });
+  }
+
+  async function handleCancelarCambio() {
+    if (!precioPendiente) return;
+    if (!window.confirm('¿Cancelar el cambio de precio programado? El aviso deja de mostrarse a tus clientes.')) return;
+    setCancelandoCambio(true);
+    setMensajePrecio(null);
+    const { data, error } = await supabase.functions.invoke('actualizar-precio', {
+      method: 'POST',
+      body: { cancelar_id: precioPendiente.id },
+    });
+    setCancelandoCambio(false);
+    const mensajeError = data?.error || (error ? await leerErrorFuncion(error) : null);
+    if (mensajeError) {
+      setMensajePrecio({ tipo: 'error', texto: mensajeError });
+      return;
+    }
+    aplicarEstadoPrecio(data);
+    setMensajePrecio({ tipo: 'ok', texto: 'Cambio de precio cancelado.' });
   }
 
   async function cargarMetricas() {
@@ -833,28 +923,79 @@ export default function AdminPage({ session }) {
               recalculan solos, guardando la misma proporción de descuento que tenían.
             </p>
 
-            <form onSubmit={handleGuardarPrecio} className="flex items-end gap-2 mb-5">
-              <div className="flex-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] block mb-1">
-                  Precio 1 sucursal ($/mes)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={precioInput}
-                  onChange={(e) => setPrecioInput(e.target.value)}
-                  className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
-                />
+            {precioPendiente && (
+              <div className="bg-[#FDF6ED] border border-[#F0DFC4] rounded-xl p-4 mb-5">
+                <p className="text-sm text-[#2C2C2A]">
+                  <strong>Cambio programado:</strong> desde el{' '}
+                  <strong>{formatearFechaPrecio(precioPendiente.vigente_desde)}</strong> el precio de 1
+                  sucursal pasa de ${Number(precioPendiente.precio_base_anterior || precioBase).toLocaleString('es-AR')} a{' '}
+                  <strong>${Number(precioPendiente.precio_base_nuevo).toLocaleString('es-AR')}</strong>.
+                </p>
+                <p className="text-xs text-[#6b6455] mt-1">
+                  Tus clientes ya ven el aviso en la app. Ese día se actualiza solo en la landing, para
+                  los clientes nuevos y en la suscripción de Mercado Pago de los que ya pagan.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCancelarCambio}
+                  disabled={cancelandoCambio}
+                  className="mt-3 text-xs font-bold tracking-wide text-white bg-[#6B655A] rounded-full px-4 py-2 disabled:opacity-60"
+                  style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                >
+                  {cancelandoCambio ? 'Cancelando...' : 'Cancelar este cambio'}
+                </button>
               </div>
-              <button
-                type="submit"
-                disabled={guardandoPrecio}
-                className="px-4 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
-                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
-              >
-                {guardandoPrecio ? 'Guardando...' : 'Guardar'}
-              </button>
-            </form>
+            )}
+
+            {!precioPendiente && (
+              <form onSubmit={handleGuardarPrecio} className="mb-5 space-y-3">
+                <div className="flex items-end gap-2 flex-wrap">
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] block mb-1">
+                      Precio nuevo 1 sucursal ($/mes)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={precioInput}
+                      onChange={(e) => setPrecioInput(e.target.value)}
+                      className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] block mb-1">
+                      Rige desde
+                    </label>
+                    <input
+                      type="date"
+                      min={hoyArgentinaISO()}
+                      value={fechaVigencia}
+                      disabled={sinAviso}
+                      onChange={(e) => setFechaVigencia(e.target.value)}
+                      className="w-full border border-[#EFDDCE] rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={guardandoPrecio}
+                    className="px-4 py-2 rounded-lg font-bold tracking-wide text-white bg-[#C1502E] disabled:opacity-60"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                  >
+                    {guardandoPrecio ? 'Guardando...' : sinAviso ? 'Aplicar ya' : 'Programar cambio'}
+                  </button>
+                </div>
+                <p className="text-xs text-[#6b6455]">
+                  Actual: ${Number(precioBase || 0).toLocaleString('es-AR')} por sucursal. Para subirlo hay que
+                  avisar con al menos {diasAvisoPrecio} días: tus clientes ven el aviso en la app desde que
+                  lo programás. Ese día el precio nuevo pasa a la landing, a los clientes nuevos y a la
+                  suscripción de Mercado Pago de los que ya pagan, con su descuento por cantidad de sucursales.
+                </p>
+                <label className="flex items-center gap-2 text-xs text-[#6b6455]">
+                  <input type="checkbox" checked={sinAviso} onChange={(e) => setSinAviso(e.target.checked)} />
+                  Aplicar ya, sin aviso (solo si todavía no tenés clientes reales)
+                </label>
+              </form>
+            )}
 
             {mensajePrecio && (
               <p className={`text-xs mb-4 ${mensajePrecio.tipo === 'error' ? 'text-[#C1502E]' : 'text-[#1D9E75]'}`}>
@@ -866,16 +1007,45 @@ export default function AdminPage({ session }) {
               {TIERS_PRECIO.map((t) => {
                 const referencia = t.hasta === 1 ? 1 : t.hasta === 4 ? 2 : t.hasta === 9 ? 5 : 10;
                 const precioTramo = precioPorSucursal(referencia, precioBase || 12000);
+                const precioTramoNuevo = precioPendiente
+                  ? precioPorSucursal(referencia, Number(precioPendiente.precio_base_nuevo))
+                  : null;
                 return (
                   <div key={t.etiqueta} className="flex justify-between border-b border-[#F5EFE3] pb-2 last:border-0">
                     <span className="text-sm text-[#2C2C2A]">{t.etiqueta}</span>
                     <span className="text-sm font-semibold text-[#C1502E]">
                       ${precioTramo.toLocaleString('es-AR')} c/u
+                      {precioTramoNuevo !== null && (
+                        <span className="text-[#6b6455] font-normal">
+                          {' '}
+                          → ${precioTramoNuevo.toLocaleString('es-AR')} desde el{' '}
+                          {formatearFechaPrecio(precioPendiente.vigente_desde)}
+                        </span>
+                      )}
                     </span>
                   </div>
                 );
               })}
             </div>
+
+            {historialPrecio.length > 0 && (
+              <div className="mt-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#8a8471] mb-2">Últimos cambios</p>
+                <div className="space-y-1">
+                  {historialPrecio.map((h) => (
+                    <div key={h.id} className="flex justify-between gap-3 text-xs text-[#6b6455] border-b border-[#F5EFE3] pb-1 last:border-0">
+                      <span>
+                        ${Number(h.precio_base_anterior || 0).toLocaleString('es-AR')} → $
+                        {Number(h.precio_base_nuevo).toLocaleString('es-AR')} desde el {formatearFechaPrecio(h.vigente_desde)}
+                      </span>
+                      <span className="font-semibold whitespace-nowrap">
+                        {h.cancelado_at ? 'Cancelado' : h.aplicado_at ? 'Aplicado' : 'Programado'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

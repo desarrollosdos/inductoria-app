@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import PageShell from '../components/PageShell';
+import PrecioCambioBanner from '../components/PrecioCambioBanner';
 import CancelarSuscripcionModal from '../components/CancelarSuscripcionModal';
 import { precioTotalMensual, PRECIO_BASE_POR_DEFECTO } from '../lib/precio';
 import { trialActivo, textoTrialRestante, EMPLEADOS_POR_SUCURSAL } from '../lib/acceso';
@@ -322,6 +323,7 @@ export default function Suscripcion({ session }) {
     <div>
       <DashboardNav userEmail={session.user.email} />
       <PageShell>
+        <PrecioCambioBanner cuenta={cuenta} />
         <div className="bg-[#EDE0C8] rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#2C2C2A] flex items-center justify-center flex-shrink-0">
