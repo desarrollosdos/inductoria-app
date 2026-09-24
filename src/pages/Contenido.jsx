@@ -1843,7 +1843,7 @@ export default function Contenido({ session }) {
                 return (
                   <div key={m.id} className="border border-[#F0DFC4] bg-[#FDF6ED] rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1 basis-56">
                         <p className="text-sm font-semibold text-[#2C2C2A]">{m.titulo}</p>
                         <p className="text-[10px] font-semibold text-[#8a8471]">
                           {conCambios
@@ -1851,7 +1851,7 @@ export default function Contenido({ session }) {
                             : `Versión ${versionActual} en revisión, todavía no la ven tus empleados.`}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 max-w-full">
                         <button
                           type="button"
                           onClick={() => abrirEdicionEnRevision(m.id)}
