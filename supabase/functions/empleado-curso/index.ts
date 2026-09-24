@@ -2,7 +2,16 @@
 // ------------------------------------------------
 // Trae el contenido completo (pasos + preguntas) de UN curso puntual,
 // validando el token del empleado. Se llama al hacer clic en un curso
-// pendiente desde "Mi perfil".
+// pendiente O ya completado desde "Mi perfil".
+//
+// Ahora también trae el progreso propio del empleado en este curso
+// (completado, puntaje, correctas, total, acuse_confirmado_at). Antes
+// CursoDetalle.jsx solo sabía si ya lo había completado mirando un
+// resultado guardado en localStorage del propio navegador — lo que hacía
+// imposible volver a entrar a la pantalla de resultado (por ejemplo para
+// terminar de confirmar el acuse de recibido más tarde, o desde otro
+// dispositivo) una vez que esa pestaña se cerraba. Con esto el servidor
+// es la fuente de verdad.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -80,12 +89,31 @@ Deno.serve(async (req) => {
       opciones: p.opciones,
     }));
 
+    // Progreso propio del empleado en este curso puntual, si ya lo
+    // intentó alguna vez (aprobado o no). Null si nunca lo hizo.
+    const { data: progreso } = await supabase
+      .from('progreso_empleado')
+      .select('completado, puntaje, correctas, total, fecha_completado, acuse_confirmado_at')
+      .eq('empleado_id', empleado.id)
+      .eq('microcurso_id', microcursoId)
+      .maybeSingle();
+
     return new Response(
       JSON.stringify({
         titulo: microcurso.titulo,
         duracion_min: microcurso.duracion_min,
         pasos: pasos || [],
         preguntas: preguntasSinRespuesta,
+        progreso: progreso
+          ? {
+              completado: progreso.completado,
+              puntaje: progreso.puntaje,
+              correctas: progreso.correctas,
+              total: progreso.total,
+              fecha_completado: progreso.fecha_completado,
+              acuse_confirmado_at: progreso.acuse_confirmado_at,
+            }
+          : null,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

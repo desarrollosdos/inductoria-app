@@ -5,6 +5,13 @@
 // todo lo necesario para "Mi perfil": sus datos, y la lista de cursos
 // (pendientes/completados) con fecha límite si tiene, y si el curso fue
 // actualizado después de que el empleado ya lo había completado.
+//
+// Ahora también devuelve si hay un checklist operativo activo para su
+// sucursal (checklist_disponible). Antes "Mi perfil" no tenía forma de
+// saber esto, así que no había ningún link hacia la pantalla de checklist
+// del empleado (que ni siquiera existía). Con este flag, el botón "Ver
+// checklist de hoy" en Mi perfil solo aparece cuando corresponde, usando
+// el mismo token de acceso — no hace falta un link ni un PIN nuevo.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -59,7 +66,7 @@ Deno.serve(async (req) => {
 
     const { data: cuenta, error: cuentaError } = await supabase
       .from('cuentas')
-      .select('nombre')
+      .select('nombre, checklists_habilitado')
       .eq('id', negocio.cuenta_id)
       .single();
 
@@ -122,6 +129,27 @@ Deno.serve(async (req) => {
       };
     });
 
+    // ¿Hay al menos un checklist operativo activo para la sucursal de
+    // este empleado QUE ADEMÁS aplique a su puesto? (por ejemplo "cierre
+    // de caja" es solo para cajeros, no para mozos) — mismo criterio que
+    // ya se usa arriba para microcursosParaEmpleado. Si la cuenta no
+    // tiene la funcionalidad habilitada, ni siquiera se consulta.
+    let checklistDisponible = false;
+    if (cuenta.checklists_habilitado) {
+      const { data: checklistsActivos } = await supabase
+        .from('checklists')
+        .select('id, puestos_aplicables')
+        .eq('negocio_id', empleado.negocio_id)
+        .eq('activo', true);
+
+      checklistDisponible = (checklistsActivos || []).some((c: any) => {
+        const puestos = c.puestos_aplicables;
+        if (!puestos || puestos.length === 0) return false;
+        if (puestos.includes('TODOS')) return true;
+        return empleado.puesto && puestos.includes(empleado.puesto);
+      });
+    }
+
     return new Response(
       JSON.stringify({
         empleado: {
@@ -133,6 +161,7 @@ Deno.serve(async (req) => {
         negocio: { nombre: negocio.nombre },
         cuenta: { nombre: cuenta.nombre },
         microcursos: microcursosConProgreso,
+        checklist_disponible: checklistDisponible,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

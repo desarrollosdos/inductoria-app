@@ -8,6 +8,14 @@
 //
 // Modelo: Claude Haiku 4.5, el más barato, mismo criterio que el resto
 // de Inductoria (procesar-contenido).
+//
+// 2026-08-28: agregado el chequeo de que `microcurso_id` pertenezca a la
+// MISMA cuenta que el empleado que pregunta (y que el curso esté
+// 'aprobado', no un borrador). Antes se buscaba el curso solo por ID sin
+// verificar de quién era — un `microcurso_id` de otro negocio (filtrado
+// por accidente, por ejemplo en una URL compartida o un log) hubiera
+// dejado leer/preguntar sobre contenido de capacitación de OTRA empresa.
+// Mismo criterio de aislamiento por cuenta que ya usa procesar-contenido.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { puedeUsarIA, MENSAJE_IA_BLOQUEADA_TRIAL_EMPLEADO } from '../_shared/acceso.ts';
@@ -94,13 +102,25 @@ Deno.serve(async (req) => {
 
     // 3. Traer el contenido del curso puntual (título + pasos), para que
     // la IA responda solo con eso, no con todo lo del negocio.
+    //
+    // Chequeo de aislamiento entre cuentas: el curso tiene que ser de la
+    // MISMA cuenta que el empleado (negocioEmpleado.cuenta_id), y tiene
+    // que estar 'aprobado' (publicado) — nunca un borrador que el dueño
+    // todavía no revisó. Sin esto, cualquiera con un token de empleado
+    // válido podría mandar el microcurso_id de OTRO negocio y leer/
+    // preguntar sobre su contenido de capacitación.
     const { data: microcurso, error: microcursoError } = await supabase
       .from('microcursos')
-      .select('titulo')
+      .select('titulo, cuenta_id, estado')
       .eq('id', microcurso_id)
       .maybeSingle();
 
-    if (microcursoError || !microcurso) {
+    if (
+      microcursoError ||
+      !microcurso ||
+      microcurso.cuenta_id !== negocioEmpleado?.cuenta_id ||
+      microcurso.estado !== 'aprobado'
+    ) {
       return new Response(JSON.stringify({ error: 'No se encontró el curso.' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
