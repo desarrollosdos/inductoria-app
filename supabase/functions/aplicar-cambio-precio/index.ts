@@ -77,33 +77,126 @@ function responder(cuerpo: unknown, status = 200): Response {
   });
 }
 
+function escaparHtml(t: string): string {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Mail de aviso de cambio de precio. HTML simple con tablas y estilos en
+// línea para que se vea bien en Gmail, Outlook y el celular. Colores de
+// la landing de Inductoria (navy #1B2A3D, terracota #C1502E).
+function armarMailAviso(
+  nombreCuenta: string,
+  sucursales: number,
+  montoActual: number,
+  montoNuevo: number,
+  fechaVigencia: string
+): { asunto: string; html: string; texto: string } {
+  const nombre = nombreCuenta ? ` ${escaparHtml(nombreCuenta)}` : '';
+  const detalleSucursales = sucursales === 1 ? '1 sucursal' : `${sucursales} sucursales`;
+  const sube = montoNuevo > montoActual;
+  const asunto = sube
+    ? `Actualización del precio de Inductoria desde el ${fechaVigencia}`
+    : `Baja el precio de Inductoria desde el ${fechaVigencia}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es-AR">
+<body style="margin:0; padding:0; background:#FBF7EA;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7EA; padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border-radius:14px; overflow:hidden; font-family:Arial, Helvetica, sans-serif; color:#2b2620;">
+        <tr>
+          <td style="background:#1B2A3D; padding:18px 28px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="vertical-align:middle; padding-right:10px;">
+                  <img src="https://inductoria.com.ar/favicon-64.png" width="32" height="32" alt="" style="display:block; border:0;">
+                </td>
+                <td style="vertical-align:middle;">
+                  <span style="color:#ffffff; font-size:20px; font-weight:bold; letter-spacing:0.3px;">Inductoria</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <p style="margin:0 0 16px; font-size:16px;">Hola${nombre},</p>
+            <p style="margin:0 0 20px; font-size:15px; line-height:1.6;">
+              Te escribimos para avisarte que desde el <strong>${fechaVigencia}</strong> cambia el precio de tu plan de Inductoria (${detalleSucursales}).
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5ddc9; border-radius:10px; margin:0 0 20px;">
+              <tr>
+                <td style="padding:14px 16px; font-size:14px; color:#6b6255;">Hoy pagás</td>
+                <td align="right" style="padding:14px 16px; font-size:16px; color:#2b2620;">${pesos(montoActual)} por mes</td>
+              </tr>
+              <tr>
+                <td style="padding:14px 16px; font-size:14px; color:#6b6255; border-top:1px solid #e5ddc9;">Desde el ${fechaVigencia}</td>
+                <td align="right" style="padding:14px 16px; font-size:18px; font-weight:bold; color:#C1502E; border-top:1px solid #e5ddc9;">${pesos(montoNuevo)} por mes</td>
+              </tr>
+            </table>
+            <p style="margin:0 0 14px; font-size:15px; line-height:1.6;">
+              No tenés que hacer nada: el monto se actualiza solo en tu suscripción de Mercado Pago y se aplica a los cobros desde esa fecha.
+            </p>
+            <p style="margin:0 0 24px; font-size:15px; line-height:1.6;">
+              Si no estás de acuerdo, podés dar de baja tu suscripción cuando quieras desde la sección Suscripción, sin ningún cargo.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr>
+                <td style="background:#C1502E; border-radius:999px;">
+                  <a href="https://app.inductoria.com.ar/" style="display:inline-block; padding:12px 24px; color:#ffffff; font-size:14px; font-weight:bold; text-decoration:none;">Entrar a Inductoria</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0; font-size:14px; line-height:1.6; color:#6b6255;">
+              Cualquier duda, respondé este mail y te contestamos.<br>Equipo de Inductoria
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px; background:#FBF7EA; font-size:12px; color:#6b6255; text-align:center;">
+            Te llega este mail porque tenés una suscripción activa en Inductoria.
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const texto = [
+    `Hola${nombreCuenta ? ` ${nombreCuenta}` : ''},`,
+    '',
+    `Desde el ${fechaVigencia} cambia el precio de tu plan de Inductoria (${detalleSucursales}).`,
+    `Hoy pagás ${pesos(montoActual)} por mes. Desde el ${fechaVigencia}: ${pesos(montoNuevo)} por mes.`,
+    '',
+    'No tenés que hacer nada: el monto se actualiza solo en tu suscripción de Mercado Pago.',
+    'Si no estás de acuerdo, podés dar de baja tu suscripción cuando quieras desde la sección Suscripción, sin ningún cargo.',
+    '',
+    'Cualquier duda, respondé este mail.',
+    'Equipo de Inductoria',
+  ].join('\n');
+
+  return { asunto, html, texto };
+}
+
 async function mandarMailAviso(
   resendKey: string,
   from: string,
   para: string,
   nombreCuenta: string,
+  sucursales: number,
   montoActual: number,
   montoNuevo: number,
   fechaVigencia: string
 ) {
-  const html = `
-    <div style="font-family: Arial, sans-serif; color: #2C2C2A; max-width: 560px;">
-      <p>Hola${nombreCuenta ? ` ${nombreCuenta}` : ''},</p>
-      <p>Te avisamos que a partir del <strong>${fechaVigencia}</strong> el precio de tu plan de Inductoria pasa de <strong>${pesos(montoActual)}</strong> a <strong>${pesos(montoNuevo)}</strong> por mes.</p>
-      <p>El cambio se aplica solo en tu suscripción de Mercado Pago, no tenés que hacer nada. Si no estás de acuerdo, podés cancelar cuando quieras desde la sección Suscripción, sin ningún cargo.</p>
-      <p>Cualquier duda, respondé este mail.</p>
-      <p>Equipo de Inductoria</p>
-    </div>`;
+  const { asunto, html, texto } = armarMailAviso(nombreCuenta, sucursales, montoActual, montoNuevo, fechaVigencia);
+  // Las respuestas van a la casilla de contacto, no a la dirección de envío.
+  const replyTo = Deno.env.get('AVISOS_REPLY_TO') || 'info.inductoria@gmail.com';
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: [para],
-      subject: 'Cambio de precio de tu plan de Inductoria',
-      html,
-    }),
+    body: JSON.stringify({ from, to: [para], reply_to: replyTo, subject: asunto, html, text: texto }),
   });
   if (!res.ok) throw new Error(await res.text());
 }
@@ -192,6 +285,7 @@ Deno.serve(async (req) => {
               mailFrom,
               email,
               c.nombre || '',
+              c.sucursales,
               precioTotalMensual(c.sucursales, precioAnterior),
               precioTotalMensual(c.sucursales, Number(cambio.precio_base_nuevo)),
               fechaLarga(cambio.vigente_desde)
