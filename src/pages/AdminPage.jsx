@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import PageShell from '../components/PageShell';
 import { TIERS_PRECIO, precioPorSucursal } from '../lib/precio';
@@ -226,6 +226,16 @@ export default function AdminPage({ session }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('resumen');
+  // Barra de subsecciones: si la pestaña activa queda fuera de la parte
+  // visible (pantallas chicas), se desliza la barra hasta mostrarla.
+  const barraTabsRef = useRef(null);
+  const tabActivaRef = useRef(null);
+  useEffect(() => {
+    const barra = barraTabsRef.current;
+    const activa = tabActivaRef.current;
+    if (!barra || !activa || barra.scrollWidth <= barra.clientWidth) return;
+    barra.scrollLeft = activa.offsetLeft - (barra.clientWidth - activa.clientWidth) / 2;
+  }, [tab]);
 
   const [costoIA, setCostoIA] = useState(null);
   const [cargandoCosto, setCargandoCosto] = useState(false);
@@ -514,56 +524,43 @@ export default function AdminPage({ session }) {
           Las métricas de acá reflejan los datos cargados, no una conciliación con MercadoPago.
         </p>
 
-        {/* Subsecciones: fila de íconos en desktop, select desplegable en mobile */}
-        <div className="hidden sm:flex sm:gap-4">
-          {SUB_TABS.map((t) => {
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className="flex flex-col items-center gap-1.5 text-center"
-              >
-                <span
-                  className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-                  style={{ background: active ? VERDE : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
+        {/* Subsecciones: la misma barra de íconos que el menú de la app
+            (DashboardNav.jsx), en PC y en celular. Antes en pantallas
+            chicas era un <select> nativo, que en Windows se abre como una
+            lista negra "tipo DOS" que no tiene nada que ver con el resto
+            de la app. En pantallas chicas la barra se desliza de costado,
+            igual que el menú principal. */}
+        <nav>
+          <div ref={barraTabsRef} className="relative flex gap-1 overflow-x-auto -mx-4 px-4 pb-1 sm:gap-3">
+            {SUB_TABS.map((t) => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  ref={active ? tabActivaRef : undefined}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setTab(t.id)}
+                  className="flex-shrink-0 min-w-[64px] min-h-[44px] px-1.5 py-1 flex flex-col items-center gap-1.5 text-center"
                 >
-                  <t.Icon />
-                </span>
-                <span
-                  className={`text-xs font-semibold whitespace-nowrap ${
-                    active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
-                  }`}
-                >
-                  {t.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="sm:hidden relative">
-          <select
-            value={tab}
-            onChange={(e) => setTab(e.target.value)}
-            className="w-full appearance-none rounded-xl border-2 px-4 py-3 text-sm font-semibold pr-10"
-            style={{ borderColor: VERDE, color: '#2C2C2A', background: '#EDE0C8' }}
-          >
-            {SUB_TABS.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <span
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center"
-            style={{ background: VERDE, color: '#fff' }}
-          >
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </span>
-        </div>
+                  <span
+                    className="w-10 h-10 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                    style={{ background: active ? '#C1502E' : '#EDE0C8', color: active ? '#fff' : '#8a8471' }}
+                  >
+                    <t.Icon />
+                  </span>
+                  <span
+                    className={`text-[11px] sm:text-xs font-semibold leading-tight whitespace-nowrap ${
+                      active ? 'text-[#2C2C2A]' : 'text-[#8a8471]'
+                    }`}
+                  >
+                    {t.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
 
         {tab === 'resumen' && (
           <>
