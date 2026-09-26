@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import DashboardNav from '../components/DashboardNav';
 import EstadoBar from '../components/EstadoBar';
 import PageShell from '../components/PageShell';
+import InstalarAppAyuda from '../components/InstalarAppAyuda';
 
 // Mismos íconos que usa DashboardNav.jsx (duplicados acá porque esos
 // componentes no están exportados desde ese archivo). Un ícono nuevo,
@@ -241,6 +242,10 @@ export default function Ayuda({ session }) {
             Qué hay en cada sección del menú y para qué sirve.
           </p>
         </div>
+
+        {/* Instalar como app de escritorio: siempre disponible acá, aunque
+            el dueño haya descartado el cartel del primer ingreso. */}
+        <InstalarAppAyuda />
 
         {SECCIONES.map(({ id, label, path, Icon, texto }) => (
           <div

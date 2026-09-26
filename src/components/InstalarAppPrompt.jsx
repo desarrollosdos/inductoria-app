@@ -76,7 +76,7 @@ export default function InstalarAppPrompt() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#2C2C2A] mb-0.5">¿Querés instalar Inductoria?</p>
           <p className="text-xs text-[#6b6455] mb-3">
-            Te queda un ícono propio y la abrís directo, sin pasar por el navegador.
+            Te queda un ícono propio y la abrís directo, sin pasar por el navegador. Si no es ahora, lo hacés cuando quieras desde "¿Cómo se usa Inductoria?".
           </p>
           <div className="flex gap-2">
             <button

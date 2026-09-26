@@ -21,6 +21,7 @@ const CLAVE_YA_PREGUNTADO = 'inductoria_instalar_preguntado';
 
 let eventoDiferido = null;
 let listeners = [];
+let listenersInstalada = [];
 
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -36,6 +37,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('appinstalled', () => {
     eventoDiferido = null;
     marcarPreguntado(); // si se instaló por cualquier vía, no preguntar más
+    listenersInstalada.forEach((cb) => cb());
   });
 }
 
@@ -102,4 +104,33 @@ export function marcarPreguntado() {
     // localStorage puede fallar en navegación privada; no es crítico,
     // en el peor caso vuelve a preguntar la próxima vez.
   }
+}
+
+// Avisa cuando la app se termina de instalar (por nuestro botón o por el
+// menú del navegador). Lo usa la tarjeta de Ayuda para pasar a mostrar
+// "Ya la tenés instalada". Devuelve una función para desuscribirse.
+export function onAppInstalada(callback) {
+  listenersInstalada.push(callback);
+  return () => {
+    listenersInstalada = listenersInstalada.filter((l) => l !== callback);
+  };
+}
+
+// Detecta el navegador solo para elegir qué instrucciones manuales
+// mostrar en Ayuda (InstalarAppAyuda.jsx). No se usa para decidir si se
+// puede instalar: eso lo decide el evento "beforeinstallprompt".
+// Devuelve: 'edge' | 'chrome' | 'safari-mac' | 'safari-ios' | 'firefox' | 'otro'
+export function detectarNavegador() {
+  if (typeof navigator === 'undefined') return 'otro';
+  const ua = navigator.userAgent || '';
+  const esIOS =
+    /iPhone|iPad|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+  if (esIOS) return 'safari-ios'; // en iPhone/iPad todos los navegadores usan el motor de Safari
+  if (/Edg\//.test(ua)) return 'edge';
+  if (/Firefox\//.test(ua)) return 'firefox';
+  if (/OPR\/|SamsungBrowser/.test(ua)) return 'otro';
+  if (/Chrome\//.test(ua)) return 'chrome';
+  if (/Safari\//.test(ua) && /Macintosh/.test(ua)) return 'safari-mac';
+  return 'otro';
 }
