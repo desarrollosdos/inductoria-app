@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import VisitTracker from './components/VisitTracker';
 import InstalarAppPrompt from './components/InstalarAppPrompt';
+import { esCuentaDemo } from './lib/acceso';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Empleados from './pages/Empleados';
@@ -305,6 +306,13 @@ export default function App() {
     // de todo lo demás, como corresponde.
     <div className="min-h-screen flex flex-col">
       <VisitTracker />
+      {/* Cuenta de demostración (demo@inductoria.com.ar): aviso fijo arriba
+          de todo para que quien la recorre sepa que no se guarda nada. */}
+      {esCuentaDemo(session?.user?.email) && (
+        <div className="bg-[#F3F9F5] border-b border-[#BFE0CE] text-[#2C4A3A] text-xs font-semibold tracking-wide text-center px-4 py-2">
+          Estás en una cuenta de demostración: podés recorrer todo, pero los cambios no se guardan.
+        </div>
+      )}
       <div className="flex-1 flex flex-col">{renderContenido()}</div>
       <Footer />
       {/* Solo para el dueño logueado (no en /empleado, /curso ni /checklist,

@@ -45,6 +45,18 @@ export const CUENTAS_EXENTAS = [
   'sofiasanzone@gmail.com',
 ];
 
+// CUENTA DE DEMOSTRACIÓN (2026-09-27): quien escribe este mail en la
+// pantalla de entrada entra directo, sin recibir link (Login.jsx llama a la
+// Edge Function demo-login). Es una sola cuenta compartida y de SOLO
+// LECTURA: la base rechaza cualquier cambio (tabla cuentas_demo, ver
+// supabase/sql/2026-09-27-cuenta-demo.sql). Para dar de baja la demo,
+// borrar la fila de cuentas_demo y la función demo-login.
+export const DEMO_EMAIL = 'demo@inductoria.com.ar';
+
+export function esCuentaDemo(email) {
+  return !!email && email.trim().toLowerCase() === DEMO_EMAIL;
+}
+
 export function esCuentaExenta(email) {
   return !!email && CUENTAS_EXENTAS.includes(email);
 }

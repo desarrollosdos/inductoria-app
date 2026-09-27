@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { esCuentaDemo } from '../lib/acceso';
 
 const BENEFICIOS = [
   'Armás cursos cortos con lo que ya usás para explicar (manuales, audios)',
@@ -18,6 +19,33 @@ export default function Login() {
     e.preventDefault();
     setEnviando(true);
     setError(null);
+
+    // Cuenta de demostración: entra directo, sin mandar link. La función
+    // demo-login devuelve un código de un solo uso y con eso se abre la
+    // sesión acá mismo (App.jsx la detecta sola y muestra el panel).
+    if (esCuentaDemo(email)) {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.token_hash) throw new Error(json.error || 'demo');
+        const { error: errDemo } = await supabase.auth.verifyOtp({
+          token_hash: json.token_hash,
+          type: 'magiclink',
+        });
+        if (errDemo) throw errDemo;
+      } catch (err) {
+        console.error(err);
+        setError('No pudimos abrir la cuenta de demostración. Probá de nuevo en un rato.');
+      }
+      setEnviando(false);
+      return;
+    }
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
