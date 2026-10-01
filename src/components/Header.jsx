@@ -66,8 +66,12 @@ function ChipEmailMobile({ email }) {
         <IconPersona />
       </button>
       {abierto && (
-        <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 max-w-[calc(100vw-2rem)] break-all">
-          <p className="text-xs font-semibold text-[#2C2C2A]">{email}</p>
+        // w-max: el globito toma el ancho del mail entero en una línea. Antes
+        // heredaba el ancho del botón (32 px) y con break-all cortaba el mail
+        // letra por letra, apilado hacia abajo. Ahora solo corta si el mail
+        // no entra en la pantalla.
+        <div className="absolute right-0 top-11 z-50 bg-white border border-[#EFDDCE] rounded-xl shadow-lg px-3 py-2 w-max max-w-[calc(100vw-2rem)]">
+          <p className="text-xs font-semibold text-[#2C2C2A] break-all">{email}</p>
         </div>
       )}
     </div>
@@ -139,7 +143,12 @@ export default function Header({ session, empleadoNombre }) {
 
         {session && (
           <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden sm:inline text-xs font-semibold text-[#FBF3EC]">{session.user.email}</span>
+            <span
+              title={session.user.email}
+              className="hidden sm:inline-block max-w-[18rem] truncate whitespace-nowrap text-xs font-semibold text-[#FBF3EC]"
+            >
+              {session.user.email}
+            </span>
             <ChipEmailMobile email={session.user.email} />
             <a
               href="/configuracion"
